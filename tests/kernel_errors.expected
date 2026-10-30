@@ -1,0 +1,29 @@
+tests/kernel_errors.hz:4:1: error: kernel: fuzzy parameter not_normal is not normal (no value has membership 1)
+tests/kernel_errors.hz:5:1: error: kernel: categorical weights sum to 1.1, not 1
+tests/kernel_errors.hz:6:1: error: kernel: duplicate support value in dup_support
+tests/kernel_errors.hz:10:1: error: kernel: non-exhaustive match
+tests/kernel_errors.hz:11:1: error: kernel: c already declared
+tests/kernel_errors.hz:12:27: error: 1.5 is not a degree in [0,1]
+tests/kernel_errors.hz:14:1: error: runtime: 5 is not a degree in [0,1]
+tests/kernel_errors.hz:15:1: error: runtime: division by zero
+tests/kernel_errors.hz:16:1: error: runtime: uniform(3, 1) is empty
+tests/kernel_errors.hz:19:7: error: unknown identifier runtime_degree
+tests/kernel_errors.hz:23:10: error: expected a number, got a Bool
+tests/kernel_errors.hz:29:19: error: unknown identifier n
+tests/kernel_errors.hz:30:22: error: `crashed` is only available inside a system or a system property
+tests/kernel_errors.hz:31:1: error: kernel: probability bound 1.5 outside [0,1]
+tests/kernel_errors.hz:32:1: error: kernel: temporal property must be Bool or Deg, got Num
+tests/kernel_errors.hz:33:1: error: a claim must be Bool or Deg, got Num
+tests/kernel_errors.hz:34:1: error: theorem t_bad
+  probability 0 — refuted
+  grade crisp · 1 parameter assignment(s) · ≤1 states/step
+  theorem rejected: belief is 0, not 1
+  counterexample at step 4 (path mass 1, degree 0):
+    state: n = 4
+tests/kernel_errors.hz:35:1: info: claim t_ok
+  probability 1 — proved
+  grade crisp · 1 parameter assignment(s) · ≤1 states/step
+tests/kernel_errors.hz:36:1: info: claim t_ok @crisp: probability 1
+tests/kernel_errors.hz:37:1: error: unknown declaration nothing_here
+tests/kernel_errors.hz:39:1: info: #eval ok_after_errors
+  6

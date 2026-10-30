@@ -1,0 +1,54 @@
+tests/fuzzy_logic.hz:7:1: info: #eval a and b
+  deg 0.4
+tests/fuzzy_logic.hz:8:1: info: #eval a or b
+  deg 0.7
+tests/fuzzy_logic.hz:9:1: info: #eval not a
+  deg 0.3
+tests/fuzzy_logic.hz:10:1: info: #eval a implies b
+  deg 0.4
+tests/fuzzy_logic.hz:13:1: info: #eval a and b
+  deg 0.28
+tests/fuzzy_logic.hz:14:1: info: #eval a or b
+  deg 0.82
+tests/fuzzy_logic.hz:17:1: info: #eval a and b
+  deg 0.1
+tests/fuzzy_logic.hz:18:1: info: #eval a or b
+  deg 1
+tests/fuzzy_logic.hz:19:1: info: #eval a implies b
+  deg 0.7
+tests/fuzzy_logic.hz:20:1: info: #eval true and a
+  deg 0.7
+tests/fuzzy_logic.hz:24:1: info: #eval 25 is warm
+  deg 0.571429 (=4/7)
+tests/fuzzy_logic.hz:25:1: info: #eval 25 is very warm
+  deg 0.326531 (=16/49)
+tests/fuzzy_logic.hz:26:1: info: #eval 25 is not very warm
+  deg 0.673469 (=33/49)
+tests/fuzzy_logic.hz:27:1: info: #eval trap(5, 0, 2, 4, 8)
+  deg 0.75
+tests/fuzzy_logic.hz:28:1: info: #eval ramp_up(3, 0, 4)
+  deg 0.75
+tests/fuzzy_logic.hz:29:1: info: #eval ramp_down(3, 0, 4)
+  deg 0.25
+tests/fuzzy_logic.hz:32:1: info: #eval forall t in 18..22, t is warm
+  deg 0.428571 (=3/7)
+tests/fuzzy_logic.hz:33:1: info: #eval exists t in 18..22, t is warm
+  deg 1
+tests/fuzzy_logic.hz:34:1: info: #eval forall t in 5..4, t is warm
+  deg 1
+tests/fuzzy_logic.hz:38:1: info: claim warm_ish
+  probability 0.68254 (=43/63) — graded
+  grade prob · 1 parameter assignment(s) · ≤9 states/step
+tests/fuzzy_logic.hz:40:1: info: act : Num @prob
+tests/fuzzy_logic.hz:41:1: info: #expect act
+  expectation 0.68254 (=43/63)
+tests/fuzzy_logic.hz:42:1: info: #outcomes reading is warm
+  reading = 18  P 0.111111 (=1/9)  ⇒ deg 0.428571 (=3/7)
+  reading = 19  P 0.111111 (=1/9)  ⇒ deg 0.571429 (=4/7)
+  reading = 20  P 0.111111 (=1/9)  ⇒ deg 0.714286 (=5/7)
+  reading = 21  P 0.111111 (=1/9)  ⇒ deg 0.857143 (=6/7)
+  reading = 22  P 0.111111 (=1/9)  ⇒ deg 1
+  reading = 23  P 0.111111 (=1/9)  ⇒ deg 0.857143 (=6/7)
+  reading = 24  P 0.111111 (=1/9)  ⇒ deg 0.714286 (=5/7)
+  reading = 25  P 0.111111 (=1/9)  ⇒ deg 0.571429 (=4/7)
+  reading = 26  P 0.111111 (=1/9)  ⇒ deg 0.428571 (=3/7)

@@ -1,0 +1,98 @@
+-- Payments client with timeouts and retries over a lossy network.
+--
+-- Question: with retries, can a customer be charged twice? How likely is delivery?
+-- The network loss rate is only known vaguely ("around 2%, could be worse"),
+-- so it is a fuzzy parameter; every answer is a [belief, plausibility] interval.
+
+enum Phase = Sending | Waiting | Done | GaveUp
+
+param loss : Num ~= {0.01: 0.6, 0.02: 1, 0.05: 0.5, 0.1: 0.2}
+
+def max_attempts : Num := 3
+def timeout_ms : Num := 1000
+def rtt_ms : Num := 80
+
+-- Server charges on every request it receives (no idempotency key).
+system Naive {
+  var phase : Phase := Sending
+  var attempts : Num := 0
+  var charges : Num := 0
+  var acked : Bool := false
+  var latency : Num := 0
+  step {
+    match phase {
+      Sending => {
+        attempts := attempts + 1
+        if flip(loss) {                 -- request lost
+          phase := Waiting
+        } else {
+          charges := charges + 1        -- card is charged
+          if flip(loss) {               -- response lost
+            phase := Waiting
+          } else {
+            acked := true
+            latency := latency + rtt_ms
+            phase := Done
+          }
+        }
+      }
+      Waiting => {                      -- the timeout fires
+        latency := latency + timeout_ms
+        if attempts < max_attempts { phase := Sending } else { phase := GaveUp }
+      }
+      _ => skip
+    }
+  }
+}
+
+-- Same client, but the server deduplicates by idempotency key.
+system Idempotent {
+  var phase : Phase := Sending
+  var attempts : Num := 0
+  var charges : Num := 0
+  var acked : Bool := false
+  var latency : Num := 0
+  step {
+    match phase {
+      Sending => {
+        attempts := attempts + 1
+        if flip(loss) {
+          phase := Waiting
+        } else {
+          if charges == 0 { charges := 1 }   -- replayed requests return the stored result
+          if flip(loss) {
+            phase := Waiting
+          } else {
+            acked := true
+            latency := latency + rtt_ms
+            phase := Done
+          }
+        }
+      }
+      Waiting => {
+        latency := latency + timeout_ms
+        if attempts < max_attempts { phase := Sending } else { phase := GaveUp }
+      }
+      _ => skip
+    }
+  }
+}
+
+-- Fuzzy SLA: "fast" fades out between 200 ms and 2 s.
+def fast(ms : Num) : Deg := ramp_down(ms, 200, 2000)
+
+-- Delivery
+claim delivered : Naive |= eventually[6] phase == Done with prob >= 0.99
+
+-- The bug: a lost response plus a retry charges the card twice.
+theorem naive_single_charge : Naive |= always[6] charges <= 1
+claim double_charge_risk : Naive |= eventually[6] charges >= 2
+
+-- The fix is a theorem: it holds on every path, for every admissible loss rate.
+theorem idempotent_single_charge : Idempotent |= always[6] charges <= 1
+theorem ack_implies_charged : Idempotent |= always[6] (acked implies charges == 1)
+
+-- Fuzzy SLA over a stochastic system: expected degree of "fast" after the protocol settles.
+claim snappy : Idempotent |= after[6] latency is fast
+#expect Idempotent |= after[6] latency
+#eval Idempotent |= after[6] phase

@@ -1,0 +1,44 @@
+-- Progressive (canary) rollout of a release whose defect rate is uncertain.
+-- Stages: 1% → 10% → 50% → 100% of traffic. At each stage monitoring samples
+-- 50 requests; any failure triggers an automatic rollback.
+--
+-- "The build is probably fine, but QA was rushed" is a fuzzy belief about the defect
+-- rate, not a probability; Haze keeps that distinction and reports intervals.
+
+enum Stage = Canary1 | Canary10 | Half | Full | RolledBack
+
+param defect : Num ~= {0: 1, 0.005: 0.8, 0.02: 0.5, 0.1: 0.2}
+
+def samples : Num := 50
+
+system Rollout {
+  var stage : Stage := Canary1
+  var exposure : Num := 0          -- cumulative % of traffic exposed to the release
+  step {
+    match stage {
+      Canary1 => {
+        exposure := exposure + 1
+        if binomial(samples, defect) > 0 { stage := RolledBack } else { stage := Canary10 }
+      }
+      Canary10 => {
+        exposure := exposure + 10
+        if binomial(samples, defect) > 0 { stage := RolledBack } else { stage := Half }
+      }
+      Half => {
+        exposure := exposure + 50
+        if binomial(samples, defect) > 0 { stage := RolledBack } else { stage := Full }
+      }
+      _ => skip
+    }
+  }
+}
+
+-- If the build is bad it must not reach 100%. With a vague defect rate this is graded.
+claim bad_build_contained : Rollout |= always[4] (stage == Full implies defect == 0)
+claim reaches_full : Rollout |= eventually[4] stage == Full
+#expect Rollout |= after[4] exposure
+#outcomes Rollout |= after[4] stage
+
+-- Statements conditional on the parameter can still be theorems:
+-- a clean build always ships, whatever the admissible defect rate turns out to be.
+theorem ships_when_clean : Rollout |= after[4] (defect == 0 implies stage == Full)

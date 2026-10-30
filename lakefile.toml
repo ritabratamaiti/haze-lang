@@ -1,0 +1,15 @@
+name = "haze"
+version = "0.1.0"
+defaultTargets = ["Haze", "haze"]
+testDriver = "hazetest"
+
+[[lean_lib]]
+name = "Haze"
+
+[[lean_exe]]
+name = "haze"
+root = "Main"
+
+[[lean_exe]]
+name = "hazetest"
+root = "HazeTest"

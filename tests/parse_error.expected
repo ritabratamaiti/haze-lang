@@ -1,0 +1,1 @@
+tests/parse_error.hz:2:1: error: expected an expression, found end of input

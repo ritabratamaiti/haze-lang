@@ -1,0 +1,34 @@
+examples/quorum_replication.hz:66:1: info: theorem durable
+  probability 1 — holds with certainty
+  grade prob+fuzzy · 3 parameter assignment(s) · ≤11 states/step
+  theorem accepted
+examples/quorum_replication.hz:69:1: info: theorem read_your_writes
+  probability 1 — holds with certainty
+  grade prob+fuzzy · 3 parameter assignment(s) · ≤11 states/step
+  theorem accepted
+examples/quorum_replication.hz:71:1: error: theorem read_your_writes_r1
+  belief ≈0.95243 · plausibility 0.990199 — graded
+  grade prob+fuzzy · 3 parameter assignment(s) · ≤11 states/step
+  theorem rejected: belief is ≈0.95243, not 1
+  by fuzzy parameter (π = possibility):
+    drop = 0.01  π 1       0.990199
+    drop = 0.05  π 0.6     0.954875
+    drop = 0.2   π 0.2     0.872
+  counterexample at step 2 (path mass 0.003267, degree 0):
+    parameters: drop = 0.01
+    state: phase = Finished, r1 = false, r2 = true, r3 = true, acked = true, fresh = false
+examples/quorum_replication.hz:72:1: info: claim stale_read_risk
+  belief 0.009801 · plausibility ≈0.04757 — graded
+  grade prob+fuzzy · 3 parameter assignment(s) · ≤14 states/step
+  by fuzzy parameter (π = possibility):
+    drop = 0.01  π 1       0.009801
+    drop = 0.05  π 0.6     0.045125
+    drop = 0.2   π 0.2     0.128
+examples/quorum_replication.hz:75:1: info: claim write_available
+  belief ≈0.976181 · plausibility 0.999702 — graded
+  grade prob+fuzzy · 3 parameter assignment(s) · ≤11 states/step
+  bound holds: belief ≥ 0.95
+  by fuzzy parameter (π = possibility):
+    drop = 0.01  π 1       0.999702
+    drop = 0.05  π 0.6     0.99275
+    drop = 0.2   π 0.2     0.896

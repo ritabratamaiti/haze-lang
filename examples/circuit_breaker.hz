@@ -1,0 +1,59 @@
+-- Circuit breaker in front of a flaky upstream.
+-- Closed: forward requests; 3 consecutive failures trip it to Open.
+-- Open: reject requests for a 2-step cool-down, then HalfOpen.
+-- HalfOpen: one trial request; success closes, failure re-opens.
+--
+-- The upstream failure rate is described linguistically ("flaky"), so it is a fuzzy
+-- parameter; the incident itself is probabilistic.
+
+enum Breaker = Closed | Open | HalfOpen
+
+param fail_rate : Num ~= {0.05: 0.3, 0.2: 1, 0.5: 0.6, 0.9: 0.2}
+
+system CB {
+  var state : Breaker := Closed
+  var consecutive : Num := 0
+  var cooldown : Num := 0
+  var sent : Num := 0            -- requests that reached the upstream
+  var rejected : Num := 0
+  step {
+    match state {
+      Closed => {
+        sent := sent + 1
+        if flip(fail_rate) {
+          consecutive := consecutive + 1
+          if consecutive >= 3 { state := Open; cooldown := 2 }
+        } else {
+          consecutive := 0
+        }
+      }
+      Open => {
+        rejected := rejected + 1
+        cooldown := cooldown - 1
+        if cooldown <= 0 { state := HalfOpen }
+      }
+      HalfOpen => {
+        sent := sent + 1
+        if flip(fail_rate) { state := Open; cooldown := 2 }
+        else { state := Closed; consecutive := 0 }
+      }
+    }
+    assert consecutive <= 3
+  }
+}
+
+-- Safety invariants, proven for every path and every admissible failure rate.
+theorem never_overloads : CB |= always[20] consecutive <= 3
+theorem no_crash : CB |= always[20] not crashed
+theorem open_has_cooldown : CB |= always[20] (state == Open implies cooldown >= 1)
+
+-- How quickly does the breaker trip?
+claim trips_quickly : CB |= eventually[6] state == Open
+-- Is it serving traffic after the incident window?
+claim closed_at_20 : CB |= after[20] state == Closed
+-- Load shedding: expected rejected requests over 20 steps.
+#expect CB |= after[20] rejected
+
+-- A fuzzy service-level objective: "rejections are rare".
+def rare(n : Num) : Deg := ramp_down(n, 1, 8)
+claim slo_rejections : CB |= after[20] rejected is rare

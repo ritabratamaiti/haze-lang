@@ -1,0 +1,39 @@
+-- Declarations the elaborator or kernel must reject. Every error is reported and
+-- checking continues with the next declaration.
+
+param not_normal : Num ~= {1: 0.5, 2: 0.7}
+def weights : Num := {1: 0.5, 2: 0.6}
+param dup_support : Num ~= {1: 1, 1: 0.5}
+
+enum Color = Red | Green | Blue
+def c : Color := Red
+def partial_match : Num := match c { Red => 1, Green => 2 }
+def c : Num := 3
+def not_a_degree : Deg := deg(1.5)
+def five : Num := 5
+def runtime_degree : Deg := deg(five)
+def div0 : Num := 1 / (five - 5)
+def empty : Num := uniform(3, 1)
+
+-- a failed node is not added, so later references are rejected cleanly
+#eval runtime_degree
+
+system S {
+  var n : Num := 0
+  step { n := true }
+}
+system T {
+  var n : Num := 0
+  step { n := n + 1 }
+}
+claim no_system : n > 0
+claim needs_system : crashed
+claim temporal_without_system : five > 0 with prob >= 1.5
+#check T |= always[3] n
+claim t_numeric : T |= after[3] n
+theorem t_bad : T |= always[5] n <= 3
+claim t_ok : T |= after[3] n == 3
+#print t_ok
+#print nothing_here
+def ok_after_errors : Num := five + 1
+#eval ok_after_errors

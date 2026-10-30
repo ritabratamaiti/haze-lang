@@ -1,0 +1,75 @@
+-- Leaderless replication with N = 3 replicas (Dynamo style).
+-- A write is acknowledged once W replicas stored it; a read contacts R replicas.
+-- Classic rule: R + W > N guarantees read-your-writes. Haze proves it for the
+-- correct configuration and quantifies how often it breaks for a cheaper one.
+
+param drop : Num ~= {0.01: 1, 0.05: 0.6, 0.2: 0.2}   -- per-message loss, vaguely known
+
+enum Phase = Write | Read | Finished
+
+def stored() : Bool := not flip(drop)
+
+-- W = 2, R = 2  (R + W > N)
+system Quorum22 {
+  var phase : Phase := Write
+  var r1 : Bool := false
+  var r2 : Bool := false
+  var r3 : Bool := false
+  var acked : Bool := false
+  var fresh : Bool := false        -- did the read see the new value?
+  step {
+    match phase {
+      Write => {
+        r1 := stored(); r2 := stored(); r3 := stored()
+        let copies := (if r1 then 1 else 0) + (if r2 then 1 else 0) + (if r3 then 1 else 0)
+        acked := copies >= 2
+        phase := Read
+      }
+      Read => {
+        -- the coordinator reads two distinct replicas chosen uniformly
+        let pair := uniform(1, 3)
+        fresh := if pair == 1 then r1 or r2 else if pair == 2 then r1 or r3 else r2 or r3
+        phase := Finished
+      }
+      _ => skip
+    }
+  }
+}
+
+-- W = 2, R = 1  (R + W = N): cheaper reads, but stale reads become possible.
+system Quorum21 {
+  var phase : Phase := Write
+  var r1 : Bool := false
+  var r2 : Bool := false
+  var r3 : Bool := false
+  var acked : Bool := false
+  var fresh : Bool := false
+  step {
+    match phase {
+      Write => {
+        r1 := stored(); r2 := stored(); r3 := stored()
+        let copies := (if r1 then 1 else 0) + (if r2 then 1 else 0) + (if r3 then 1 else 0)
+        acked := copies >= 2
+        phase := Read
+      }
+      Read => {
+        let one := uniform(1, 3)
+        fresh := if one == 1 then r1 else if one == 2 then r2 else r3
+        phase := Finished
+      }
+      _ => skip
+    }
+  }
+}
+
+-- Durability: an acknowledged write is on at least two replicas.
+theorem durable : Quorum22 |= always[2] (acked implies ((if r1 then 1 else 0) + (if r2 then 1 else 0) + (if r3 then 1 else 0) >= 2))
+
+-- Read-your-writes holds for R + W > N ...
+theorem read_your_writes : Quorum22 |= always[2] ((phase == Finished and acked) implies fresh)
+-- ... and fails for R + W = N, with a concrete stale-read scenario.
+theorem read_your_writes_r1 : Quorum21 |= always[2] ((phase == Finished and acked) implies fresh)
+claim stale_read_risk : Quorum21 |= after[2] (acked and not fresh)
+
+-- Availability of writes under the vague loss model.
+claim write_available : Quorum22 |= after[2] acked with prob >= 0.95
