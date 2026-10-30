@@ -1,0 +1,65 @@
+examples/probability_classics.hz:9:1: info: #eval total
+  7   ↦ 0.166667 (=1/6)
+  6   ↦ 0.138889 (=5/36)
+  8   ↦ 0.138889 (=5/36)
+  5   ↦ 0.111111 (=1/9)
+  9   ↦ 0.111111 (=1/9)
+  4   ↦ 0.083333 (=1/12)
+  10  ↦ 0.083333 (=1/12)
+  3   ↦ 0.055556 (=1/18)
+  11  ↦ 0.055556 (=1/18)
+  2   ↦ 0.027778 (=1/36)
+  12  ↦ 0.027778 (=1/36)
+examples/probability_classics.hz:10:1: info: #prob total == 7
+  probability 0.166667 (=1/6)
+examples/probability_classics.hz:11:1: info: #expect total
+  expectation 7
+examples/probability_classics.hz:12:1: info: claim doubles
+  probability 0.166667 (=1/6) — graded
+  grade prob · 1 parameter assignment(s) · ≤36 states/step
+examples/probability_classics.hz:13:1: info: claim at_least_one_six
+  probability 0.305556 (=11/36) — graded
+  grade prob · 1 parameter assignment(s) · ≤36 states/step
+examples/probability_classics.hz:17:1: info: #prob heads >= 8
+  probability 0.054688 (=7/128)
+examples/probability_classics.hz:18:1: info: #expect heads
+  expectation 5
+examples/probability_classics.hz:33:1: info: claim birthday_23
+  probability ≈0.507297 — graded
+  grade prob · 1 parameter assignment(s) · ≤23 states/step
+examples/probability_classics.hz:34:1: info: claim birthday_50
+  probability ≈0.970374 — graded
+  grade prob · 1 parameter assignment(s) · ≤50 states/step
+examples/probability_classics.hz:46:1: info: #eval Polya |= after[5] red
+  6  ↦ 0.166667 (=1/6)
+  5  ↦ 0.166667 (=1/6)
+  4  ↦ 0.166667 (=1/6)
+  3  ↦ 0.166667 (=1/6)
+  2  ↦ 0.166667 (=1/6)
+  1  ↦ 0.166667 (=1/6)
+examples/probability_classics.hz:60:1: info: claim all_within_10
+  probability ≈0.780602 — graded
+  grade prob · 1 parameter assignment(s) · ≤3 states/step
+examples/probability_classics.hz:62:1: info: #expect Coupons |= after[80] draws
+  expectation ≈8.333333
+examples/probability_classics.hz:83:1: info: claim fair_win
+  probability ≈0.5 — graded
+  grade prob · 1 parameter assignment(s) · ≤4 states/step
+examples/probability_classics.hz:84:1: info: claim biased_win
+  probability ≈0.228571 — graded
+  grade prob · 1 parameter assignment(s) · ≤4 states/step
+examples/probability_classics.hz:85:1: info: theorem never_negative
+  probability 1 — holds with certainty
+  grade prob · 1 parameter assignment(s) · ≤5 states/step
+  theorem accepted
+examples/probability_classics.hz:98:1: info: claim vague_win
+  belief ≈0.360125 · plausibility ≈0.5 — graded
+  grade prob+fuzzy · 3 parameter assignment(s) · ≤4 states/step
+  by fuzzy parameter (π = possibility):
+    p = 0.4   π 0.3     ≈0.228571
+    p = 0.45  π 0.7     ≈0.353883
+    p = 0.5   π 1       ≈0.5
+examples/probability_classics.hz:106:1: info: observe first == Boy or second == Boy
+  evidence probability 0.75; worlds renormalized
+examples/probability_classics.hz:107:1: info: #prob first == Boy and second == Boy
+  probability 0.333333 (=1/3)

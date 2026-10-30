@@ -74,6 +74,7 @@ The [`examples`](examples) folder contains models of common reliability patterns
 | [`circuit_breaker.hz`](examples/circuit_breaker.hz) | Circuit-breaker invariants, trip time and load shedding with a flaky upstream. |
 | [`canary_rollout.hz`](examples/canary_rollout.hz) | Whether a defective build reaches all traffic during a staged rollout. |
 | [`incident_triage.hz`](examples/incident_triage.hz) | The probable root cause of an incident, given the alerts that fired. |
+| [`probability_classics.hz`](examples/probability_classics.hz) | Classic problems with known answers: dice, the birthday problem, Pólya's urn, the coupon collector, gambler's ruin and the boy–girl paradox. |
 
 A description of every construct of the language is in
 [`docs/Language-Reference.md`](docs/Language-Reference.md).
