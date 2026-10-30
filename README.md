@@ -137,3 +137,11 @@ intervals, and state spaces are enumerated (with merging and relevance projectio
 large or continuous models are out of scope. Fuzzy parameters must have finite supports.
 The Lean proofs cover the grade lattice and the fuzzy connectives. The model checker as a
 whole is tested, not formally verified.
+
+## License
+
+Haze is source-available under the [PolyForm Noncommercial License 1.0.0](LICENSE.md):
+free for personal, research, educational and other non-commercial use. For commercial
+use, contact the author.
+
+Required Notice: Copyright (c) 2026 Ritabrata Maiti
