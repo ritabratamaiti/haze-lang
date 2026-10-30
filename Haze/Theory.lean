@@ -1,8 +1,25 @@
 /-
-Machine-checked facts about the Haze kernel, proved in Lean against the very definitions
-the kernel executes (not against a separate model).
+Copyright (c) 2026 Ritabrata Maiti. All rights reserved.
+Released under the PolyForm Noncommercial License 1.0.0 as described in the file LICENSE.md.
+Authors: Ritabrata Maiti
 -/
 import Haze.Kernel.Eval
+
+/-!
+# Kernel Theorems
+
+This file proves facts about the definitions that the kernel executes, not about a separate
+model of them.
+
+## Main Results
+
+* `Haze.Grade.le_iff_join`, `Haze.Grade.le_top`: grades form a finite join-semilattice whose
+  order is `Grade.le`. This makes the latent-grade inference in `Haze.Kernel.checkFun`
+  terminate with the least fixed point.
+* `Haze.Kernel.tand_comm`, `Haze.Kernel.tand_one`, `Haze.Kernel.tand_le_min`: the t-norms are
+  commutative, have unit 1, and are bounded by the Gödel t-norm `min`.
+* `Haze.Kernel.demorgan_godel`, `Haze.Kernel.demorgan_lukasiewicz`: De Morgan duality.
+-/
 
 namespace Haze
 
@@ -36,7 +53,7 @@ theorem le_join_left (a b : Grade) : a.le (a.join b) = true := by
 theorem le_join_right (a b : Grade) : b.le (a.join b) = true := by
   rw [join_comm]; exact le_join_left b a
 
-/-- `le` is exactly the order induced by `join`. -/
+/-- The grade order `Grade.le` is the order induced by `Grade.join`. -/
 theorem le_iff_join (a b : Grade) : a.le b = true ↔ a.join b = b := by
   rcases a with ⟨p, f, d⟩; rcases b with ⟨p', f', d'⟩
   cases p <;> cases f <;> cases d <;> cases p' <;> cases f' <;> cases d' <;> simp [le, join]
@@ -57,15 +74,15 @@ theorem tand_comm (l : Logic) (a b : Rat) : tand l a b = tand l b a := by
 theorem tor_comm (l : Logic) (a b : Rat) : tor l a b = tor l b a := by
   cases l <;> simp only [tor, qmin, qmax] <;> (try split) <;> (try split) <;> grind
 
-/-- `1` is the unit of every t-norm on `[0,1]`. -/
+/-- The degree 1 is the unit of every t-norm on degrees. -/
 theorem tand_one (l : Logic) (a : Rat) (h0 : 0 ≤ a) (h1 : a ≤ 1) : tand l a 1 = a := by
   cases l <;> simp only [tand, qmin, qmax] <;> (try split) <;> grind
 
-/-- `0` is the unit of every t-conorm on `[0,1]`. -/
+/-- The degree 0 is the unit of every t-conorm on degrees. -/
 theorem tor_zero (l : Logic) (a : Rat) (h0 : 0 ≤ a) (h1 : a ≤ 1) : tor l a 0 = a := by
   cases l <;> simp only [tor, qmin, qmax] <;> (try split) <;> grind
 
-/-- t-norms are bounded by Gödel's `min`: Gödel logic is the most permissive conjunction. -/
+/-- Every t-norm is bounded by the Gödel t-norm `min`, so Gödel conjunction is the most permissive. -/
 theorem tand_le_min (l : Logic) (a b : Rat) (ha : 0 ≤ a) (ha' : a ≤ 1) (hb : 0 ≤ b) (hb' : b ≤ 1) :
     tand l a b ≤ qmin a b := by
   -- the product case is nonlinear: `a·b ≤ a·1` and `a·b ≤ 1·b`

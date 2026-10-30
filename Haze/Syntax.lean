@@ -1,11 +1,27 @@
 /-
-Haze surface syntax: lexer, concrete syntax tree and recursive-descent parser
-(the analogue of `Lean.Parser` producing `Lean.Syntax`).
+Copyright (c) 2026 Ritabrata Maiti. All rights reserved.
+Released under the PolyForm Noncommercial License 1.0.0 as described in the file LICENSE.md.
+Authors: Ritabrata Maiti
 -/
 import Haze.Core
 
+/-!
+# Concrete Syntax
+
+This file contains the lexer, the concrete syntax tree and the recursive-descent parser for
+Haze source files. It plays the role of `Lean.Parser` and `Lean.Syntax` in Lean, but the
+grammar is fixed rather than extensible.
+
+## Main Definitions
+
+* `Haze.Syntax.lex`: splits a source file into tokens.
+* `Haze.Syntax.SExpr`, `Haze.Syntax.SStmt`, `Haze.Syntax.SDecl`: syntax trees.
+* `Haze.Syntax.program`: parses a complete source file.
+-/
+
 namespace Haze.Syntax
 
+/-- A position in a source file. Lines and columns start at 1. -/
 structure Pos where
   line : Nat := 1
   col : Nat := 1
@@ -13,6 +29,7 @@ structure Pos where
 
 instance : ToString Pos := ⟨fun p => s!"{p.line}:{p.col}"⟩
 
+/-- Tokens. Keywords are lexed as identifiers and recognized by the parser. -/
 inductive Tok where
   | ident (s : String)
   | num (q : Rat)
@@ -20,6 +37,7 @@ inductive Tok where
   | eof
   deriving Inhabited, Repr, BEq
 
+/-- A token, with its source position and the range of characters that it covers. -/
 structure Token where
   tok : Tok
   pos : Pos
@@ -27,17 +45,19 @@ structure Token where
   stop : Nat
   deriving Inhabited
 
+/-- Reserved words, which can't be used as identifiers. -/
 def keywords : List String :=
   ["logic", "enum", "param", "input", "def", "observe", "system", "var", "step", "claim",
    "theorem", "with", "prob", "if", "then", "else", "let", "in", "forall", "exists", "match",
    "and", "or", "not", "implies", "is", "very", "true", "false", "assert", "skip",
    "always", "eventually", "after"]
 
-/-- Multi-character symbols first (longest match), then Unicode aliases. -/
+/-- Symbols. Multi-character symbols come first so that the longest match wins. -/
 def symbols : List String :=
   [":=", "~=", "|=", "==", "!=", "<=", ">=", "=>", "->", "..",
    "(", ")", "{", "}", "[", "]", ",", ":", ";", "|", "@", "<", ">", "+", "-", "*", "/", "~", "_", "="]
 
+/-- Unicode spellings of ASCII symbols, such as `≤` for `<=` and `≈` for `~=`. -/
 def unicodeAlias : Char → Option String
   | '≈' => some "~=" | '≤' => some "<=" | '≥' => some ">=" | '≠' => some "!="
   | '⊨' => some "|=" | '→' => some "->" | '⇒' => some "=>" | _ => none
@@ -45,6 +65,10 @@ def unicodeAlias : Char → Option String
 def isIdStart (c : Char) : Bool := c.isAlpha
 def isIdChar (c : Char) : Bool := c.isAlphanum || c == '_' || c == '\''
 
+/--
+Splits a source file into tokens. Line comments start with `--`, and block comments are written `/-
+… -/`.
+-/
 def lex (src : String) : Except (Pos × String) (Array Token) := Id.run do
   let cs := src.toList.toArray
   let n := cs.size
@@ -122,6 +146,10 @@ def lex (src : String) : Except (Pos × String) (Array Token) := Id.run do
 
 /-! ## Concrete syntax -/
 
+/--
+Expressions as written in the source, before names are resolved and types are checked. `atPos`
+records source positions for error messages.
+-/
 inductive SExpr where
   | num (q : Rat)
   | bool (b : Bool)
@@ -138,6 +166,7 @@ inductive SExpr where
   | atPos (p : Pos) (e : SExpr)
   deriving Inhabited, Repr
 
+/-- Statements as written in the source. -/
 inductive SStmt where
   | assign (n : String) (e : SExpr)
   | ite (c : SExpr) (t e : List SStmt)
@@ -148,12 +177,14 @@ inductive SStmt where
   | atPos (p : Pos) (s : SStmt)
   deriving Inhabited, Repr
 
+/-- A property as written in the source: either a term or `S |= modality φ` for a system `S`. -/
 structure SProp where
   sys : Option String := none
   mode : Temporal := .after 0
   body : SExpr
   deriving Inhabited, Repr
 
+/-- Top-level declarations and commands as written in the source. -/
 inductive SDecl where
   | logic (l : String)
   | enumD (n : String) (ctors : List String)
@@ -168,6 +199,7 @@ inductive SDecl where
   | print (n : String)
   deriving Inhabited, Repr
 
+/-- A parsed declaration, with its position and source text. -/
 structure DeclStx where
   decl : SDecl
   pos : Pos
@@ -180,6 +212,7 @@ structure PState where
   toks : Array Token
   i : Nat := 0
 
+/-- The parser monad. It tracks the current token and reports errors at a source position. -/
 abbrev P := StateT PState (Except (Pos × String))
 
 def peekTok : P Token := do let s ← get; pure (s.toks[s.i]?.getD s.toks.back!)
@@ -213,6 +246,10 @@ def number : P Rat := do
   | .num q => advance; pure q
   | t => failAt s!"expected a number, found {describe t}"
 
+/--
+Parses items separated by `sep` until `close`, allowing a trailing separator. `close` is not
+consumed.
+-/
 def sepBy (p : P α) (sep : String) (close : String) : P (List α) := do
   let mut out := #[]
   if ← isSym close then return []
@@ -225,7 +262,7 @@ def sepBy (p : P α) (sep : String) (close : String) : P (List α) := do
       break
   return out.toList
 
-/-- Items until `close`, with optional `sep` between them (used for match arms). -/
+/-- Parses items until `close`, with optional `sep` separators between them. `close` is not consumed. -/
 def itemsUntil (p : P α) (sep close : String) : P (List α) := do
   let mut out := #[]
   while !(← isSym close) do
@@ -239,6 +276,12 @@ def withPos (p : P SExpr) : P SExpr := do
   return .atPos pos (← p)
 
 mutual
+/--
+Parses an expression.
+
+From loosest to tightest, the levels of precedence are `if`, `let` and the quantifiers; `implies`;
+`or`; `and`; `not`; comparisons and `is`; `+` and `-`; `*` and `/`; unary `-`; and atoms.
+-/
 partial def expr : P SExpr := withPos do
   if ← isKw "if" then
     advance
@@ -352,6 +395,7 @@ partial def atom : P SExpr := withPos do
 end
 
 mutual
+/-- Parses a block of statements in braces. Semicolons between statements are optional. -/
 partial def block : P (List SStmt) := do
   expectSym "{"
   let mut out := #[]
@@ -421,6 +465,7 @@ def grade : P (List String) := do
   while ← isSym "+" do advance; gs := gs.push (← ident)
   return gs.toList
 
+/-- Parses one top-level declaration or command. -/
 def decl : P SDecl := do
   let t ← peekTok
   match t.tok with
@@ -493,6 +538,7 @@ def decl : P SDecl := do
     else failAt s!"unknown command {c}"
   | tok => failAt s!"expected a declaration, found {describe tok}"
 
+/-- Parses a complete source file into its declarations. -/
 def program (src : String) : Except (Pos × String) (Array DeclStx) := do
   let toks ← lex src
   let chars := src.toList.toArray

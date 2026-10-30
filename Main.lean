@@ -1,5 +1,18 @@
+/-
+Copyright (c) 2026 Ritabrata Maiti. All rights reserved.
+Released under the PolyForm Noncommercial License 1.0.0 as described in the file LICENSE.md.
+Authors: Ritabrata Maiti
+-/
 import Haze.Frontend
 
+/-!
+# Command-Line Interface
+
+`haze [--fuel N] FILE.hz...` checks Haze source files and prints their messages. It exits
+with status 1 if any declaration was rejected.
+-/
+
+/-- The help text of the command-line interface. -/
 def usage : String :=
   "usage: haze [--fuel N] FILE.hz...\n" ++
   "Checks Haze programs: graded types, exact probabilities, fuzzy [belief, plausibility]."

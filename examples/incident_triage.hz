@@ -1,5 +1,5 @@
 -- Incident triage: which component is at fault, given what monitoring observed?
--- Priors come from past incidents; alert behaviour per root cause is probabilistic.
+-- Priors come from past incidents; alert behavior per root cause is probabilistic.
 -- `observe` conditions every world on the evidence (exact Bayesian update).
 
 enum Cause = Database | Cache | Network | Deploy

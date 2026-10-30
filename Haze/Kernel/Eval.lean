@@ -1,20 +1,42 @@
 /-
-Exact semantics of Haze kernel terms.
-
-`M α` is an exact finite sub-distribution over `Res α` (a value or `stuck` = out of fuel),
-in an error monad for genuine runtime faults. All weights are exact rationals.
+Copyright (c) 2026 Ritabrata Maiti. All rights reserved.
+Released under the PolyForm Noncommercial License 1.0.0 as described in the file LICENSE.md.
+Authors: Ritabrata Maiti
 -/
 import Haze.Kernel.Check
+
+/-!
+# Exact Evaluation
+
+This file gives kernel terms their exact semantics. A term denotes a finite sub-distribution
+over outcomes, computed with exact rational weights. An outcome is either a value or
+`Res.stuck`, which means that evaluation ran out of fuel and the outcome is unknown. Runtime
+faults such as division by zero are errors, not outcomes.
+
+## Main Definitions
+
+* `Haze.Kernel.M`: the exact distribution monad.
+* `Haze.Kernel.eval`: evaluates a term.
+* `Haze.Kernel.exec`: executes one statement of a system step.
+-/
 
 namespace Haze.Kernel
 open Std
 
+/--
+Exact finite sub-distributions over outcomes, with errors for runtime faults.
+
+An outcome is either a value or `Res.stuck`, which means that evaluation ran out of fuel. Weights
+are exact rational numbers.
+-/
 structure M (α : Type) where
   run : Except String (List (Res α × Rat))
 
 namespace M
+/-- The distribution with all of its mass on `a`. -/
 def pure (a : α) : M α := ⟨.ok [(.ok a, 1)]⟩
 
+/-- Sequences two computations, multiplying the weights. Mass that is stuck remains stuck. -/
 def bind (m : M α) (f : α → M β) : M β := ⟨do
   let xs ← m.run
   let mut out : Array (Res β × Rat) := #[]
@@ -31,13 +53,16 @@ instance : Monad M where
   pure := M.pure
   bind := M.bind
 
+/-- Aborts with a runtime error. -/
 def fail (msg : String) : M α := ⟨.error msg⟩
+/-- The distribution with all of its mass on the unknown outcome. -/
 def stuck : M α := ⟨.ok [(.stuck, 1)]⟩
 
+/-- The distribution with the given outcomes and weights. Outcomes with weight 0 are dropped. -/
 def ofList (xs : List (α × Rat)) : M α :=
   ⟨.ok (xs.filterMap fun (a, w) => if w == 0 then none else some (.ok a, w))⟩
 
-/-- Merge equal outcomes (keeps first-occurrence order, so output is deterministic). -/
+/-- Merges equal outcomes, keeping the order of first occurrence so that output is deterministic. -/
 def compactList [BEq α] [Hashable α] (xs : List (α × Rat)) : List (α × Rat) := Id.run do
   let mut ix : HashMap α Nat := {}
   let mut out : Array (α × Rat) := #[]
@@ -47,9 +72,14 @@ def compactList [BEq α] [Hashable α] (xs : List (α × Rat)) : List (α × Rat
     | none => ix := ix.insert a out.size; out := out.push (a, w)
   return (out.filter (·.2 != 0)).toList
 
+/-- Merges equal outcomes of a computation. -/
 def compact [DecidableEq α] [Hashable α] (m : M α) : M α := ⟨return compactList (← m.run)⟩
 end M
 
+/--
+The evaluation context: the current world, the system state, the local variables and the remaining
+fuel.
+-/
 structure ECtx where
   env : Env
   world : Array (Res Value) := #[]
@@ -58,44 +88,64 @@ structure ECtx where
   locals : List Value := []
   fuel : Nat
 
+/-- Reads a value as a number. -/
 def asNum : Value → M Rat
   | .num q => pure q
   | v => M.fail s!"runtime: expected a number, got {repr v}"
 
+/-- Reads a value as a degree. -/
 def asDeg : Value → M Rat
   | .deg q => pure q
   | v => M.fail s!"runtime: expected a degree, got {repr v}"
 
+/-- Reads a value as a Boolean. -/
 def asBool : Value → M Bool
   | .bool b => pure b
   | v => M.fail s!"runtime: expected a Bool, got {repr v}"
 
+/-- Checks that a number is an integer. -/
 def asInt (q : Rat) : M Int :=
   if isInt q then pure q.num else M.fail s!"runtime: expected an integer, got {fmtQ q}"
 
+/-- Clamps a rational number to the interval from 0 to 1. -/
 def clamp01 (q : Rat) : Rat := qmax 0 (qmin 1 q)
 
+/--
+The t-norm of a fuzzy logic, which is its conjunction on degrees. Gödel logic uses `min`, product
+logic uses multiplication, and Łukasiewicz logic uses `max 0 (a + b - 1)`.
+-/
 def tand : Logic → Rat → Rat → Rat
   | .godel, a, b => qmin a b
   | .product, a, b => a * b
   | .lukasiewicz, a, b => qmax 0 (a + b - 1)
 
+/-- The t-conorm of a fuzzy logic, which is its disjunction on degrees and is dual to `tand`. -/
 def tor : Logic → Rat → Rat → Rat
   | .godel, a, b => qmax a b
   | .product, a, b => a + b - a * b
   | .lukasiewicz, a, b => qmin 1 (a + b)
 
+/--
+The triangular membership function, which is 0 outside the interval from `a` to `c` and peaks at 1
+when `x = b`.
+-/
 def tri (x a b c : Rat) : Rat :=
   if x < a then 0 else if x < b then (x - a) / (b - a)
   else if x == b then 1 else if x < c then (c - x) / (c - b) else 0
 
+/--
+The trapezoidal membership function, which rises from `a` to `b`, is 1 from `b` to `c` and falls
+from `c` to `d`.
+-/
 def trap (x a b c d : Rat) : Rat :=
   if x < a then 0 else if x < b then (x - a) / (b - a)
   else if x ≤ c then 1 else if x < d then (d - x) / (d - c) else 0
 
+/-- The membership function that is 0 up to `a`, is 1 from `b` on, and is linear in between. -/
 def rampUp (x a b : Rat) : Rat :=
   if x ≤ a then 0 else if b ≤ x then 1 else (x - a) / (b - a)
 
+/-- Applies a primitive to argument values. -/
 def evalPrim (op : Prim) (vs : List Value) : M Value := do
   match op, vs with
   | .eq, [a, b] => pure (.bool (a == b))
@@ -133,13 +183,16 @@ def evalPrim (op : Prim) (vs : List Value) : M Value := do
   | .rampDown, [x, a, b] => return .deg (1 - clamp01 (rampUp (← asNum x) (← asNum a) (← asNum b)))
   | _, _ => M.fail s!"runtime: bad primitive application {repr op}"
 
+/-- The binomial coefficient of `n` and `k`. -/
 def choose (n k : Nat) : Nat := Id.run do
   let mut r := 1
   for i in [0:k] do r := r * (n - i) / (i + 1)
   return r
 
+/-- The largest support accepted for a random primitive or a quantifier range. -/
 def maxSupport : Nat := 100000
 
+/-- The exact distribution of a random primitive. -/
 def evalRand (r : RandPrim) (vs : List Value) : M Value := do
   match r, vs with
   | .bernoulli, [p] =>
@@ -162,6 +215,7 @@ def evalRand (r : RandPrim) (vs : List Value) : M Value := do
   | _, _ => M.fail "runtime: bad random primitive application"
 
 mutual
+/-- Evaluates arguments from left to right. -/
 partial def evalArgs (c : ECtx) : List Expr → M (List Value)
   | [] => pure []
   | e :: es => do
@@ -169,6 +223,11 @@ partial def evalArgs (c : ECtx) : List Expr → M (List Value)
     let vs ← evalArgs c es
     pure (v :: vs)
 
+/--
+Evaluates a term to its exact distribution of outcomes.
+
+Each function call uses one unit of fuel. When no fuel remains, the outcome is `Res.stuck`.
+-/
 partial def eval (c : ECtx) : Expr → M Value
   | .lit v => pure v
   | .bvar i => match c.locals[i]? with
@@ -233,14 +292,16 @@ partial def eval (c : ECtx) : Expr → M Value
     | v => M.fail s!"runtime: match on non-enum value {repr v}"
 end
 
-/-- Mutable part of a system configuration. -/
+/-- The mutable part of a system configuration: the state variables and whether an assertion failed. -/
 structure SState where
   vars : Array Value
   crashed : Bool := false
   deriving DecidableEq, Hashable, Inhabited
 
-/-- Execute one statement of a system step. A failed `assert` crashes the system:
-the rest of the step is skipped and the crashed configuration is absorbing. -/
+/--
+Executes one statement of a system step. A failed `assert` crashes the system: the rest of the
+step is skipped, and a crashed configuration never changes again.
+-/
 partial def exec (c : ECtx) (locals : List Value) (s : SState) (st : Stmt) : M SState :=
   if s.crashed then pure s else
   let ce : ECtx := { c with vars := s.vars, crashed := false, locals }

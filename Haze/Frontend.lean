@@ -1,18 +1,36 @@
 /-
-Haze front end (analogue of `Lean.Elab.Frontend`): parse, then for every declaration
-elaborate → kernel-check → run its semantic action, collecting messages.
-The whole pipeline is a pure function `String → Output`.
+Copyright (c) 2026 Ritabrata Maiti. All rights reserved.
+Released under the PolyForm Noncommercial License 1.0.0 as described in the file LICENSE.md.
+Authors: Ritabrata Maiti
 -/
 import Haze.Elab
 import Haze.Kernel.Verify
 
+/-!
+# Front End
+
+The front end processes a source file one declaration at a time, in the role of
+`Lean.Elab.Frontend`. Each declaration is elaborated, checked by the kernel and then
+executed: random nodes extend the worlds, observations condition them, and claims and
+queries are evaluated. Processing is a pure function from the source text to messages.
+
+## Main Definitions
+
+* `Haze.Frontend.processDecl`: processes one declaration.
+* `Haze.Frontend.run`: processes a source file.
+-/
+
 namespace Haze.Frontend
 open Haze.Syntax Haze.Kernel
 
+/-- Command-line options. `fuel` bounds the depth of nested function calls. -/
 structure Options where
   fuel : Nat := 1000
   deriving Inhabited
 
+/--
+The state of the front end: the environment, the current branches and the messages produced so far.
+-/
 structure FState where
   file : String
   opts : Options
@@ -21,8 +39,10 @@ structure FState where
   out : Array String := #[]
   errors : Nat := 0
 
+/-- The front-end monad. -/
 abbrev FM := StateM FState
 
+/-- Records a message at a source position. Messages with severity `error` are counted as errors. -/
 def emit (pos : Pos) (sev : String) (msg : String) : FM Unit := modify fun s =>
   { s with out := s.out.push s!"{s.file}:{pos}: {sev}: {msg}",
            errors := if sev == "error" then s.errors + 1 else s.errors }
@@ -63,17 +83,24 @@ def fmtConfig (env : Env) (relevant : Array Bool) (sys : Option SysInfo)
       [s!"state: {", ".intercalate vs}{if c.st.crashed then "  [crashed]" else ""}"]
   ps ++ ins ++ st
 
+/-- Renders an interval, or a single probability when belief equals plausibility. -/
 def fmtInterval (i : Interval) : String :=
   if i.bel == i.pl then s!"probability {fmtQ i.bel}"
   else s!"belief {fmtQ i.bel} · plausibility {fmtQ i.pl}"
 
-
 /-! ## Running properties -/
 
+/--
+The model checker for a property, reading only the global variables that the property depends on.
+-/
 def checkerFor (env : Env) (fuel : Nat) (spec : PropSpec) : Checker :=
   let sys := spec.sys.bind (env.systems[·]?)
   { env, fuel, sys, body := spec.body, relevant := relevantGlobals env sys spec.body }
 
+/--
+Checks a property on every branch, returning the result for each branch and the first
+counterexample.
+-/
 def runSpec (env : Env) (fuel : Nat) (bs : Array Branch) (spec : PropSpec) :
     Except String (List BranchResult × Option Witness) := do
   let ck := checkerFor env fuel spec
@@ -85,7 +112,7 @@ def runSpec (env : Env) (fuel : Nat) (bs : Array Branch) (spec : PropSpec) :
     if wit.isNone then wit := w
   return (rows.toList, wit)
 
-/-- Per-parameter table; omitted when every parameter assignment gives the same result. -/
+/-- A table of results per parameter assignment, omitted when every assignment gives the same result. -/
 def branchTable (env : Env) (rows : List BranchResult) : List String :=
   let same := match rows with
     | r :: rs => rs.all fun x => x.lo == r.lo && x.hi == r.hi
@@ -97,11 +124,16 @@ def branchTable (env : Env) (rows : List BranchResult) : List String :=
     let v := if r.lo == r.hi then fmtQ r.lo else s!"[{fmtQ r.lo}, {fmtQ r.hi}]"
     s!"  {padRight (label r) w}  π {padRight (fmtQ r.poss) 6}  {v}"
 
+/-- Describes a result as proved, refuted, certain, impossible or graded. -/
 def status (g : Grade) (i : Interval) : String :=
   if i.bel == 1 then (if g.prob || g.fuzzy then "holds with certainty" else "proved")
   else if i.pl == 0 then (if g.prob || g.fuzzy then "fails with certainty" else "refuted")
   else "graded"
 
+/--
+Checks a claim or theorem, reports the result and adds the claim to the environment if it is
+accepted.
+-/
 def doClaim (d : DeclStx) (name : String) (isThm : Bool) (spec : PropSpec) (bound : Bound) : FM Unit := do
   let s ← get
   let env := s.env
@@ -148,6 +180,7 @@ def doClaim (d : DeclStx) (name : String) (isThm : Bool) (spec : PropSpec) (boun
     else
       emit d.pos "error" s!"{kind} {name}{indent lines}"
 
+/-- The exact distribution of the value of a property after `k` steps, on one branch. -/
 def evalDist (env : Env) (fuel : Nat) (b : Branch) (spec : PropSpec) :
     Except String (List (Res Value × Rat)) := do
   let ck := checkerFor env fuel spec
@@ -171,6 +204,7 @@ def fmtDist (env : Env) (xs : List (Res Value × Rat)) : List String :=
   shown.map (fun (r, q) => s!"{padRight (fmtRes env r) w}  ↦ {fmtQ q}")
     ++ (if xs.length > 12 then [s!"… {xs.length - 12} more outcomes"] else [])
 
+/-- Runs a query command and reports its result. -/
 def doQuery (d : DeclStx) (k : QueryKind) (spec : PropSpec) : FM Unit := do
   let s ← get
   let env := s.env
@@ -244,7 +278,7 @@ def doQuery (d : DeclStx) (k : QueryKind) (spec : PropSpec) : FM Unit := do
           | none => groups := groups.push (key, w, vals)
         let wd := groups.foldl (fun m g => max m g.1.length) 0
         for (key, m, vs) in groups do
-          let vs := M.compactList vs
+          let vs := (M.compactList vs).mergeSort fun a b => b.2 ≤ a.2
           let out := match vs with
             | [(r, _)] => fmtRes env r
             | _ => " | ".intercalate (vs.map fun (r, q) => s!"{fmtRes env r} {fmtQ (q / m)}")
@@ -253,6 +287,7 @@ def doQuery (d : DeclStx) (k : QueryKind) (spec : PropSpec) : FM Unit := do
         if unk != 0 then lines := lines.push s!"diverged (out of fuel): {fmtQ unk}"
     emit d.pos "info" s!"{d.text}{indent lines.toList}"
 
+/-- Prints a summary of a declaration. -/
 def doPrint (d : DeclStx) (n : String) : FM Unit := do
   let env := (← get).env
   if let some c := env.claims[n]? then
@@ -273,6 +308,10 @@ def doPrint (d : DeclStx) (n : String) : FM Unit := do
 
 /-! ## Driver -/
 
+/--
+Processes one declaration: elaborates it, checks it with the kernel and runs its semantic action.
+The environment changes only if all three steps succeed.
+-/
 def processDecl (d : DeclStx) : FM Unit := do
   let s ← get
   match (Elab.elabDecl d.decl).run { env := s.env, pos := d.pos } with
@@ -298,9 +337,11 @@ def processDecl (d : DeclStx) : FM Unit := do
         | .ok r =>
           modify fun s => { s with branches := r.branches }
           let ev := match r.evidence with
-            | [([], z)] => [s!"evidence probability {fmtQ z}; worlds renormalised"]
-            | es => "evidence probability by fuzzy parameter:" ::
-                es.map fun (a, z) => s!"  {fmtAssign env' a}: {fmtQ z}"
+            | (_, z) :: rest =>
+              if rest.all (·.2 == z) then [s!"evidence probability {fmtQ z}; worlds renormalized"]
+              else "evidence probability by fuzzy parameter:" ::
+                r.evidence.map fun (a, z) => s!"  {fmtAssign env' a}: {fmtQ z}"
+            | [] => []
           let dr := if r.dropped == 0 then [] else
             [s!"{r.dropped} parameter assignment(s) contradict the observation and were discarded"]
           emit d.pos "info" s!"{d.text}{indent (ev ++ dr)}"
@@ -309,6 +350,7 @@ def processDecl (d : DeclStx) : FM Unit := do
       | .print n => doPrint d n
       | _ => commit
 
+/-- Checks a source file, returning its messages and the number of errors. -/
 def run (file src : String) (opts : Options := {}) : String × Nat :=
   match Syntax.program src with
   | .error (p, msg) => (s!"{file}:{p}: error: {msg}", 1)

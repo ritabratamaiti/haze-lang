@@ -25,11 +25,11 @@ examples/canary_rollout.hz:40:1: info: #outcomes Rollout |= after[4] stage
   when defect = 0 (π 1):
     (all worlds)  P 1         ⇒ Full
   when defect = 0.005 (π 0.8):
-    (all worlds)  P 1         ⇒ Full ≈0.471479 | RolledBack ≈0.528521
+    (all worlds)  P 1         ⇒ RolledBack ≈0.528521 | Full ≈0.471479
   when defect = 0.02 (π 0.5):
-    (all worlds)  P 1         ⇒ Full ≈0.048296 | RolledBack ≈0.951704
+    (all worlds)  P 1         ⇒ RolledBack ≈0.951704 | Full ≈0.048296
   when defect = 0.1 (π 0.2):
-    (all worlds)  P 1         ⇒ Full ≈0 | RolledBack ≈1
+    (all worlds)  P 1         ⇒ RolledBack ≈1 | Full ≈0
 examples/canary_rollout.hz:44:1: info: theorem ships_when_clean
   probability 1 — holds with certainty
   grade prob+fuzzy · 4 parameter assignment(s) · ≤4 states/step

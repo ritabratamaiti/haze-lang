@@ -1,9 +1,17 @@
 /-
-Golden tests: every `*.hz` file in `tests/` and `examples/` is checked and its output
-compared with the sibling `*.expected` file. Run `lake test`, or
-`lake exe hazetest --update` to regenerate expectations after an intended change.
+Copyright (c) 2026 Ritabrata Maiti. All rights reserved.
+Released under the PolyForm Noncommercial License 1.0.0 as described in the file LICENSE.md.
+Authors: Ritabrata Maiti
 -/
 import Haze.Frontend
+
+/-!
+# Golden Tests
+
+Every `.hz` file in `tests/` and `examples/` is checked, and its output is compared with the
+`.expected` file next to it. Run the tests with `lake test`. After an intended change in
+output, regenerate the expected files with `lake exe hazetest --update`.
+-/
 
 def normalize (s : String) : String :=
   (s.replace "\r\n" "\n").trimAscii.toString

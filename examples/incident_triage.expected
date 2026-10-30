@@ -1,11 +1,11 @@
 examples/incident_triage.hz:19:1: info: #prob cause == Database
   probability 0.3
 examples/incident_triage.hz:21:1: info: observe timeouts
-  evidence probability 0.67; worlds renormalised
+  evidence probability 0.67; worlds renormalized
 examples/incident_triage.hz:22:1: info: observe error_5xx
-  evidence probability 0.50597 (=339/670); worlds renormalised
+  evidence probability 0.50597 (=339/670); worlds renormalized
 examples/incident_triage.hz:23:1: info: observe not cache_misses
-  evidence probability 0.845133 (=191/226); worlds renormalised
+  evidence probability 0.845133 (=191/226); worlds renormalized
 examples/incident_triage.hz:25:1: info: #eval cause
   Database  ↦ 0.593717 (=567/955)
   Network   ↦ 0.234555 (=224/955)

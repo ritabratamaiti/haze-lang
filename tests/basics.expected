@@ -6,7 +6,7 @@ tests/basics.hz:13:1: info: claim stay_wins
   grade prob · 1 parameter assignment(s) · ≤9 states/step
   bound holds: plausibility ≤ 0.34
 tests/basics.hz:18:1: info: observe positive
-  evidence probability 0.059; worlds renormalised
+  evidence probability 0.059; worlds renormalized
 tests/basics.hz:19:1: info: #prob sick
   probability 0.161017 (=19/118)
 tests/basics.hz:22:1: info: theorem add_comm_small
