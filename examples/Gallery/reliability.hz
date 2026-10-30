@@ -1,0 +1,49 @@
+-- Reliability engineering: redundancy, voting and repairable systems.
+
+-- 1. Triple modular redundancy ---------------------------------------------------
+-- Three identical modules compute the same value (1). A working module outputs 1;
+-- a failed module outputs an arbitrary value from 0 to 3. A voter outputs the
+-- majority value. The module reliability is only known vaguely: "about 95%".
+param r : Num ~= {0.9: 0.5, 0.95: 1, 0.99: 0.7}
+
+input ok1 : Bool ~ flip(r)
+input ok2 : Bool ~ flip(r)
+input ok3 : Bool ~ flip(r)
+def out1 : Num := if ok1 then 1 else uniform(0, 3)
+def out2 : Num := if ok2 then 1 else uniform(0, 3)
+def out3 : Num := if ok3 then 1 else uniform(0, 3)
+def voted : Num := if out1 == out2 then out1 else if out1 == out3 then out1 else out2
+def working : Num := (if ok1 then 1 else 0) + (if ok2 then 1 else 0) + (if ok3 then 1 else 0)
+
+-- The voter masks any single failure.
+theorem masks_one_failure : working >= 2 implies voted == 1
+claim single_module : ok1                  -- r
+claim two_of_three : working >= 2          -- 3r² - 2r³
+claim voter_correct : voted == 1           -- slightly higher: failed modules may agree on 1
+
+-- 2. A series–parallel system ------------------------------------------------------
+-- Two pumps in parallel (each works with probability 0.8), in series with a
+-- valve (0.95): R = (1 - 0.2²) · 0.95 = 0.912.
+input pump_a : Bool ~ flip(0.8)
+input pump_b : Bool ~ flip(0.8)
+input valve : Bool ~ flip(0.95)
+claim flow : (pump_a or pump_b) and valve
+
+-- 3. A repairable server -------------------------------------------------------------
+-- Each step a working server fails with probability 0.1, and a failed server is
+-- repaired with probability 0.5. Its long-run availability is 0.5 / 0.6 = 5/6.
+system Server {
+  var up : Bool := true
+  var downtime : Num := 0
+  step {
+    if up {
+      if flip(0.1) { up := false }
+    } else {
+      downtime := downtime + 1
+      if flip(0.5) { up := true }
+    }
+  }
+}
+claim available_at_50 : Server |= after[50] up        -- 5/6 + (1/6) · 0.4^50
+claim no_outage_in_24 : Server |= always[24] up       -- 0.9^24
+#expect Server |= after[24] downtime

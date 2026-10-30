@@ -33,3 +33,10 @@ output differs, the driver prints the first line that doesn't match.
 Add a `.hz` file to this directory, run `lake exe hazetest --update` to create its
 `.expected` file, and check that the expected output is correct. Prefer results that can be
 verified by hand, such as small exact probabilities.
+
+## Independent Checks
+
+[`scripts/verify_gallery.py`](../scripts/verify_gallery.py) recomputes every result of the
+models in [`examples/Gallery`](../examples/Gallery) without using Haze, from closed-form
+answers or with an exact step-by-step calculation in Python, and compares them with the
+output of `haze`. Run it with `python scripts/verify_gallery.py` after `lake build`.

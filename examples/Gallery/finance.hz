@@ -1,0 +1,48 @@
+-- Finance and insurance: binomial option pricing and an insurer's risk of ruin.
+
+-- 1. Cox–Ross–Rubinstein option pricing, three periods -------------------------------
+-- The stock starts at 100 and moves up by 20% or down by 10% each period. The
+-- risk-free rate is 5% per period, so the risk-neutral probability of an up move
+-- is (1.05 - 0.9) / (1.2 - 0.9) = 1/2. A European option is worth its expected
+-- payoff under these probabilities, discounted by 1.05³.
+system Stock {
+  var price : Num := 100
+  step { if flip(0.5) { price := price * 1.2 } else { price := price * 0.9 } }
+}
+def discount : Num := 1.05 * 1.05 * 1.05
+
+#eval Stock |= after[3] price
+#expect Stock |= after[3] max(price - 100, 0) / discount     -- call, strike 100
+#expect Stock |= after[3] max(100 - price, 0) / discount     -- put, strike 100
+-- Put–call parity: call - put = 100 - 100 / 1.05³
+#expect Stock |= after[3] (max(price - 100, 0) - max(100 - price, 0)) / discount
+
+-- With a vaguely known volatility, the up factor is "about 1.2". The down factor
+-- is 1 / up (so this model differs from the one above, whose down factor is 0.9),
+-- and the risk-neutral probability follows from both. The price of the call
+-- becomes an interval.
+param up : Num ~= {1.1: 0.5, 1.2: 1, 1.3: 0.5}
+def down : Num := 1 / up
+def q : Num := (1.05 - down) / (up - down)
+system VagueStock {
+  var price : Num := 100
+  step { if flip(q) { price := price * up } else { price := price * down } }
+}
+#expect VagueStock |= after[3] max(price - 100, 0) / discount
+
+-- 2. The risk of ruin of an insurer ------------------------------------------------
+-- The insurer starts with capital 3 and collects a premium of 1 per period. Each
+-- period it pays a claim of 0, 2 or 5 with probabilities 0.7, 0.2 and 0.1. The
+-- expected claim, 0.9, is below the premium, but ruin is still possible.
+system Insurer {
+  var capital : Num := 3
+  var ruined : Bool := false
+  step {
+    if not ruined {
+      capital := capital + 1 - {0: 0.7, 2: 0.2, 5: 0.1}
+      if capital < 0 { ruined := true }
+    }
+  }
+}
+claim ruin_within_20 : Insurer |= eventually[20] ruined
+theorem ruin_is_final : Insurer |= always[20] (ruined implies capital < 0)

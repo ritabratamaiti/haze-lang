@@ -1,0 +1,44 @@
+-- Epidemiology: the Reed–Frost chain-binomial model in a household of five.
+--
+-- One person is infected and four are susceptible. In each generation, every
+-- susceptible person escapes each infected person independently with probability
+-- 1 - p, so they are infected with probability 1 - (1 - p)^I. The transmission
+-- probability p is only known vaguely: "about 0.3".
+
+param p : Num ~= {0.2: 0.5, 0.3: 1, 0.5: 0.4}
+
+-- (1 - p)^i, written as a recursive function
+def escape(i : Num) : Num := if i <= 0 then 1 else (1 - p) * escape(i - 1)
+
+system Household {
+  var susceptible : Num := 4
+  var infected : Num := 1
+  var total : Num := 1
+  step {
+    let cases := binomial(susceptible, 1 - escape(infected))
+    susceptible := susceptible - cases
+    infected := cases
+    total := total + cases
+  }
+}
+
+theorem people_conserved : Household |= always[6] susceptible + total == 5
+#eval Household |= after[5] total             -- final-size distribution
+#expect Household |= after[5] total
+claim large_outbreak : Household |= after[5] total >= 3
+claim over_in_two_generations : Household |= eventually[2] infected == 0
+
+-- Vaccinating two of the four susceptible people.
+system Vaccinated {
+  var susceptible : Num := 2
+  var infected : Num := 1
+  var total : Num := 1
+  step {
+    let cases := binomial(susceptible, 1 - escape(infected))
+    susceptible := susceptible - cases
+    infected := cases
+    total := total + cases
+  }
+}
+#expect Vaccinated |= after[5] total
+claim vaccinated_large_outbreak : Vaccinated |= after[5] total >= 3

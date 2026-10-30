@@ -1,0 +1,12 @@
+examples/Gallery/games.hz:27:1: info: claim shooter_wins
+  probability ≈0.492929 — graded
+  grade prob · 1 parameter assignment(s) · ≤13 states/step
+examples/Gallery/games.hz:28:1: info: claim decided_on_come_out
+  probability 0.333333 (=1/3) — graded
+  grade prob · 1 parameter assignment(s) · ≤8 states/step
+examples/Gallery/games.hz:44:1: info: claim server_holds
+  probability ≈0.735729 — graded
+  grade prob · 1 parameter assignment(s) · ≤6 states/step
+examples/Gallery/games.hz:63:1: info: claim hht_first
+  probability ≈0.666667 — graded
+  grade prob · 1 parameter assignment(s) · ≤5 states/step

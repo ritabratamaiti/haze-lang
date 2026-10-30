@@ -1,0 +1,63 @@
+-- Games: craps, a game of tennis, and Penney's game.
+
+enum Phase = ComeOut | OnPoint | Won | Lost
+
+-- 1. Craps ---------------------------------------------------------------------------
+-- On the come-out roll, 7 or 11 wins and 2, 3 or 12 loses. Any other total becomes
+-- the point, and the shooter rolls until the point (win) or a 7 (loss).
+-- The probability of winning is 244/495 ≈ 0.492929.
+system Craps {
+  var phase : Phase := ComeOut
+  var point : Num := 0
+  step {
+    let roll := uniform(1, 6) + uniform(1, 6)
+    match phase {
+      ComeOut => {
+        if roll == 7 or roll == 11 { phase := Won }
+        else if roll == 2 or roll == 3 or roll == 12 { phase := Lost }
+        else { point := roll; phase := OnPoint }
+      }
+      OnPoint => {
+        if roll == point { phase := Won } else if roll == 7 { phase := Lost }
+      }
+      _ => skip
+    }
+  }
+}
+claim shooter_wins : Craps |= eventually[100] phase == Won
+claim decided_on_come_out : Craps |= after[1] (phase == Won or phase == Lost)   -- 12/36
+
+-- 2. A game of tennis ------------------------------------------------------------------
+-- The server wins each point with probability 0.6. A game is won with at least four
+-- points and a lead of two. At deuce the probability of winning is p² / (1 - 2pq).
+system Tennis {
+  var server : Num := 0
+  var receiver : Num := 0
+  step {
+    if not ((server >= 4 or receiver >= 4) and abs(server - receiver) >= 2) {
+      if flip(0.6) { server := server + 1 } else { receiver := receiver + 1 }
+      -- deuce is the same state however long it lasts
+      if server >= 3 and receiver >= 3 and server == receiver { server := 3; receiver := 3 }
+    }
+  }
+}
+claim server_holds : Tennis |= eventually[200] (server >= 4 and server - receiver >= 2)
+
+-- 3. Penney's game -----------------------------------------------------------------------
+-- A fair coin is flipped until HHT or HTT appears. HHT comes first with probability 2/3.
+-- (0 = nothing yet, 1 = heads, 2 = tails)
+system Penney {
+  var before : Num := 0
+  var last : Num := 0
+  var winner : Num := 0
+  step {
+    if winner == 0 {
+      let coin := if flip(0.5) then 1 else 2
+      if before == 1 and last == 1 and coin == 2 { winner := 1 }
+      else if before == 1 and last == 2 and coin == 2 { winner := 2 }
+      before := last
+      last := coin
+    }
+  }
+}
+claim hht_first : Penney |= eventually[200] winner == 1

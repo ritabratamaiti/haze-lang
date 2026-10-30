@@ -76,6 +76,19 @@ The [`examples`](examples) folder contains models of common reliability patterns
 | [`incident_triage.hz`](examples/incident_triage.hz) | The probable root cause of an incident, given the alerts that fired. |
 | [`probability_classics.hz`](examples/probability_classics.hz) | Classic problems with known answers: dice, the birthday problem, Pólya's urn, the coupon collector, gambler's ruin and the boy–girl paradox. |
 
+The [`examples/Gallery`](examples/Gallery) folder contains models from other fields. Each
+answer agrees with a closed-form result or an independent exact calculation:
+
+| Example | Field | What it computes |
+|---|---|---|
+| [`genetics.hz`](examples/Gallery/genetics.hz) | Genetics | Fixation by genetic drift, Hardy–Weinberg proportions with a vague allele frequency, a Mendelian cross. |
+| [`epidemic.hz`](examples/Gallery/epidemic.hz) | Epidemiology | The final size of a household outbreak (Reed–Frost) with a vague transmission probability, with and without vaccination. |
+| [`physics.hz`](examples/Gallery/physics.hz) | Physics | Radioactive decay, diffusion in the Ehrenfest model and the return of a random walk. |
+| [`reliability.hz`](examples/Gallery/reliability.hz) | Reliability engineering | Triple modular redundancy (a theorem that one failure is masked), series–parallel systems and server availability. |
+| [`finance.hz`](examples/Gallery/finance.hz) | Finance | Binomial option prices, put–call parity, prices under vague volatility and an insurer's risk of ruin. |
+| [`games.hz`](examples/Gallery/games.hz) | Games | Craps (244/495), a game of tennis with deuce and Penney's game. |
+| [`queueing.hz`](examples/Gallery/queueing.hz) | Networking | Buffer occupancy and packet drops under a vague arrival rate. |
+
 A description of every construct of the language is in
 [`docs/Language-Reference.md`](docs/Language-Reference.md).
 

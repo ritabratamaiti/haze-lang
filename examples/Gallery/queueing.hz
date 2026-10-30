@@ -1,0 +1,25 @@
+-- Queueing: a network buffer with room for 4 packets.
+--
+-- Each step the server sends the packet at the head of the queue with probability
+-- 0.5, and then a new packet arrives with probability `arrival`. A packet that
+-- arrives at a full buffer is dropped. The arrival rate during the busy hour is
+-- only known vaguely: "usually 0.3, sometimes higher".
+
+param arrival : Num ~= {0.3: 1, 0.4: 0.6, 0.5: 0.3}
+
+system Buffer {
+  var queue : Num := 0
+  var dropped : Num := 0
+  step {
+    if queue > 0 and flip(0.5) { queue := queue - 1 }
+    if flip(arrival) {
+      if queue < 4 { queue := queue + 1 } else { dropped := dropped + 1 }
+    }
+  }
+}
+
+theorem never_overflows : Buffer |= always[50] (queue >= 0 and queue <= 4)
+#eval Buffer |= after[50] queue
+claim full_at_50 : Buffer |= after[50] queue == 4
+claim no_drops_in_50 : Buffer |= always[50] dropped == 0
+#expect Buffer |= after[50] dropped

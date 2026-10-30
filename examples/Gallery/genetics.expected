@@ -1,0 +1,40 @@
+examples/Gallery/genetics.hz:14:1: info: theorem copies_in_range
+  probability 1 — holds with certainty
+  grade prob · 1 parameter assignment(s) · ≤7 states/step
+  theorem accepted
+examples/Gallery/genetics.hz:15:1: info: #eval Drift |= after[1] copies
+  2  ↦ 0.329218 (=80/243)
+  1  ↦ 0.263374 (=64/243)
+  3  ↦ 0.219479 (=160/729)
+  0  ↦ 0.087791 (=64/729)
+  4  ↦ 0.082305 (=20/243)
+  5  ↦ 0.016461 (=4/243)
+  6  ↦ 0.001372 (=1/729)
+examples/Gallery/genetics.hz:16:1: info: #expect Drift |= after[10] copies
+  expectation 2
+examples/Gallery/genetics.hz:17:1: info: claim fixed
+  probability ≈0.333323 — graded
+  grade prob · 1 parameter assignment(s) · ≤6 states/step
+examples/Gallery/genetics.hz:18:1: info: claim lost
+  probability ≈0.666657 — graded
+  grade prob · 1 parameter assignment(s) · ≤6 states/step
+examples/Gallery/genetics.hz:26:1: info: claim heterozygous
+  belief 0.236 · plausibility 0.37 — graded
+  grade prob+fuzzy · 3 parameter assignment(s) · ≤4 states/step
+  by fuzzy parameter (π = possibility):
+    q = 0.1  π 0.6     0.18
+    q = 0.2  π 1       0.32
+    q = 0.3  π 0.5     0.42
+examples/Gallery/genetics.hz:27:1: info: claim affected
+  belief 0.022 · plausibility 0.065 — graded
+  grade prob+fuzzy · 3 parameter assignment(s) · ≤4 states/step
+  by fuzzy parameter (π = possibility):
+    q = 0.1  π 0.6     0.01
+    q = 0.2  π 1       0.04
+    q = 0.3  π 0.5     0.09
+examples/Gallery/genetics.hz:34:1: info: #prob from_mother == Rec and from_father == Rec
+  probability 0.25
+examples/Gallery/genetics.hz:35:1: info: observe not (from_mother == Rec and from_father == Rec)
+  evidence probability 0.75; worlds renormalized
+examples/Gallery/genetics.hz:36:1: info: #prob from_mother != from_father
+  probability 0.666667 (=2/3)

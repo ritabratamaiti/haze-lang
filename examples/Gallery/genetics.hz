@@ -1,0 +1,36 @@
+-- Genetics: genetic drift, Hardy–Weinberg proportions and a Mendelian cross.
+
+enum Allele = Dom | Rec
+
+-- 1. Wright–Fisher genetic drift ----------------------------------------------
+-- A population carries 6 copies of a gene, 2 of which are a new neutral allele.
+-- Each generation draws 6 copies from the previous generation's frequencies.
+-- The allele is eventually fixed with probability equal to its initial
+-- frequency, 2/6, and its expected number of copies never changes.
+system Drift {
+  var copies : Num := 2
+  step { copies := binomial(6, copies / 6) }
+}
+theorem copies_in_range : Drift |= always[60] (copies >= 0 and copies <= 6)
+#eval Drift |= after[1] copies                 -- binomial(6, 1/3)
+#expect Drift |= after[10] copies              -- 2
+claim fixed : Drift |= eventually[60] copies == 6    -- → 1/3
+claim lost : Drift |= eventually[60] copies == 0     -- → 2/3
+
+-- 2. Hardy–Weinberg proportions with a vaguely known allele frequency ----------
+-- The recessive allele frequency q is "about 0.2". Under random mating a child
+-- is heterozygous with probability 2q(1 - q) and affected with probability q².
+param q : Num ~= {0.1: 0.6, 0.2: 1, 0.3: 0.5}
+input maternal : Allele ~ if flip(q) then Rec else Dom
+input paternal : Allele ~ if flip(q) then Rec else Dom
+claim heterozygous : maternal != paternal          -- 0.18, 0.32, 0.42
+claim affected : maternal == Rec and paternal == Rec  -- 0.01, 0.04, 0.09
+
+-- 3. A Mendelian cross of two carriers ----------------------------------------
+-- Each parent passes Dom or Rec with probability 1/2. A quarter of children are
+-- affected. Among unaffected children, two thirds are carriers.
+input from_mother : Allele ~ {Dom: 0.5, Rec: 0.5}
+input from_father : Allele ~ {Dom: 0.5, Rec: 0.5}
+#prob from_mother == Rec and from_father == Rec    -- 1/4
+observe not (from_mother == Rec and from_father == Rec)
+#prob from_mother != from_father                    -- 2/3
