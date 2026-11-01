@@ -88,6 +88,7 @@ answer agrees with a closed-form result or an independent exact calculation:
 | [`finance.hz`](examples/Gallery/finance.hz) | Finance | Binomial option prices, put–call parity, prices under vague volatility and an insurer's risk of ruin. |
 | [`games.hz`](examples/Gallery/games.hz) | Games | Craps (244/495), a game of tennis with deuce and Penney's game. |
 | [`queueing.hz`](examples/Gallery/queueing.hz) | Networking | Buffer occupancy and packet drops under a vague arrival rate. |
+| [`game_physics.hz`](examples/Gallery/game_physics.hz) | Video games | Tunneling through walls, energy drift of integrators, bouncing, frame-rate dependent jumps and a jetpack in gusty wind. |
 
 A description of every construct of the language is in
 [`docs/Language-Reference.md`](docs/Language-Reference.md).

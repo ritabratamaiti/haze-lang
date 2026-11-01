@@ -224,6 +224,51 @@ check(b, "claim full_at_50", *interval([(pi, after((0, 0), buffer(lam), 50, lamb
 check(b, "claim no_drops_in_50", *interval([(pi, always((0, 0), buffer(lam), 50, lambda s: s[1] == 0)) for pi, lam in lams]))
 check(b, "#expect Buffer |= after[50] dropped", *interval([(pi, after((0, 0), buffer(lam), 50, lambda s: s[1])) for pi, lam in lams]))
 
+# ---- game physics -------------------------------------------------------------
+b = blocks("examples/Gallery/game_physics.hz")
+def tunnel_safe(speed, start, swept):
+    x, hit = start, False
+    for _ in range(31):
+        if x >= 24: return False
+        if not hit:
+            nxt = x + speed
+            if (x < 20 and nxt >= 20) if swept else (20 <= nxt < 24): x, hit = 20, True
+            else: x = nxt
+    return True
+safe = F(sum(tunnel_safe(s, x0, False) for s in range(1, 13) for x0 in range(6)), 72)
+check(b, "theorem naive_never_tunnels", safe, name="naive collision: fraction of (speed, start) pairs that never tunnel")
+results.append((all(tunnel_safe(s, x0, True) for s in range(1, 13) for x0 in range(6)) and "theorem accepted" in "\n".join(b["theorem swept_never_tunnels"]), "swept collision never tunnels (all 72 cases)", "all safe"))
+results.append((all(tunnel_safe(s, x0, False) for s in range(1, 5) for x0 in range(6)) and "theorem accepted" in "\n".join(b["theorem naive_safe_when_slow"]), "naive collision safe when speed <= thickness", "all safe"))
+check(b, "#eval ExplicitEuler |= after[10] v * v / 2 + y", F(105), name="explicit Euler energy after 10 ticks: 100 + 10/2")
+check(b, "#eval SemiImplicitEuler |= after[10] v * v / 2 + y", F(95), name="semi-implicit Euler energy after 10 ticks: 100 - 10/2")
+def bounce_ok():
+    y, v = F(30), F(0)
+    for _ in range(61):
+        if y < 0 or v * v / 2 + y > 30: return False
+        v -= 1; y += v
+        if y < 0: y, v = F(0), -v / 2
+    return True
+results.append((bounce_ok() and "theorem accepted" in "\n".join(b["theorem bounce_never_gains_energy"]), "bounce: above floor and never gains energy for 60 ticks", "holds"))
+def jump(rate):
+    def step(s):
+        y, v, peak = s
+        if y < 0: return [(s, F(1))]
+        out = []
+        for dt, q in ((2, rate), (1, 1 - rate)):
+            v2 = v - dt; y2 = y + v2 * dt
+            out.append(((y2, v2, max(peak, y2)), q))
+        return out
+    return step
+rates = [(F(1), F(1, 50)), (F(1, 2), F(1, 10)), (F(1, 5), F(1, 4))]
+check(b, "claim variable_step_reaches_ledge", *interval([(pi, eventually((0, 10, 0), jump(r), 25, lambda s: s[0] >= 45)) for pi, r in rates]))
+results.append((all(abs(float(eventually((0, 10, 0), jump(r), 25, lambda s: s[0] >= 45) - (1 - r) ** 9)) < 1e-12 for _, r in rates), "  ...equals (1 - drop rate)^9: any dropped frame during the 9-tick ascent misses the ledge", "(1-r)^9"))
+def jet(s):
+    y, v, fuel = s
+    thrust = 2 if fuel > 0 else 0
+    return [((max(y + v + thrust - 1 - g, 0), v + thrust - 1 - g, max(fuel - 1, 0)), q) for g, q in ((1, F(3, 10)), (0, F(7, 10)))]
+check(b, "claim jetpack_reaches_platform", eventually((0, 0, 12), jet, 30, lambda s: s[0] >= 40))
+check(b, "#expect Jetpack |= after[30] y", after((0, 0, 12), jet, 30, lambda s: s[0]))
+
 passed = sum(r[0] for r in results)
 for ok, name, exp in results:
     print("PASS" if ok else "FAIL", name, "|", exp)
