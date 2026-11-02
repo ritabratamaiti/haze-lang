@@ -33,5 +33,7 @@ The first version of Haze.
 
 ### Tools
 
-* The `haze` command, with the `--fuel` option.
+* The `haze` command, with the `--fuel` option and JSON output (`--json`).
 * Golden tests, run with `lake test`.
+* A conformance test that checks a Python implementation against its Haze model, and continuous
+  integration that runs it.

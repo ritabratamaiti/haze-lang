@@ -1,0 +1,66 @@
+-- Specification of the payment client in payments_client.py.
+--
+-- The client sends a charge request to the payment server and retries after a
+-- timeout, up to three attempts. Requests and responses can each be lost. The
+-- server deduplicates requests by idempotency key, so a retried request never
+-- charges the card again. The loss rate of the network is only known vaguely.
+--
+-- This file is the single source of truth: the theorems and bounds below must hold,
+-- and test_conformance.py checks that the Python implementation has exactly the
+-- outcome distributions computed here.
+
+enum Phase = Sending | Waiting | Done | GaveUp
+
+param loss : Num ~= {0.01: 0.6, 0.02: 1, 0.05: 0.5, 0.1: 0.2}
+
+def max_attempts : Num := 3
+def timeout_ms : Num := 1000
+def rtt_ms : Num := 80
+
+system Client {
+  var phase : Phase := Sending
+  var attempts : Num := 0
+  var charges : Num := 0
+  var acked : Bool := false
+  var latency : Num := 0
+  step {
+    match phase {
+      Sending => {
+        attempts := attempts + 1
+        if flip(loss) {                         -- the request is lost
+          phase := Waiting
+        } else {
+          if charges == 0 { charges := 1 }      -- the server charges once per key
+          if flip(loss) {                       -- the response is lost
+            phase := Waiting
+          } else {
+            acked := true
+            latency := latency + rtt_ms
+            phase := Done
+          }
+        }
+      }
+      Waiting => {
+        latency := latency + timeout_ms
+        if attempts < max_attempts { phase := Sending } else { phase := GaveUp }
+      }
+      _ => skip
+    }
+  }
+}
+
+-- Safety: these must hold on every path, for every admissible loss rate.
+theorem single_charge : Client |= always[6] charges <= 1
+theorem ack_means_charged : Client |= always[6] (acked implies charges == 1)
+theorem bounded_attempts : Client |= always[6] attempts <= max_attempts
+theorem terminates : Client |= eventually[6] (phase == Done or phase == GaveUp)
+
+-- Service-level requirement.
+claim delivered : Client |= after[6] acked with prob >= 0.99
+
+-- Outcome distributions that the implementation must match exactly.
+#eval Client |= after[6] phase
+#eval Client |= after[6] charges
+#eval Client |= after[6] attempts
+#eval Client |= after[6] latency
+#expect Client |= after[6] latency

@@ -4,6 +4,7 @@ Released under the PolyForm Noncommercial License 1.0.0 as described in the file
 Authors: Ritabrata Maiti
 -/
 import Haze.Elab
+import Haze.Json
 import Haze.Kernel.Verify
 
 /-!
@@ -37,15 +38,39 @@ structure FState where
   env : Env := {}
   branches : Array Branch := #[{}]
   out : Array String := #[]
+  /-- One JSON record per message, for `haze --json`. -/
+  records : Array String := #[]
   errors : Nat := 0
 
 /-- The front-end monad. -/
 abbrev FM := StateM FState
 
-/-- Records a message at a source position. Messages with severity `error` are counted as errors. -/
-def emit (pos : Pos) (sev : String) (msg : String) : FM Unit := modify fun s =>
+/--
+Records a message at a source position, together with structured `data` for the JSON output.
+Messages with severity `error` are counted as errors.
+-/
+def emit (pos : Pos) (sev : String) (msg : String) (data : List (String × Json) := []) :
+    FM Unit := modify fun s =>
+  let record := Json.obj ([("file", .str s.file), ("line", Json.nat pos.line),
+    ("column", Json.nat pos.col), ("severity", .str sev), ("message", .str msg)] ++ data)
   { s with out := s.out.push s!"{s.file}:{pos}: {sev}: {msg}",
+           records := s.records.push record.render,
            errors := if sev == "error" then s.errors + 1 else s.errors }
+
+/-- The JSON form of an interval. -/
+def jsonInterval (i : Interval) : List (String × Json) :=
+  [("belief", Json.rat i.bel), ("plausibility", Json.rat i.pl)]
+
+/-- The JSON form of the result of a property on each parameter assignment. -/
+def jsonBranches (env : Env) (rows : List BranchResult) : Json :=
+  .arr (rows.map fun r => .obj [("parameters", Json.assignment env r.assign),
+    ("possibility", Json.rat r.poss), ("lower", Json.rat r.lo), ("upper", Json.rat r.hi)])
+
+/-- The JSON form of a distribution. The unknown outcome has the value `null`. -/
+def jsonDist (env : Env) (xs : List (Res Value × Rat)) : Json :=
+  .arr (xs.map fun (r, q) => .obj [("value", match r with
+      | .ok v => Json.value env v
+      | .stuck => .null), ("probability", Json.rat q)])
 
 def indent (lines : List String) : String :=
   String.intercalate "" (lines.map ("\n  " ++ ·))
@@ -173,12 +198,32 @@ def doClaim (d : DeclStx) (name : String) (isThm : Bool) (spec : PropSpec) (boun
       ++ branchTable env rows
       ++ (if ok then [] else witLines)
     let kind := if isThm then "theorem" else "claim"
+    let cex : Json := match wit with
+      | some w =>
+        let st : List (String × Json) := match sys with
+          | some si => (si.vars.toList.zip w.config.st.vars.toList).map fun ((n, _), v) => (n, Json.value env v)
+          | none => []
+        let ins : List (String × Json) := Id.run do
+          let mut out := #[]
+          for h : i in [0:env.globals.size] do
+            let gl := env.globals[i]
+            if let .node _ true := gl.kind then
+              if rel[i]?.getD true then
+                if let some (.ok v) := w.config.world[i]? then out := out.push (gl.name, Json.value env v)
+          return out.toList
+        .obj [("step", Json.nat w.step), ("mass", Json.rat w.mass), ("degree", Json.rat w.degree),
+          ("parameters", Json.assignment env w.assign), ("inputs", .obj ins), ("state", .obj st),
+          ("crashed", .bool w.config.st.crashed)]
+      | none => .null
+    let data : List (String × Json) := [("kind", .str kind), ("name", .str name),
+        ("accepted", .bool ok), ("grade", .str (toString g))] ++ jsonInterval iv ++
+      [("branches", jsonBranches env rows), ("counterexample", if ok then .null else cex)]
     if ok then
       let info : ClaimInfo := { name := name, isTheorem := isThm, spec := spec, bound := bound, grade := g, result := iv }
       modify fun s => { s with env := { s.env with claims := s.env.claims.insert name info } }
-      emit d.pos "info" s!"{kind} {name}{indent lines}"
+      emit d.pos "info" s!"{kind} {name}{indent lines}" data
     else
-      emit d.pos "error" s!"{kind} {name}{indent lines}"
+      emit d.pos "error" s!"{kind} {name}{indent lines}" data
 
 /-- The exact distribution of the value of a property after `k` steps, on one branch. -/
 def evalDist (env : Env) (fuel : Nat) (b : Branch) (spec : PropSpec) :
@@ -212,25 +257,35 @@ def doQuery (d : DeclStx) (k : QueryKind) (spec : PropSpec) : FM Unit := do
   match k with
   | .check =>
     match checkSpec env spec true with
-    | .ok (t, g) => emit d.pos "info" s!"{d.text.drop 7 |>.trimAscii} : {t} @{g}"
+    | .ok (t, g) =>
+      let data : List (String × Json) := [("kind", .str "check"), ("query", .str d.text),
+        ("type", .str (toString t)), ("grade", .str (toString g))]
+      emit d.pos "info" s!"{d.text.drop 7 |>.trimAscii} : {t} @{g}" data
     | .error e => emit d.pos "error" e
   | .eval =>
     let mut dists := #[]
+    let mut js := #[]
     for b in s.branches do
       match evalDist env fuel b spec with
       | .error e => emit d.pos "error" e; return
-      | .ok xs => dists := dists.push (b, fmtDist env xs)
+      | .ok xs =>
+        dists := dists.push (b, fmtDist env xs)
+        js := js.push (Json.obj [("parameters", Json.assignment env b.assign),
+          ("possibility", Json.rat b.poss), ("distribution", jsonDist env xs)])
     let same := dists.all fun (_, l) => some l == (dists[0]?.map (·.2))
     let lines := if same then (dists[0]?.map (·.2)).getD [] else
       dists.toList.flatMap fun (b, l) =>
         s!"when {fmtAssign env b.assign} (π {fmtQ b.poss}):" :: l.map ("  " ++ ·)
     emit d.pos "info" s!"{d.text}{indent lines}"
+      [("kind", .str "eval"), ("query", .str d.text), ("branches", .arr js.toList)]
   | .prob =>
     match runSpec env fuel s.branches spec with
     | .error e => emit d.pos "error" e
     | .ok (rows, _) =>
       let iv := integrate (rows.map fun r => (r.poss, r.lo, r.hi))
       emit d.pos "info" s!"{d.text}{indent ([fmtInterval iv] ++ branchTable env rows)}"
+        ([("kind", .str "prob"), ("query", .str d.text)] ++ jsonInterval iv ++
+          [("branches", jsonBranches env rows)])
   | .expect =>
     let mut rows := #[]
     for b in s.branches do
@@ -254,6 +309,10 @@ def doQuery (d : DeclStx) (k : QueryKind) (spec : PropSpec) : FM Unit := do
       "by fuzzy parameter (π = possibility):" :: rows.toList.map fun (b, e) =>
         s!"  {padRight (fmtAssign env b.assign) w}  π {padRight (fmtQ b.poss) 6}  E {fmtQ e}"
     emit d.pos "info" s!"{d.text}{indent (head :: tbl)}"
+      [("kind", .str "expect"), ("query", .str d.text), ("lower", Json.rat iv.bel),
+       ("upper", Json.rat iv.pl), ("branches", .arr (rows.toList.map fun (b, e) =>
+          .obj [("parameters", Json.assignment env b.assign), ("possibility", Json.rat b.poss),
+                ("expectation", Json.rat e)]))]
   | .outcomes =>
     let ck := checkerFor env fuel spec
     let some kk := (match spec.mode with | .after k => some k | _ => none)
@@ -345,17 +404,27 @@ def processDecl (d : DeclStx) : FM Unit := do
           let dr := if r.dropped == 0 then [] else
             [s!"{r.dropped} parameter assignment(s) contradict the observation and were discarded"]
           emit d.pos "info" s!"{d.text}{indent (ev ++ dr)}"
+            [("kind", .str "observe"), ("query", .str d.text), ("evidence", .arr (r.evidence.map
+              fun (a, z) => .obj [("parameters", Json.assignment env' a), ("probability", Json.rat z)]))]
       | .claim n isThm spec bound => doClaim d n isThm spec bound
       | .query k spec => doQuery d k spec
       | .print n => doPrint d n
       | _ => commit
 
+/-- Checks a source file, returning the final front-end state. -/
+def runState (file src : String) (opts : Options := {}) : FState :=
+  match Syntax.program src with
+  | .error (p, msg) => ((emit p "error" msg).run { file, opts }).2
+  | .ok decls => ((decls.forM processDecl).run { file, opts }).2
+
 /-- Checks a source file, returning its messages and the number of errors. -/
 def run (file src : String) (opts : Options := {}) : String × Nat :=
-  match Syntax.program src with
-  | .error (p, msg) => (s!"{file}:{p}: error: {msg}", 1)
-  | .ok decls =>
-    let ((), s) := (decls.forM processDecl).run { file, opts }
-    ("\n".intercalate s.out.toList, s.errors)
+  let s := runState file src opts
+  ("\n".intercalate s.out.toList, s.errors)
+
+/-- Checks a source file, returning one JSON record per message and the number of errors. -/
+def runJson (file src : String) (opts : Options := {}) : String × Nat :=
+  let s := runState file src opts
+  ("\n".intercalate s.records.toList, s.errors)
 
 end Haze.Frontend

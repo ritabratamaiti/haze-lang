@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build, test and check conformance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Installs the toolchain from lean-toolchain, then runs `lake build` (the library,
+      # the `haze` command and the theorems in Haze/Theory.lean) and `lake test`
+      # (the golden tests in tests/ and examples/).
+      - uses: leanprover/lean-action@v1
+
+      - name: Check the gallery against independent calculations
+        run: python3 scripts/verify_gallery.py
+
+      - name: Check the payment client against its Haze specification
+        run: python3 conformance/payments/test_conformance.py

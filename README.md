@@ -56,6 +56,14 @@ payments_retry.hz:88:1: error: theorem naive_single_charge
 With an idempotency key, the same property is accepted as a theorem for every possible
 loss rate. The complete model is [`examples/payments_retry.hz`](examples/payments_retry.hz).
 
+## Using Haze with Real Code
+
+A Haze model can serve as the specification of an implementation. The
+[`conformance/payments`](conformance/payments) folder contains a Python payment client, its
+Haze model, and a test that checks that the client's outcome distributions are exactly those
+of the model, for every admissible loss rate. Continuous integration runs this test on every
+push. [`docs/Workflow.md`](docs/Workflow.md) describes the workflow.
+
 ## Learn Haze
 
 The [`examples/Tutorial`](examples/Tutorial) folder contains a commented walkthrough:
@@ -103,12 +111,15 @@ automatically.
 * To check a model, run `lake exe haze FILE.hz`. The command exits with status 1 if any
   declaration is rejected.
 * To change the bound on nested function calls, pass `--fuel N` (the default is 1000).
+* To print results as JSON for other programs, pass `--json`.
 * To run all tests, run `lake test`.
 
 ## Documentation
 
 - [Language Reference](docs/Language-Reference.md)
 - [Design and Semantics](docs/Design.md), including how Haze relates to Lean's implementation
+- [Using Haze in a Development Workflow](docs/Workflow.md): checking an implementation against
+  its Haze model in continuous integration
 - [Test Suite](tests/README.md)
 - [Release Notes](RELEASES.md)
 - [Contribution Guidelines](CONTRIBUTING.md)

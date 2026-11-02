@@ -289,6 +289,18 @@ or `error`. The result of a claim or `#prob` is
 When the results differ between parameter values, a table shows the result for each value
 and its possibility `π`. The precise definitions are in [`Design.md`](Design.md).
 
+## Command-Line Interface
+
+`haze [--fuel N] [--json] FILE.hz...` checks each file and prints its messages.
+
+* `--fuel N` sets the number of nested function calls after which an outcome becomes unknown.
+  The default is 1000.
+* `--json` prints one JSON record per message instead of text. The format is described in
+  [`Workflow.md`](Workflow.md#step-3-machine-readable-results).
+
+The exit status is 0 if every declaration was accepted and 1 otherwise, so `haze` can be used
+in continuous integration.
+
 ## Limits
 
 Haze computes exact results by enumerating states, so models must be finite and bounded:
