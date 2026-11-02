@@ -27,7 +27,7 @@ def blocks(path):
     return bl
 
 def nums(text):
-    return [float(x) for x in re.findall(r"-?\d+(?:\.\d+)?", text.replace("(=", " ").replace("/", " / "))]
+    return [float(x) for x in re.findall(r"-?\d+(?:\.\d+)?(?:e-?\d+)?", text.replace("(=", " ").replace("/", " / "))]
 
 def check(bl, key, *expected, name=None):
     text = "\n".join(bl.get(key, ["<missing>"]))

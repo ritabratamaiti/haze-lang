@@ -286,6 +286,10 @@ or `error`. The result of a claim or `#prob` is
 * a pair of belief and plausibility, where belief is the degree to which the model
   guarantees the property and plausibility is the degree to which it allows it.
 
+Numbers are exact. A number with a long decimal expansion is rounded and marked with `≈`, and
+the exact fraction follows when it is short, as in `0.666667 (=2/3)`. Numbers below 0.001 are
+shown in scientific notation, as in `≈1.37018e-8 (=1/72982849)`.
+
 When the results differ between parameter values, a table shows the result for each value
 and its possibility `π`. The precise definitions are in [`Design.md`](Design.md).
 

@@ -57,9 +57,9 @@ examples/Gallery/game_physics.hz:129:1: info: #eval VariableStepJump |= after[25
     45  ↦ ≈0.833748
     44  ↦ ≈0.155915
     43  ↦ ≈0.010073
-    42  ↦ ≈0.000261
-    41  ↦ ≈0.000002
-    40  ↦ ≈0
+    42  ↦ ≈2.61275e-4 (=40824203/156250000000)
+    41  ↦ ≈2.32064e-6 (=1813/781250000)
+    40  ↦ ≈3.2e-9 (=1/312500000)
   when drop_rate = 0.1 (π 0.5):
     44  ↦ ≈0.425684
     45  ↦ ≈0.38742
@@ -73,7 +73,7 @@ examples/Gallery/game_physics.hz:129:1: info: #eval VariableStepJump |= after[25
     42  ↦ 0.205994 (=3375/16384)
     45  ↦ ≈0.075085
     41  ↦ 0.036621 (=75/2048)
-    40  ↦ 0.000977 (=1/1024)
+    40  ↦ ≈9.76563e-4 (=1/1024)
 examples/Gallery/game_physics.hz:147:1: info: claim jetpack_reaches_platform
   probability ≈0.972796 — graded
   grade prob · 3 parameter assignment(s) · ≤229 states/step

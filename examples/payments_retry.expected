@@ -16,7 +16,7 @@ examples/payments_retry.hz:88:1: error: theorem naive_single_charge
     loss = 0.02  π 1       ≈0.980024
     loss = 0.05  π 0.5     0.950363 (=76029/80000)
     loss = 0.1   π 0.2     0.9028
-  counterexample at step 3 (path mass ≈0.000098, degree 0):
+  counterexample at step 3 (path mass ≈9.801e-5 (=9801/100000000), degree 0):
     parameters: loss = 0.01
     state: phase = Waiting, attempts = 2, charges = 2, acked = false, latency = 1000
 examples/payments_retry.hz:89:1: info: claim double_charge_risk
@@ -53,13 +53,13 @@ examples/payments_retry.hz:97:1: info: #expect Idempotent |= after[6] latency
 examples/payments_retry.hz:98:1: info: #eval Idempotent |= after[6] phase
   when loss = 0.01 (π 0.6):
     Done    ↦ ≈0.999992
-    GaveUp  ↦ ≈0.000008
+    GaveUp  ↦ ≈7.8806e-6 (=7880599/1000000000000)
   when loss = 0.02 (π 1):
     Done    ↦ ≈0.999938
-    GaveUp  ↦ ≈0.000062
+    GaveUp  ↦ ≈6.20991e-5 (=970299/15625000000)
   when loss = 0.05 (π 0.5):
     Done    ↦ ≈0.999073
-    GaveUp  ↦ ≈0.000927
+    GaveUp  ↦ ≈9.26859e-4 (=59319/64000000)
   when loss = 0.1 (π 0.2):
     Done    ↦ 0.993141
     GaveUp  ↦ 0.006859

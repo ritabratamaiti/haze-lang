@@ -371,17 +371,41 @@ def fmtDec (q : Rat) (digits : Nat := 6) : String := Id.run do
   return sign ++ toString ip ++ (if fp.isEmpty then "" else "." ++ fp)
 
 /--
-Renders a rational number exactly if it has a short decimal expansion, and otherwise in rounded
-decimal notation followed by the exact fraction.
+Renders a positive rational number in scientific notation with six significant digits, such as
+`1.37019e-8`.
+-/
+def fmtSci (q : Rat) : String := Id.run do
+  let mut x := if q < 0 then -q else q
+  let mut e : Int := 0
+  for _ in [0:100000] do
+    if x ≥ 1 then break
+    x := x * 10
+    e := e - 1
+  for _ in [0:100000] do
+    if x < 10 then break
+    x := x / 10
+    e := e + 1
+  let mut m := fmtDec x 5
+  if m.startsWith "10" then
+    m := fmtDec (x / 10) 5
+    e := e + 1
+  return (if q < 0 then "-" else "") ++ m ++ "e" ++ toString e
+
+/--
+Renders a rational number exactly if it has a short decimal expansion. Otherwise it is rounded,
+in decimal notation or, below 0.001, in scientific notation, and followed by the exact fraction
+when the fraction is short.
 -/
 def fmtQ (q : Rat) : String :=
   if q.den == 1 then toString q.num
   else
     let exactDec := ((q * (1000000 : Rat)).den == 1)
-    let d := fmtDec q
-    if exactDec then d
-    else if q.den ≤ 100000 then s!"{d} (={q.num}/{q.den})"
-    else s!"≈{d}"
+    let a := if q < 0 then -q else q
+    if exactDec then fmtDec q
+    else if a < 1/1000 then
+      if q.den ≤ 1000000000000 then s!"≈{fmtSci q} (={q.num}/{q.den})" else s!"≈{fmtSci q}"
+    else if q.den ≤ 100000 then s!"{fmtDec q} (={q.num}/{q.den})"
+    else s!"≈{fmtDec q}"
 
 /-- Renders a value for messages, using constructor names for enumeration values. -/
 def fmtValue (env : Env) : Value → String

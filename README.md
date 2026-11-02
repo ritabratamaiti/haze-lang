@@ -48,7 +48,7 @@ payments_retry.hz:85:1: info: claim delivered
 payments_retry.hz:88:1: error: theorem naive_single_charge
   belief ≈0.955681 · plausibility ≈0.986011 — graded
   theorem rejected: belief is ≈0.955681, not 1
-  counterexample at step 3 (path mass ≈0.000098, degree 0):
+  counterexample at step 3 (path mass ≈9.801e-5 (=9801/100000000), degree 0):
     parameters: loss = 0.01
     state: phase = Waiting, attempts = 2, charges = 2, acked = false, latency = 1000
 ```
@@ -89,6 +89,12 @@ answer agrees with a closed-form result or an independent exact calculation:
 | [`games.hz`](examples/Gallery/games.hz) | Games | Craps (244/495), a game of tennis with deuce and Penney's game. |
 | [`queueing.hz`](examples/Gallery/queueing.hz) | Networking | Buffer occupancy and packet drops under a vague arrival rate. |
 | [`game_physics.hz`](examples/Gallery/game_physics.hz) | Video games | Tunneling through walls, energy drift of integrators, bouncing, frame-rate dependent jumps and a jetpack in gusty wind. |
+
+The [`examples/Law`](examples/Law) folder applies Haze to a real court case.
+[`sally_clark.hz`](examples/Law/sally_clark.hz) recomputes the statistical evidence in R v Clark
+(the "1 in 73 million" figure), using only numbers from the case and the published analysis
+of it, and shows how the probability of a natural explanation changes once the question is
+asked correctly.
 
 The [`examples/Conformance`](examples/Conformance) sample shows how a Haze model can serve as
 the specification of real code: a test checks that a Python payment client has exactly the
