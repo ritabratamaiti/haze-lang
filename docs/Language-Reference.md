@@ -295,11 +295,33 @@ and its possibility `π`. The precise definitions are in [`Design.md`](Design.md
 
 * `--fuel N` sets the number of nested function calls after which an outcome becomes unknown.
   The default is 1000.
-* `--json` prints one JSON record per message instead of text. The format is described in
-  [`Workflow.md`](Workflow.md#step-3-machine-readable-results).
+* `--json` prints one JSON record per message instead of text, as described below.
 
 The exit status is 0 if every declaration was accepted and 1 otherwise, so `haze` can be used
 in continuous integration.
+
+### JSON Output
+
+With `--json`, each message is printed as a JSON object on its own line. Every record has the
+fields `file`, `line`, `column`, `severity` and `message`, which is the text that `haze` would
+otherwise print. Records for results also have a `kind` and further fields:
+
+| `kind` | Fields |
+|---|---|
+| `theorem`, `claim` | `name`, `accepted`, `grade`, `belief`, `plausibility`, `branches`, `counterexample` |
+| `prob` | `query`, `belief`, `plausibility`, `branches` |
+| `expect` | `query`, `lower`, `upper`, `branches`, each with an `expectation` |
+| `eval` | `query`, `branches`, each with a `distribution` of `value` and `probability` pairs |
+| `check` | `query`, `type`, `grade` |
+| `observe` | `query`, `evidence`, the probability of the evidence for each parameter assignment |
+
+`branches` lists the result for each assignment of the fuzzy parameters, with its `parameters`
+and `possibility`; for properties it has the `lower` and `upper` bounds. A `counterexample` has
+the `step`, `parameters`, `inputs` and `state` at which a property fails, or is `null`.
+
+Numbers are exact: probabilities and numeric values are strings such as `"2/3"`, which
+libraries for exact fractions read directly. Booleans are JSON Booleans, enumeration values are
+the names of their constructors, and an unknown outcome has the value `null`.
 
 ## Limits
 

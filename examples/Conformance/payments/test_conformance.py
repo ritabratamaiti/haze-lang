@@ -15,14 +15,14 @@ implementation against the model):
 
 Run it from the repository root after `lake build`:
 
-    python conformance/payments/test_conformance.py
+    python examples/Conformance/payments/test_conformance.py
 """
 from collections import defaultdict
 from fractions import Fraction
 import json, os, pathlib, subprocess, sys
 
 HERE = pathlib.Path(__file__).resolve().parent
-ROOT = HERE.parent.parent
+ROOT = HERE.parent.parent.parent
 HAZE = ROOT / ".lake" / "build" / "bin" / ("haze.exe" if os.name == "nt" else "haze")
 sys.path.insert(0, str(HERE))
 import payments_client as impl  # noqa: E402

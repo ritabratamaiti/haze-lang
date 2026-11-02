@@ -1,9 +1,23 @@
-# Using Haze in a Development Workflow
+# Sample: Checking an Implementation Against a Haze Model
 
-This guide describes how to use Haze alongside an implementation, following the pattern that
-is common with Lean in industry: write a model, prove its properties, and then test the
-implementation against the model. It uses the payment client in
-[`conformance/payments`](../conformance/payments) as a running example.
+This sample shows one way to use Haze alongside real code, following a pattern that is common
+with Lean in industry: write a model, prove its properties, and then test the implementation
+against the model. It is an example, not part of Haze: the only Haze feature it relies on is the
+JSON output of `haze` (see the [language reference](../../docs/Language-Reference.md#json-output)).
+
+The [`payments`](payments) folder contains:
+
+- [`payments.hz`](payments/payments.hz): the Haze model of a payment client, which serves as its
+  specification;
+- [`payments_client.py`](payments/payments_client.py): the implementation, in Python;
+- [`test_conformance.py`](payments/test_conformance.py): a test that checks the implementation
+  against the model.
+
+Run the test from the repository root after `lake build`:
+
+```sh
+python examples/Conformance/payments/test_conformance.py
+```
 
 ## The Pattern
 
@@ -25,11 +39,11 @@ alone is enough: the model can be proved correct but may not describe the code, 
 can be tested but random testing rarely finds the rare paths that the model checker
 enumerates.
 
-## Step 1 and 2: The Model and Its Requirements
+## The Model and Its Requirements
 
-[`payments.hz`](../conformance/payments/payments.hz) models a client that sends a charge
-request, retries after a timeout up to three times, and talks to a server that deduplicates
-requests by idempotency key. The loss rate of the network is a fuzzy parameter:
+[`payments.hz`](payments/payments.hz) models a client that sends a charge request, retries
+after a timeout up to three times, and talks to a server that deduplicates requests by
+idempotency key. The loss rate of the network is a fuzzy parameter:
 
 ```haze
 param loss : Num ~= {0.01: 0.6, 0.02: 1, 0.05: 0.5, 0.1: 0.2}
@@ -45,40 +59,9 @@ claim delivered : Client |= after[6] acked with prob >= 0.99
 The `#eval` commands compute the exact distributions of the outcomes that the implementation
 must reproduce.
 
-## Step 3: Machine-Readable Results
+## The Conformance Test
 
-With `--json`, `haze` prints one JSON record per message instead of text:
-
-```sh
-lake exe haze --json conformance/payments/payments.hz
-```
-
-Each record has the fields `file`, `line`, `column`, `severity` and `message`, the text that
-`haze` would otherwise print. Records for results have more fields:
-
-| `kind` | Fields |
-|---|---|
-| `theorem`, `claim` | `name`, `accepted`, `grade`, `belief`, `plausibility`, `branches`, `counterexample` |
-| `prob` | `query`, `belief`, `plausibility`, `branches` |
-| `expect` | `query`, `lower`, `upper`, `branches`, each with an `expectation` |
-| `eval` | `query`, `branches`, each with a `distribution` of `value` and `probability` pairs |
-| `check` | `query`, `type`, `grade` |
-| `observe` | `query`, `evidence`, the probability of the evidence for each parameter assignment |
-
-`branches` lists the result for each assignment of the fuzzy parameters, with its
-`parameters` and `possibility`. A `counterexample` has the `step`, the `parameters`, the
-`inputs` and the `state` at which a property fails.
-
-Numbers are exact. Probabilities and numeric values are strings such as `"2/3"`, which
-Python's `fractions.Fraction` and similar libraries read directly. Booleans are JSON Booleans,
-and enumeration values are the names of their constructors. An unknown outcome, from a
-computation that ran out of fuel, has the value `null`.
-
-## Step 4: The Conformance Test
-
-[`test_conformance.py`](../conformance/payments/test_conformance.py) checks the Python
-implementation, [`payments_client.py`](../conformance/payments/payments_client.py), against
-the model:
+[`test_conformance.py`](payments/test_conformance.py) checks the implementation as follows:
 
 1. It runs `haze --json` on the model and stops if any theorem or claim is rejected.
 2. The implementation receives its network as a parameter, so the test can decide which
@@ -111,13 +94,6 @@ many times with real randomness instead, and compare the observed frequencies wi
 probabilities using a statistical test. The model's exact probabilities make such tests
 precise, because only the sampling error of the implementation remains.
 
-## Step 5: Continuous Integration
-
-[`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs on every push and pull request.
-It builds Haze, checks the theorems about its kernel, runs the golden tests, checks the
-gallery against independent calculations, and runs the conformance test. A change to either
-the model or the implementation that makes them disagree fails the build.
-
 ## Applying the Pattern to Your Own Code
 
 * Make the sources of randomness and failure in the implementation injectable: the network,
@@ -127,4 +103,5 @@ the model or the implementation that makes them disagree fails the build.
   the outcome of each request, not the contents of the messages.
 * Use a fuzzy parameter for every rate that isn't known precisely. The conformance test then
   checks the implementation at each admissible value.
-* Keep the model next to the code, and review changes to both in the same pull request.
+* Keep the model next to the code, review changes to both in the same pull request, and run
+  `haze` and the conformance test in continuous integration.

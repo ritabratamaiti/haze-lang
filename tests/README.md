@@ -41,6 +41,5 @@ models in [`examples/Gallery`](../examples/Gallery) without using Haze, from clo
 answers or with an exact step-by-step calculation in Python, and compares them with the
 output of `haze`. Run it with `python scripts/verify_gallery.py` after `lake build`.
 
-[`conformance/payments/test_conformance.py`](../conformance/payments/test_conformance.py)
-checks a Python implementation against its Haze model; see
-[`docs/Workflow.md`](../docs/Workflow.md).
+The sample in [`examples/Conformance`](../examples/Conformance) has its own test, which checks a
+Python implementation against its Haze model.

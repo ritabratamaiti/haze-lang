@@ -5,7 +5,7 @@
 -- server deduplicates requests by idempotency key, so a retried request never
 -- charges the card again. The loss rate of the network is only known vaguely.
 --
--- This file is the single source of truth: the theorems and bounds below must hold,
+-- This file is the specification: the theorems and bounds below must hold,
 -- and test_conformance.py checks that the Python implementation has exactly the
 -- outcome distributions computed here.
 

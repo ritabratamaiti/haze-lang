@@ -56,14 +56,6 @@ payments_retry.hz:88:1: error: theorem naive_single_charge
 With an idempotency key, the same property is accepted as a theorem for every possible
 loss rate. The complete model is [`examples/payments_retry.hz`](examples/payments_retry.hz).
 
-## Using Haze with Real Code
-
-A Haze model can serve as the specification of an implementation. The
-[`conformance/payments`](conformance/payments) folder contains a Python payment client, its
-Haze model, and a test that checks that the client's outcome distributions are exactly those
-of the model, for every admissible loss rate. Continuous integration runs this test on every
-push. [`docs/Workflow.md`](docs/Workflow.md) describes the workflow.
-
 ## Learn Haze
 
 The [`examples/Tutorial`](examples/Tutorial) folder contains a commented walkthrough:
@@ -98,6 +90,10 @@ answer agrees with a closed-form result or an independent exact calculation:
 | [`queueing.hz`](examples/Gallery/queueing.hz) | Networking | Buffer occupancy and packet drops under a vague arrival rate. |
 | [`game_physics.hz`](examples/Gallery/game_physics.hz) | Video games | Tunneling through walls, energy drift of integrators, bouncing, frame-rate dependent jumps and a jetpack in gusty wind. |
 
+The [`examples/Conformance`](examples/Conformance) sample shows how a Haze model can serve as
+the specification of real code: a test checks that a Python payment client has exactly the
+outcome distributions of its Haze model, using the JSON output of `haze`.
+
 A description of every construct of the language is in
 [`docs/Language-Reference.md`](docs/Language-Reference.md).
 
@@ -118,8 +114,6 @@ automatically.
 
 - [Language Reference](docs/Language-Reference.md)
 - [Design and Semantics](docs/Design.md), including how Haze relates to Lean's implementation
-- [Using Haze in a Development Workflow](docs/Workflow.md): checking an implementation against
-  its Haze model in continuous integration
 - [Test Suite](tests/README.md)
 - [Release Notes](RELEASES.md)
 - [Contribution Guidelines](CONTRIBUTING.md)

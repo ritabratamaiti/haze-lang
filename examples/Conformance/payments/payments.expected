@@ -1,0 +1,96 @@
+examples/Conformance/payments/payments.hz:53:1: info: theorem single_charge
+  probability 1 — holds with certainty
+  grade prob+fuzzy · 4 parameter assignment(s) · ≤5 states/step
+  theorem accepted
+examples/Conformance/payments/payments.hz:54:1: info: theorem ack_means_charged
+  probability 1 — holds with certainty
+  grade prob+fuzzy · 4 parameter assignment(s) · ≤5 states/step
+  theorem accepted
+examples/Conformance/payments/payments.hz:55:1: info: theorem bounded_attempts
+  probability 1 — holds with certainty
+  grade prob+fuzzy · 4 parameter assignment(s) · ≤5 states/step
+  theorem accepted
+examples/Conformance/payments/payments.hz:56:1: info: theorem terminates
+  probability 1 — holds with certainty
+  grade prob+fuzzy · 4 parameter assignment(s) · ≤2 states/step
+  theorem accepted
+examples/Conformance/payments/payments.hz:59:1: info: claim delivered
+  belief ≈0.998319 · plausibility ≈0.99997 — graded
+  grade prob+fuzzy · 4 parameter assignment(s) · ≤5 states/step
+  bound holds: belief ≥ 0.99
+  by fuzzy parameter (π = possibility):
+    loss = 0.01  π 0.6     ≈0.999992
+    loss = 0.02  π 1       ≈0.999938
+    loss = 0.05  π 0.5     ≈0.999073
+    loss = 0.1   π 0.2     0.993141
+examples/Conformance/payments/payments.hz:62:1: info: #eval Client |= after[6] phase
+  when loss = 0.01 (π 0.6):
+    Done    ↦ ≈0.999992
+    GaveUp  ↦ ≈0.000008
+  when loss = 0.02 (π 1):
+    Done    ↦ ≈0.999938
+    GaveUp  ↦ ≈0.000062
+  when loss = 0.05 (π 0.5):
+    Done    ↦ ≈0.999073
+    GaveUp  ↦ ≈0.000927
+  when loss = 0.1 (π 0.2):
+    Done    ↦ 0.993141
+    GaveUp  ↦ 0.006859
+examples/Conformance/payments/payments.hz:63:1: info: #eval Client |= after[6] charges
+  when loss = 0.01 (π 0.6):
+    1  ↦ 0.999999
+    0  ↦ 0.000001
+  when loss = 0.02 (π 1):
+    1  ↦ 0.999992
+    0  ↦ 0.000008
+  when loss = 0.05 (π 0.5):
+    1  ↦ 0.999875
+    0  ↦ 0.000125
+  when loss = 0.1 (π 0.2):
+    1  ↦ 0.999
+    0  ↦ 0.001
+examples/Conformance/payments/payments.hz:64:1: info: #eval Client |= after[6] attempts
+  when loss = 0.01 (π 0.6):
+    1  ↦ 0.9801
+    2  ↦ ≈0.019504
+    3  ↦ ≈0.000396
+  when loss = 0.02 (π 1):
+    1  ↦ 0.9604
+    2  ↦ ≈0.038032
+    3  ↦ ≈0.001568
+  when loss = 0.05 (π 0.5):
+    1  ↦ 0.9025
+    2  ↦ ≈0.087994
+    3  ↦ ≈0.009506
+  when loss = 0.1 (π 0.2):
+    1  ↦ 0.81
+    2  ↦ 0.1539
+    3  ↦ 0.0361
+examples/Conformance/payments/payments.hz:65:1: info: #eval Client |= after[6] latency
+  when loss = 0.01 (π 0.6):
+    80    ↦ 0.9801
+    1080  ↦ ≈0.019504
+    2080  ↦ ≈0.000388
+    3000  ↦ ≈0.000008
+  when loss = 0.02 (π 1):
+    80    ↦ 0.9604
+    1080  ↦ ≈0.038032
+    2080  ↦ ≈0.001506
+    3000  ↦ ≈0.000062
+  when loss = 0.05 (π 0.5):
+    80    ↦ 0.9025
+    1080  ↦ ≈0.087994
+    2080  ↦ ≈0.008579
+    3000  ↦ ≈0.000927
+  when loss = 0.1 (π 0.2):
+    80    ↦ 0.81
+    1080  ↦ 0.1539
+    2080  ↦ 0.029241
+    3000  ↦ 0.006859
+examples/Conformance/payments/payments.hz:66:1: info: #expect Client |= after[6] latency
+  lower expectation ≈108.672073 · upper expectation ≈179.45239
+  by fuzzy parameter (π = possibility):
+    loss = 0.01  π 0.6     E ≈100.30326
+    loss = 0.02  π 1       E ≈121.225291
+    loss = 0.05  π 0.5     E ≈187.858961
+    loss = 0.1   π 0.2     E 312.41028
