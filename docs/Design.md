@@ -183,9 +183,7 @@ is the set of variables it reads, closed under these dependencies. Variables tha
 reads are always in the cone, since a crash affects everything, and so are the variables that a
 function call in an assignment depends on, since a call can run out of fuel. Assignments to the
 other variables are removed from the step (`Haze.Kernel.sliceStep`), and those variables stay at
-a placeholder value that nothing reads. In the Raft example, a safety property never reads the
-elapsed time, so the configurations that differ only in it collapse into one, and checking six
-election rounds takes about two seconds instead of not finishing.
+a placeholder value that nothing reads. A clock or a counter that a property never reads no longer splits its configurations.
 
 ### Claims and theorems
 
@@ -227,10 +225,8 @@ test (see the [test suite](../tests/README.md)), and many expected results were 
 2/3 for the Monty Hall problem, a posterior of 19/118 after a positive medical test, a necessity
 and possibility pair, a Łukasiewicz implication, a 0.19³ chance of giving up after three retries,
 a stale-read risk of 0.128, and a root-cause posterior of 567/955. The models in
-[`examples/Gallery`](../examples/Gallery), [`examples/Agents`](../examples/Agents),
-[`examples/Protocols`](../examples/Protocols) and [`examples/Privacy`](../examples/Privacy) are
-also checked against independent calculations by
-[`scripts/verify_gallery.py`](../scripts/verify_gallery.py), 121 checks in all. The test
+[`examples/Gallery`](../examples/Gallery) are also checked against independent calculations by
+[`scripts/verify_gallery.py`](../scripts/verify_gallery.py). The test
 [`tests/systems_and_conditioning.hz`](../tests/systems_and_conditioning.hz) covers the
 reductions above, including a dependency chain long enough to catch a closure that stops
 early.

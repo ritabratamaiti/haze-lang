@@ -1,6 +1,5 @@
 """
-Checks the numbers printed by the models in examples/Gallery, examples/Agents,
-examples/Protocols and examples/Privacy against independent calculations.
+Checks the numbers printed by the models in examples/Gallery against independent calculations.
 
 The script runs the haze binary on each gallery file and then recomputes every result here with
 exact fractions, without using Haze: either from a closed-form answer, or by pushing the
@@ -272,105 +271,6 @@ def jet(s):
     return [((max(y + v + thrust - 1 - g, 0), v + thrust - 1 - g, max(fuel - 1, 0)), q) for g, q in ((1, F(3, 10)), (0, F(7, 10)))]
 check(b, "claim jetpack_reaches_platform", eventually((0, 0, 12), jet, 30, lambda s: s[0] >= 40))
 check(b, "#expect Jetpack |= after[30] y", after((0, 0, 12), jet, 30, lambda s: s[0]))
-
-def fuzzy(*params):
-    """All joint assignments of fuzzy parameters given as {value: membership}, as (possibility, values)."""
-    for combo in itertools.product(*(p.items() for p in params)):
-        yield min(m for _, m in combo), tuple(v for v, _ in combo)
-
-# ---- AI agents: support agent ---------------------------------------------------
-b = blocks("examples/Agents/support_agent.hz")
-for k in (1, 2, 8):
-    check(b, f"claim pass_{k}", F(3, 10) * F(97, 100) ** k + F(7, 10) * F(4586, 10000) ** k)
-# Everything finishes within 8 steps. A refund reaches a decision unless the order lookup fails
-# three times; a correct decision needs the request understood and the right refund chosen.
-U = {F(95, 100): F(6, 10), F(97, 100): F(1), F(99, 100): F(1, 2)}
-D = {F(90, 100): F(6, 10), F(94, 100): F(1), F(97, 100): F(1, 2)}
-C = {F(8, 10): F(6, 10), F(9, 10): F(1)}
-reach = 1 - F(5, 100) ** 3
-def agent(u, d, c):
-    r = u * d
-    wrong_paid = F(15, 100) * reach * (1 - r) * (1 - c)    # ineligible, wrongly approved by agent and checker
-    return {"correct": reach * r,
-            "wrong_refund": wrong_paid * (F(6, 10) + F(3, 10) + F(1, 10) * F(5, 100)),
-            "wrong_refund_large": wrong_paid * F(1, 10) * F(5, 100),
-            "wrongly_declined": F(85, 100) * reach * (1 - r),
-            "loss": wrong_paid * (F(6, 10) * 40 + F(3, 10) * 180 + F(1, 10) * F(5, 100) * 750)}
-rows = [(pi, agent(*v)) for pi, v in fuzzy(U, D, C)]
-for key in ("correct", "wrong_refund", "wrong_refund_large", "wrongly_declined"):
-    check(b, f"claim {key}", *interval([(pi, r[key]) for pi, r in rows]))
-check(b, "#expect Agent |= after[8] (if phase == Refunded and not eligible then amount else 0)",
-      *interval([(pi, r["loss"]) for pi, r in rows]))
-
-# ---- AI agents: coding agent in CI ------------------------------------------------
-b = blocks("examples/Agents/coding_agent_ci.hz")
-SOLVES = {F(4, 10): F(6, 10), F(55, 100): F(1), F(7, 10): F(1, 2)}
-SHARE = {F(78, 1000): F(6, 10), F(163, 1000): F(1), F(296, 1000): F(4, 10)}
-CATCH = {F(5, 10): F(1, 2), F(7, 10): F(1), F(85, 100): F(4, 10)}
-def pipeline(s, share, c, gen, review):
-    w = share * s / (1 - share)                       # wrong but passes the existing tests
-    merge_ok = (F(95, 100) if gen else 1) * (F(98, 100) if review else 1)
-    merge_wrong = ((1 - c) if gen else 1) * (F(4, 10) if review else 1)
-    m = s * merge_ok + w * merge_wrong                # an attempt is merged
-    tries = 1 + (1 - m) + (1 - m) ** 2                # attempts made within three
-    return {"merged": m * tries, "wrong": w * merge_wrong * tries,
-            "precision": w * merge_wrong / m, "runs": tries}
-def ci(key, gen, review):
-    return [(pi, pipeline(*v, gen, review)[key]) for pi, v in fuzzy(SOLVES, SHARE, CATCH)]
-check(b, "claim merged_tests_only", *interval(ci("merged", False, False)))
-check(b, "claim wrong_merge_tests_only", *interval(ci("wrong", False, False)))
-check(b, "claim wrong_merge_generated", *interval(ci("wrong", True, False)))
-check(b, "claim wrong_merge_both", *interval(ci("wrong", True, True)))
-check(b, "claim merged_both", *interval(ci("merged", True, True)))
-check(b, "#prob Pipeline(false, false) |= after[3] wrong given stage == Merged", *interval(ci("precision", False, False)))
-check(b, "#prob Pipeline(true, false) |= after[3] wrong given stage == Merged", *interval(ci("precision", True, False)))
-check(b, "#prob Pipeline(true, true) |= after[3] wrong given stage == Merged", *interval(ci("precision", True, True)))
-check(b, "claim precision_target", *interval(ci("precision", True, True)))
-check(b, "#expect Pipeline(false, false) |= after[3] ci_runs", *interval(ci("runs", False, False)))
-check(b, "#expect Pipeline(true, true) |= after[3] ci_runs", *interval(ci("runs", True, True)))
-
-# ---- Raft leader election -------------------------------------------------------
-# With three servers, a round elects a leader unless all three time out within `delay` ticks
-# of each other: a lone candidate, or two, always gets the third server's vote.
-b = blocks("examples/Protocols/raft_election.hz")
-def raft(delay):
-    triples = list(itertools.product(range(15, 31), repeat=3))
-    win = F(sum(1 for t in triples if max(t) - min(t) >= delay), len(triples))
-    first = F(sum(min(t) for t in triples), len(triples))
-    return win, first
-def raft_leaders(t, delay, coin):
-    first = min(t); cand = [x < first + delay for x in t]
-    earliest = [i for i in range(3) if cand[i] and t[i] == first]
-    pick = earliest[1] if coin and len(earliest) > 1 else earliest[0]
-    votes = [int(cand[i]) + sum(1 for j in range(3) if not cand[j] and pick == i) for i in range(3)]
-    return sum(v >= 2 for v in votes)
-results.append((all(raft_leaders(t, d, c) <= 1 for d in (1, 2) for c in (False, True)
-                    for t in itertools.product(range(15, 31), repeat=3)),
-                "raft: no timeouts give two leaders in a round (brute force)", "<= 1"))
-for delay, key in ((1, "claim first_round"), (2, "claim first_round_slow_network")):
-    check(b, key, raft(delay)[0])
-win2, _ = raft(2)
-check(b, "claim within_three_rounds", 1 - (1 - win2) ** 3)
-for delay in (1, 2):
-    win, first = raft(delay)
-    per_round = first + 2 * delay * win
-    check(b, f"#expect Election(true, {delay}) |= after[3] elapsed * 10", 10 * per_round * (1 + (1 - win) + (1 - win) ** 2))
-
-# ---- randomized response ------------------------------------------------------------
-b = blocks("examples/Privacy/randomized_response.hz")
-yes_c, yes_h = F(1, 2) + F(1, 3), F(1, 3)
-check(b, "#prob answer given cheated", yes_c)
-check(b, "#prob answer given not cheated", yes_h)
-RATE = {F(5, 100): F(1, 2), F(1, 10): F(1), F(2, 10): F(1, 2)}
-post = lambda r, k: yes_c ** k * r / (yes_c ** k * r + yes_h ** k * (1 - r))
-check(b, "#prob person_cheated given first_answer", *interval([(pi, post(r, 1)) for r, pi in RATE.items()]))
-check(b, "#prob person_cheated given first_answer and second_answer", *interval([(pi, post(r, 2)) for r, pi in RATE.items()]))
-def accuracy(r, randomized):
-    p = r / 2 + F(1, 3) if randomized else r
-    est = (lambda y: 2 * (F(y, 200) - F(1, 3))) if randomized else (lambda y: F(y, 200))
-    return sum(q for y, q in binom(200, p) if abs(est(y) - r) <= F(5, 100))
-check(b, "#prob abs(estimate - base_rate) <= 0.05", *interval([(pi, accuracy(r, True)) for r, pi in RATE.items()]))
-check(b, "#prob abs(direct_estimate - base_rate) <= 0.05", *interval([(pi, accuracy(r, False)) for r, pi in RATE.items()]))
 
 passed = sum(r[0] for r in results)
 for ok, name, exp in results:

@@ -45,9 +45,3 @@ property holds, taken from a parameter value that breaks the bound.
 The `haze` command checks models and supports `--fuel` and JSON output (`--json`). The test
 suite runs with `lake test`. When a result depends on more than six parameter assignments, the
 output summarizes them and ranks the parameters by how much each one moves the result.
-
-### Examples
-
-New examples model AI agents (consistency across repeated runs from τ-bench, and a coding
-agent's wrong merges in CI from the PatchDiff study), Raft leader election with and without
-randomized timeouts, and a randomized-response survey with its privacy guarantee.

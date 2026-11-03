@@ -45,9 +45,7 @@ probabilities, make the best tests.
 ## Independent checks
 
 Golden tests catch changes, but they can't tell whether the original answer was right. For the
-models in [`examples/Gallery`](../examples/Gallery), [`examples/Agents`](../examples/Agents),
-[`examples/Protocols`](../examples/Protocols) and [`examples/Privacy`](../examples/Privacy),
-[`scripts/verify_gallery.py`](../scripts/verify_gallery.py) recomputes every result without Haze, from closed-form answers or an exact step-by-step
+models in [`examples/Gallery`](../examples/Gallery), [`scripts/verify_gallery.py`](../scripts/verify_gallery.py) recomputes every result without Haze, from closed-form answers or an exact step-by-step
 calculation in Python, and compares them with what `haze` prints. Run it with
 `python scripts/verify_gallery.py` after `lake build`.
 
