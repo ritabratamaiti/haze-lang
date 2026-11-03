@@ -33,6 +33,14 @@ logic product      -- multiplication and probabilistic sum
 logic lukasiewicz  -- max(0, a + b - 1) and min(1, a + b)
 ```
 
+`explore N` sets how many states Haze explores for an unbounded property (see
+[Claims and Theorems](#8-claims-and-theorems)), from that point in the file on. The default is
+100,000, and `haze --states N` changes the default for a whole run.
+
+```haze
+explore 5000
+```
+
 ### 2. Enumeration Types
 
 An enumeration type lists its possible values. The names of the values must be unique in the
@@ -193,9 +201,31 @@ A property is a term of type `Bool` or `Deg`, optionally about a system:
 | `S \|= after[k] φ` | `φ` after `k` steps |
 | `S \|= always[k] φ` | `φ` at every step from 0 to `k` |
 | `S \|= eventually[k] φ` | `φ` at some step from 0 to `k` |
+| `S \|= always φ` | `φ` at every step, forever |
+| `S \|= eventually φ` | `φ` at some step, however late |
 
 In a property about `S`, you can use the state variables of `S` and `crashed`. For a `Deg`
 property, `always` takes the lowest degree along each path and `eventually` the highest.
+
+Without a bound, `always` and `eventually` look at the whole infinite run. Haze explores every
+reachable state and solves the resulting equations, so a game that can last any number of rounds
+gets its exact answer rather than an approximation from a long horizon:
+
+```haze
+claim shooter_wins : Craps |= eventually phase == Won       -- exactly 244/495
+#expect Game(0.5) |= steps until money == 0 or money == 6   -- exactly 9
+```
+
+`#expect S |= steps until φ` is the expected number of steps until a `Bool` property first
+holds. It is infinite, and Haze says so, when there is a positive probability that `φ` never
+holds.
+
+A system can have infinitely many states, for example when a counter has no upper limit. Haze
+then stops after the number of states set by `explore`, and treats what happens after the
+unexplored states as unknown. The answer is an interval that contains the true value. It is
+narrow when the unexplored states are unlikely to be reached, as in a queue that usually stays
+short, and wide when they aren't, as in a random walk that drifts away; exploring further
+can't help in that case.
 
 A property can be conditioned with `given`, which asks how likely it is among the runs or
 worlds where a condition holds:
@@ -226,7 +256,7 @@ Queries print information about the model without changing it:
 | `#check e` | The type and grade of `e`. |
 | `#eval e` | The exact distribution of `e`, for each parameter value if they differ. With `S \|= after[k] e`, the distribution at step `k`. |
 | `#prob φ` | The belief and plausibility of a property. |
-| `#expect e` | The expectation of a number, or its lower and upper expectations when fuzzy parameters are involved. |
+| `#expect e` | The expectation of a number, or its lower and upper expectations when fuzzy parameters are involved. With `S \|= steps until φ`, the expected number of steps until `φ` holds. |
 | `#outcomes e` | The outcome of `e` for each combination of input values, with its probability. |
 | `#print x` | A summary of the declaration `x`, including its grade or result. |
 
@@ -306,6 +336,8 @@ definition sets an upper limit.
   `step`, `claim`, `theorem`, `with`, `prob`, `if`, `then`, `else`, `let`, `in`,
   `forall`, `exists`, `match`, `and`, `or`, `not`, `implies`, `is`, `very`, `true`,
   `false`, `assert`, `skip`, `always`, `eventually`, `after` and `given`.
+* `explore`, `steps` and `until` have a special meaning only where they're used, at the start of
+  a declaration and after `|=`, and can be used as names elsewhere.
 * The symbols `≈`, `≤`, `≥`, `≠`, `⊨`, `→` and `⇒` may be written instead of `~=`, `<=`,
   `>=`, `!=`, `|=`, `->` and `=>`.
 
@@ -326,15 +358,21 @@ on its own, keeping the others at their most plausible values, to rank the param
 much they move the result. That ranking says which estimate is worth improving first. Parameters
 that a property can't read are left out.
 
+Results of unbounded properties can carry two notes. One says that exploration stopped at the
+`explore` limit, so the interval also accounts for the unexplored states. The other says that
+part of the state space was too large to solve exactly; Haze then solves it in floating point
+and checks the resulting bounds in exact arithmetic, so the interval is guaranteed to contain
+the true value but is no longer a single exact number.
+
 All numbers are exact. A number with a long decimal expansion is rounded and marked with `≈`,
 followed by the exact fraction when it's short, as in `0.666667 (=2/3)`. Numbers below 0.001 are
 shown in scientific notation, as in `≈1.37018e-8 (=1/72982849)`.
 
 ## Command-Line Interface
 
-`haze [--fuel N] [--json] FILE.hz...` checks each file and prints its messages. `--fuel N` sets
-how deeply function calls can nest before an outcome counts as unknown (the default is 1000),
-and `--json` prints one JSON record per message instead of text, as described below. The exit
+`haze [--fuel N] [--states N] [--json] FILE.hz...` checks each file and prints its messages.
+`--fuel N` sets how deeply function calls can nest before an outcome counts as unknown (the
+default is 1000), `--states N` sets the default for `explore`, and `--json` prints one JSON record per message instead of text, as described below. The exit
 status is 0 if every declaration was accepted and 1 otherwise, which makes `haze` easy to run in
 continuous integration.
 
@@ -348,7 +386,7 @@ print). Records that carry a result also have a `kind` and the fields below:
 |---|---|
 | `theorem`, `claim` | `name`, `accepted`, `grade`, `belief`, `plausibility`, `branches`, `counterexample` |
 | `prob` | `query`, `belief`, `plausibility`, `branches` |
-| `expect` | `query`, `lower`, `upper`, `branches`, each with an `expectation` |
+| `expect` | `query`, `lower`, `upper`, `branches`, each with an `expectation` (or, for `steps until`, a `lower` and `upper`, which are `null` when infinite) |
 | `eval` | `query`, `branches`, each with a `distribution` of `value` and `probability` pairs |
 | `check` | `query`, `type`, `grade` |
 | `observe` | `query`, `evidence`, the probability of the evidence for each parameter assignment |
@@ -369,6 +407,15 @@ large. Temporal properties can look at most 100,000 steps ahead, `uniform` range
 ranges can have at most 100,000 values, and `binomial` allows at most 10,000 trials. At most
 2,000,000 distinct configurations are kept per step, after merging equal configurations and
 dropping variables the property can't read.
+
+Unbounded properties explore at most 100,000 states unless `explore` says otherwise.
+Groups of states that can all reach each other are solved exactly when they have at most 120
+states, and with certified bounds when they are larger.
+
+Checking uses every processor core. The parameter assignments of a query are checked in
+parallel, large frontiers and breadth-first levels are expanded in parallel, and when a frontier
+is small, a step's own random choices are split across cores. Results don't depend on the
+number of cores.
 
 Two reductions keep this manageable. Each query builds only the inputs and parameters that it,
 or an earlier observation, can read, so unrelated inputs don't multiply the number of worlds. And

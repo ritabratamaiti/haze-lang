@@ -17,8 +17,9 @@ system Drift {
 theorem copies_in_range : Drift |= always[60] (copies >= 0 and copies <= 6)
 #eval Drift |= after[1] copies                 -- binomial(6, 1/3) after one generation
 #expect Drift |= after[10] copies              -- still 2
-claim fixed : Drift |= eventually[60] copies == 6    -- close to 1/3
-claim lost : Drift |= eventually[60] copies == 0     -- close to 2/3
+claim fixed : Drift |= eventually copies == 6    -- exactly 1/3
+claim lost : Drift |= eventually copies == 0     -- exactly 2/3
+#expect Drift |= steps until copies == 0 or copies == 6
 
 -- 2. Hardy–Weinberg proportions with a vaguely known allele frequency ----------
 -- Here the frequency q of a recessive allele is only known as "about 0.2", so it

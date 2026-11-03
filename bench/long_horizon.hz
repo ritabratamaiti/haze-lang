@@ -1,0 +1,9 @@
+-- A long horizon on a small chain: gambler's ruin with 40 units, 2,000 steps.
+system Gambler {
+  var money : Num := 20
+  step {
+    if money > 0 and money < 40 { money := money + (if flip(0.49) then 1 else -1) }
+  }
+}
+#prob Gambler |= after[2000] money == 40
+claim ruin : Gambler |= eventually[2000] money == 0

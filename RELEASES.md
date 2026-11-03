@@ -35,6 +35,17 @@ Fuzzy parameters give results as belief and plausibility, computed by integratin
 α-cuts. Systems are model checked up to a bound, with counterexamples when a property fails,
 and the grade lattice and the fuzzy connectives come with theorems proved in Lean.
 
+`always` and `eventually` can be used without a bound, and `#expect S |= steps until φ` gives
+the expected number of steps until a property holds. The kernel explores the reachable states
+and solves the resulting linear equations exactly, component by component. Large components are
+solved in floating point and certified in exact arithmetic, and systems with infinitely many
+states are explored up to a limit set by `explore N` or `--states`, with the unexplored part
+counted as unknown. The samples that used long horizons to approximate such answers (craps,
+tennis, Penney's game, genetic drift and gambler's ruin) now state them exactly.
+
+Checking runs on every core: parameter assignments, large frontiers and the random choices
+within a step are processed in parallel, with the same results as before.
+
 Checking only tracks what a property can observe. Each query builds just the inputs and
 parameters that it or an earlier observation reads, and state variables outside the property's
 cone of influence aren't tracked. A failed `with prob <=` bound now shows a run where the
@@ -42,6 +53,7 @@ property holds, taken from a parameter value that breaks the bound.
 
 ### Tools
 
-The `haze` command checks models and supports `--fuel` and JSON output (`--json`). The test
+The `haze` command checks models and supports `--fuel`, `--states` and JSON output (`--json`).
+`python scripts/bench.py` times the models in `bench`. The test
 suite runs with `lake test`. When a result depends on more than six parameter assignments, the
 output summarizes them and ranks the parameters by how much each one moves the result.

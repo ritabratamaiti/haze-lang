@@ -413,6 +413,7 @@ Elaborates a top-level declaration into a kernel declaration. The result is not 
 `Haze.Kernel.addDecl` checks it again.
 -/
 def elabDecl : SDecl → ElabM Decl
+  | .explore n => pure (.explore n)
   | .logic l => match l with
     | "godel" | "zadeh" => pure (.logic .godel)
     | "product" => pure (.logic .product)

@@ -8,17 +8,18 @@ import Haze.Frontend
 /-!
 # Command-Line Interface
 
-`haze [--fuel N] [--json] FILE.hz...` checks Haze source files and prints their messages, or one
+`haze [--fuel N] [--states N] [--json] FILE.hz...` checks Haze source files and prints their messages, or one
 JSON record per message with `--json`. The exit status is 1 if any declaration was rejected and 2
 if the arguments are invalid.
 -/
 
 /-- The help text of the command-line interface. -/
 def usage : String :=
-  "usage: haze [--fuel N] [--json] FILE.hz...\n" ++
+  "usage: haze [--fuel N] [--states N] [--json] FILE.hz...\n" ++
   "Checks Haze programs: graded types, exact probabilities, fuzzy [belief, plausibility].\n" ++
-  "  --fuel N  bound on nested function calls (default 1000)\n" ++
-  "  --json    print one JSON record per message"
+  "  --fuel N    bound on nested function calls (default 1000)\n" ++
+  "  --states N  states explored for an unbounded property (default 100000)\n" ++
+  "  --json      print one JSON record per message"
 
 def main (args : List String) : IO UInt32 := do
   let mut opts : Haze.Frontend.Options := {}
@@ -30,6 +31,9 @@ def main (args : List String) : IO UInt32 := do
     | "--fuel" :: n :: tl =>
       let some k := n.toNat? | IO.eprintln "--fuel expects a number"; return 2
       opts := { opts with fuel := k }; rest := tl
+    | "--states" :: n :: tl =>
+      let some k := n.toNat? | IO.eprintln "--states expects a number"; return 2
+      opts := { opts with states := k }; rest := tl
     | "--json" :: tl => json := true; rest := tl
     | ("-h" :: _) | ("--help" :: _) => IO.println usage; return 0
     | f :: tl => files := files.push f; rest := tl

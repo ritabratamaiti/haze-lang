@@ -203,17 +203,28 @@ inductive Stmt where
   deriving Repr, Inhabited
 
 /--
-Bounded temporal modalities. `after k` looks at step `k` only, `always k` requires the property at
-every step from 0 to `k`, and `eventually k` requires it at some step from 0 to `k`.
+Temporal modalities. `after k` looks at step `k` only, `always k` requires the property at every
+step from 0 to `k`, and `eventually k` requires it at some step from 0 to `k`. The unbounded
+forms look at the whole infinite run, and `stepsUntil` is the number of steps until the property
+first holds, which `#expect` can compute.
 -/
 inductive Temporal where
   | after (k : Nat)
   | always (k : Nat)
   | eventually (k : Nat)
+  | alwaysInf
+  | eventuallyInf
+  | stepsUntil
   deriving DecidableEq, Repr, Inhabited
 
+/-- Whether a modality looks at the whole infinite run. -/
+def Temporal.unbounded : Temporal → Bool
+  | .alwaysInf | .eventuallyInf | .stepsUntil => true
+  | _ => false
+
 instance : ToString Temporal := ⟨fun
-  | .after k => s!"after[{k}]" | .always k => s!"always[{k}]" | .eventually k => s!"eventually[{k}]"⟩
+  | .after k => s!"after[{k}]" | .always k => s!"always[{k}]" | .eventually k => s!"eventually[{k}]"
+  | .alwaysInf => "always" | .eventuallyInf => "eventually" | .stepsUntil => "steps until"⟩
 
 /--
 A property: a truth-valued term, optionally evaluated on the states of a transition system under a
@@ -321,6 +332,7 @@ inductive QueryKind where
 /-- Elaborated declarations, which the kernel takes as input. -/
 inductive Decl where
   | logic (l : Logic)
+  | explore (n : Nat)
   | enumD (name : String) (ctors : Array String)
   | param (name : String) (ty : Ty) (support : List (Value × Rat))
   | node (name : String) (ty : Ty) (val : Expr) (isInput : Bool) (declared : Option Grade)

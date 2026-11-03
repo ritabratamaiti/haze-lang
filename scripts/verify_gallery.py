@@ -76,6 +76,37 @@ def always(init, step, k, f):
     st = lambda sh: [((s2, sh[1] and bool(f(s2))), q) for s2, q in step(sh[0])]
     return after((init, bool(f(init))), st, k, lambda sh: sh[1])
 
+def absorb(init, step, f, steps=False):
+    """For a chain that is absorbed with probability 1, the exact probability of reaching a state
+    where f holds (or, with steps=True, the expected number of steps until it does), found by
+    exploring the chain and solving its linear equations with fractions."""
+    states, idx, i = [init], {init: 0}, 0
+    while i < len(states):
+        s = states[i]; i += 1
+        if f(s) or all(t == s for t, q in step(s) if q): continue
+        for t, q in step(s):
+            if q and t not in idx: idx[t] = len(states); states.append(t)
+    n = len(states)
+    a = [[F(0)] * (n + 1) for _ in range(n)]
+    for k, s in enumerate(states):
+        a[k][k] = F(1)
+        # an absorbing state where f fails never reaches f: probability 0
+        stuck = all(t == s for t, q in step(s) if q)
+        if f(s) or stuck:
+            a[k][n] = F(0) if steps or not f(s) else F(1)
+            continue
+        a[k][n] = F(1) if steps else F(0)
+        for t, q in step(s):
+            if q: a[k][idx[t]] -= q
+    for c in range(n):
+        piv = next(r for r in range(c, n) if a[r][c] != 0)
+        a[c], a[piv] = a[piv], a[c]
+        pv = a[c][c]; a[c] = [x / pv for x in a[c]]
+        for r in range(n):
+            if r != c and a[r][c] != 0:
+                fr = a[r][c]; a[r] = [x - fr * y for x, y in zip(a[r], a[c])]
+    return a[0][n]
+
 def binom(n, p):
     return [(k, comb(n, k) * p**k * (1 - p)**(n - k)) for k in range(n + 1)]
 
@@ -85,8 +116,9 @@ drift = lambda c: [(k, q) for k, q in binom(6, F(c, 6))]
 for k, q in binom(6, F(1, 3)):
     check_line(b, "#eval Drift |= after[1] copies", str(k), q, f"drift: P(copies={k}) after 1 generation")
 check(b, "#expect Drift |= after[10] copies", after(2, drift, 10, lambda c: c))
-check(b, "claim fixed", eventually(2, drift, 60, lambda c: c == 6))
-check(b, "claim lost", eventually(2, drift, 60, lambda c: c == 0))
+check(b, "claim fixed", absorb(2, drift, lambda c: c == 6), name="drift: fixation probability 1/3")
+check(b, "claim lost", absorb(2, drift, lambda c: c == 0), name="drift: loss probability 2/3")
+check(b, "#expect Drift |= steps until copies == 0 or copies == 6", absorb(2, drift, lambda c: c in (0, 6), steps=True))
 qs = [(F(3, 5), F(1, 10)), (F(1), F(1, 5)), (F(1, 2), F(3, 10))]
 check(b, "claim heterozygous", *interval([(pi, 2*q*(1-q)) for pi, q in qs]))
 check(b, "claim affected", *interval([(pi, q*q) for pi, q in qs]))
@@ -179,8 +211,8 @@ def craps(s):
             ns = ("W", pt) if r == pt else ("L", pt) if r == 7 else s
         out.append((ns, q))
     return out
-check(b, "claim shooter_wins", eventually(("C", 0), craps, 100, lambda s: s[0] == "W"))
-results.append((abs(float(eventually(("C", 0), craps, 100, lambda s: s[0] == "W")) - 244/495) < 1e-9, "  ...craps vs closed form 244/495", f"{244/495:.6f}"))
+check(b, "claim shooter_wins", F(244, 495), name="craps: shooter wins (closed form 244/495)")
+results.append((absorb(("C", 0), craps, lambda s: s[0] in "WL") == 1 and absorb(("C", 0), craps, lambda s: s[0] == "W") == F(244, 495), "  ...craps chain solved exactly equals 244/495", "244/495"))
 check(b, "claim decided_on_come_out", F(12, 36))
 def tennis(s):
     a, c = s
@@ -192,7 +224,7 @@ def tennis(s):
     return out
 p, qq = F(3, 5), F(2, 5)
 tennis_formula = p**4 * (1 + 4*qq + 10*qq**2) + 20 * p**3 * qq**3 * p**2 / (1 - 2*p*qq)
-check(b, "claim server_holds", eventually((0, 0), tennis, 200, lambda s: s[0] >= 4 and s[0] - s[1] >= 2))
+check(b, "claim server_holds", tennis_formula, name="tennis: server holds (closed form)")
 results.append((abs(float(tennis_formula) - 0.735729) < 6e-7, "  ...tennis vs closed form p^4(1+4q+10q^2) + 20p^3q^3·p^2/(1-2pq)", f"{float(tennis_formula):.6f}"))
 def penney(s):
     bf, ls, w = s
@@ -202,7 +234,7 @@ def penney(s):
         w2 = 1 if (bf == 1 and ls == 1 and coin == 2) else 2 if (bf == 1 and ls == 2 and coin == 2) else 0
         out.append(((ls, coin, w2), F(1, 2)))
     return out
-check(b, "claim hht_first", F(2, 3), name="Penney: HHT before HTT (2/3; horizon 200 differs by < 1e-6)")
+check(b, "claim hht_first", F(2, 3), name="Penney: HHT before HTT (2/3)")
 
 # ---- queueing ---------------------------------------------------------------
 b = blocks("examples/Gallery/queueing.hz")

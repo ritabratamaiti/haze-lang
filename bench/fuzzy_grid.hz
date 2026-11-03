@@ -1,0 +1,19 @@
+-- Many fuzzy parameter assignments: 3^4 = 81 branches of a bounded queue.
+param arrive : Num ~= {0.3: 0.5, 0.4: 1, 0.5: 0.5}
+param serve : Num ~= {0.4: 0.5, 0.5: 1, 0.6: 0.5}
+param burst : Num ~= {0.05: 0.5, 0.1: 1, 0.2: 0.5}
+param fail : Num ~= {0.01: 0.5, 0.02: 1, 0.05: 0.5}
+system Queue {
+  var len : Num := 0
+  var dropped : Num := 0
+  var down : Bool := false
+  step {
+    let n := (if flip(arrive) then 1 else 0) + (if flip(burst) then 2 else 0)
+    let s := if not down and flip(serve) then 1 else 0
+    let next := max(len + n - s, 0)
+    if next > 30 { dropped := dropped + next - 30; len := 30 } else { len := next }
+    down := if down then flip(0.5) else flip(fail)
+  }
+}
+#expect Queue |= after[40] len
+claim rarely_full : Queue |= eventually[40] len >= 25

@@ -162,6 +162,68 @@ configurations one step at a time and merges configurations that are equal. On t
 If a path runs into an unknown outcome, the rest of that path is unknown too. It counts as a
 failure for the lower bound and as a success for the upper bound.
 
+### Unbounded properties
+
+`always φ` and `eventually φ` without a bound, and `steps until φ`, are about the whole infinite
+run. For these, the kernel first explores every reachable configuration breadth first
+(`Haze.Kernel.Checker.explore`), giving a finite Markov chain, and then solves linear equations
+on it.
+
+For a `Bool` property, `eventually φ` is the probability `x_s` of reaching a state where `φ`
+holds. If `h_s` is the probability that `φ` holds in state `s` (it can be random), then
+`x_s = h_s + (1 - h_s) Σ_t P(s, t) x_t`. `always φ` is one minus the probability of reaching a
+state where `φ` fails. For a `Deg` property, `eventually` is the expected highest degree along
+the run and `always` the expected lowest. Both reduce to reachability by the layer-cake formula
+`E[X] = Σⱼ (θⱼ - θⱼ₋₁) P(X ≥ θⱼ)`, where the `θⱼ` are the degrees the property takes, so one
+system is solved for each `θⱼ`. The expected number of steps until `φ` holds solves
+`y_s = c_s (1 + Σ_t P(s, t) y_t)`, where `c_s` is the probability that `φ` doesn't hold in `s`;
+it is infinite from states where, with positive probability, `φ` never holds, and graph search
+finds those exactly.
+
+`Haze.Kernel.Solve.solve` handles these systems. States that can't reach a positive right-hand
+side have value 0, found by graph search. The rest are split into strongly connected
+components, which are solved from the ones that can't reach any other component to the ones
+that can, so each component only needs the values of components already solved. A component of
+up to 120 states is solved exactly by Gauss–Jordan elimination over the rationals.
+
+Exact elimination on a larger component would take too long, so Haze solves it in floating
+point and then certifies the answer. The floating-point solution comes from an LU factorization
+of the band of `I - A`, which is cheap because breadth-first numbering keeps the band narrow
+(and is safe without pivoting because `I - A` is a nonsingular M-matrix). Haze then moves the
+solution down and up along a vector `v` with `(I - A) v ≈ 1`, rounds the results to multiples
+of 2⁻⁶⁴, and checks in exact arithmetic that the lower vector `l` satisfies `F l ≥ l` and the
+upper vector `u` satisfies `F u ≤ u`, where `F x = b + A x`. Since `F` is monotone and its
+iterates converge to the unique solution `x*` from any starting point, these inequalities prove
+`l ≤ x* ≤ u`. Floating-point error can only make the check fail, in which case Haze widens the
+bounds and tries again, falling back to the trivial bounds. It never makes a bound wrong. This is
+the idea behind optimistic value iteration (Hartmanns and Kaminski, 2020).
+
+Exploration stops once `explore` states are known. States found but not expanded are treated as
+unknown, exactly like outcomes that ran out of fuel: they count as failures for the lower bound
+and as successes for the upper bound. This makes systems with infinitely many states usable,
+with a result that is always sound and is tight when the unexplored states are unlikely.
+
+### Parallel checking
+
+The kernel is pure, so independent work can run on separate Lean tasks without changing any
+result. The parameter assignments of a query are checked in parallel. Within an assignment,
+frontiers of 64 or more configurations, breadth-first levels and the property's value in each
+state are computed in parallel chunks whose results are joined in their original order. When the
+frontier is small, which is common for systems with few states but many random choices per step,
+the first point in a step that splits into eight or more outcomes runs the rest of the step
+for each outcome in parallel instead (`Haze.Kernel.M.bindSplit`). A query with four or more parameter assignments
+doesn't split steps, since its assignments already keep the cores busy.
+
+The benchmarks in [`bench`](../bench) cover these cases; `python scripts/bench.py` times them.
+On a 20-thread laptop, the model with 81 parameter assignments went from 37 to 6.5 seconds and
+the one with 4,096 random choices per step from 4.6 to 2.1 seconds. A model with a long horizon
+on a small chain doesn't benefit, because each step depends on the one before.
+
+Haze doesn't use the GPU. Almost all the time goes into running step programs, with branching
+and exact rational arithmetic, and that kind of work suits CPU cores rather than a GPU. The one
+GPU-friendly part, the floating-point solve, takes a small share of the time. Because its
+answer is certified afterwards, a GPU solver could be added later without trusting it.
+
 ### Keeping state spaces small
 
 Before checking a property, Haze works out which global variables the property can possibly
@@ -210,8 +272,9 @@ instead looks for a configuration where it holds, as a counterexample to the neg
 
 ## Trust and testing
 
-The trusted part of Haze is the kernel in [`Haze/Kernel`](../Haze/Kernel), about 1,400 lines
-of Lean including documentation. `Haze.Kernel.addDecl` re-checks every type and grade that the
+The trusted part of Haze is the kernel in [`Haze/Kernel`](../Haze/Kernel), about 2,000 lines
+of Lean including documentation. Floating-point code runs inside it only to propose bounds,
+which the kernel then checks in exact arithmetic. `Haze.Kernel.addDecl` re-checks every type and grade that the
 elaborator produces, so a mistake in the elaborator can't slip an ill-typed or wrongly graded
 declaration past it.
 

@@ -1,0 +1,22 @@
+-- Heavy branching inside one step: three random timers with 16 values each, as in a
+-- leader election, give 4,096 combinations per round.
+system Election {
+  var elected : Bool := false
+  var elapsed : Num := 0
+  step {
+    if not elected {
+      let t1 := uniform(15, 30)
+      let t2 := uniform(15, 30)
+      let t3 := uniform(15, 30)
+      let first := min(t1, min(t2, t3))
+      let c1 := t1 < first + 2
+      let c2 := t2 < first + 2
+      let c3 := t3 < first + 2
+      let candidates := (if c1 then 1 else 0) + (if c2 then 1 else 0) + (if c3 then 1 else 0)
+      elected := candidates < 3
+      elapsed := elapsed + first + (if candidates < 3 then 4 else 0)
+    }
+  }
+}
+#expect Election |= after[3] elapsed
+claim fast : Election |= eventually[3] (elected and elapsed <= 40)

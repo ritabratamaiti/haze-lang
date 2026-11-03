@@ -17,8 +17,9 @@ down, rates you only have a rough idea of. Then you state what the system should
 and Haze checks it.
 
 Because the model includes chance, the answers aren't simply true or false. Haze works out how
-likely each outcome is, exactly, with fractions rather than simulation, and when a guarantee
-can fail it shows you a run where it does. Some inputs aren't really probabilities. If all you
+likely each outcome is, exactly, with fractions rather than simulation, over a fixed number of
+steps or over runs of any length, and when a guarantee can fail it shows you a run where it
+does. Some inputs aren't really probabilities. If all you
 know is that packet loss is "around 2%, maybe worse", you can write exactly that, and Haze
 answers with a range: how strongly what you know guarantees the property, and how strongly it
 allows it.

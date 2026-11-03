@@ -68,40 +68,29 @@ claim all_within_10 : Coupons |= eventually[10] have == 4
 -- 6. Gambler's ruin -----------------------------------------------------------
 -- The gambler starts with 3, bets 1 per round, and stops on reaching 0 or 6. With win
 -- probability p and r = (1-p)/p, P(reach 6) = (1 - r^3) / (1 - r^6), which is 8/35 for
--- p = 0.4. For p = 1/2 the formula is 0/0, and the answer is its limit, 1/2.
-system FairGame {
+-- p = 0.4. For p = 1/2 the formula is 0/0, and the answer is its limit, 1/2. A game can
+-- last any number of rounds, so these properties have no bound: `eventually` looks at the
+-- whole run, and the answers are exact.
+system Game(win : Num) {
   var money : Num := 3
   step {
     if money > 0 and money < 6 {
-      if flip(0.5) { money := money + 1 } else { money := money - 1 }
+      if flip(win) { money := money + 1 } else { money := money - 1 }
     }
   }
 }
-system BiasedGame {
-  var money : Num := 3
-  step {
-    if money > 0 and money < 6 {
-      if flip(0.4) { money := money + 1 } else { money := money - 1 }
-    }
-  }
-}
-claim fair_win : FairGame |= eventually[200] money == 6
-claim biased_win : BiasedGame |= eventually[200] money == 6
-theorem never_negative : BiasedGame |= always[200] money >= 0
+claim fair_win : Game(0.5) |= eventually money == 6
+claim biased_win : Game(0.4) |= eventually money == 6
+theorem never_negative : Game(0.4) |= always money >= 0
+
+-- A fair game started at 3 lasts 3 × (6 - 3) = 9 rounds on average.
+#expect Game(0.5) |= steps until money == 0 or money == 6
 
 -- Now suppose you only know the win probability vaguely: "about fair, maybe slightly
 -- against us". The same question then has a [belief, plausibility] interval as its
 -- answer.
 param p : Num ~= {0.4: 0.3, 0.45: 0.7, 0.5: 1}
-system VagueGame {
-  var money : Num := 3
-  step {
-    if money > 0 and money < 6 {
-      if flip(p) { money := money + 1 } else { money := money - 1 }
-    }
-  }
-}
-claim vague_win : VagueGame |= eventually[200] money == 6
+claim vague_win : Game(p) |= eventually money == 6
 
 -- 7. The boy-or-girl paradox --------------------------------------------------
 -- A family has two children, and at least one of them is a boy. The probability that

@@ -26,7 +26,7 @@ system Craps {
     }
   }
 }
-claim shooter_wins : Craps |= eventually[100] phase == Won
+claim shooter_wins : Craps |= eventually phase == Won       -- exactly 244/495
 claim decided_on_come_out : Craps |= after[1] (phase == Won or phase == Lost)   -- 12/36: 8 winning rolls, 4 losing
 
 -- 2. A game of tennis ------------------------------------------------------------------
@@ -39,13 +39,13 @@ system Tennis {
   step {
     if not ((server >= 4 or receiver >= 4) and abs(server - receiver) >= 2) {
       if flip(0.6) { server := server + 1 } else { receiver := receiver + 1 }
-      -- every tie from 3-3 on is the same deuce state, so fold it back to 3-3 and
-      -- keep the number of states small
+      -- every tie from 3-3 on is the same deuce state, so fold it back to 3-3; this
+      -- keeps the number of states finite, so Haze can look at games of any length
       if server >= 3 and receiver >= 3 and server == receiver { server := 3; receiver := 3 }
     }
   }
 }
-claim server_holds : Tennis |= eventually[200] (server >= 4 and server - receiver >= 2)
+claim server_holds : Tennis |= eventually (server >= 4 and server - receiver >= 2)
 
 -- 3. Penney's game -----------------------------------------------------------------------
 -- A fair coin is flipped until either HHT or HTT appears, and HHT comes first with
@@ -66,4 +66,4 @@ system Penney {
     }
   }
 }
-claim hht_first : Penney |= eventually[200] winner == 1
+claim hht_first : Penney |= eventually winner == 1

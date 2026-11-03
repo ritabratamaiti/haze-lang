@@ -83,6 +83,25 @@ def compactList [BEq α] [Hashable α] (xs : List (α × Rat)) : List (α × Rat
 
 /-- Merges equal outcomes of a computation, as `compactList` does. -/
 def compact [DecidableEq α] [Hashable α] (m : M α) : M α := ⟨return compactList (← m.run)⟩
+
+/--
+Sequences two computations like `bind`. If `par` is set and the first computation has several
+outcomes, the continuations for the different outcomes run as parallel tasks and are told not to
+split again; otherwise `par` is passed on. The result is the same as `bind` either way.
+-/
+def bindSplit (par : Bool) (m : M α) (f : Bool → α → M β) : M β := ⟨do
+  let xs ← m.run
+  if !par || xs.length < 8 then return ← (bind m (f par)).run
+  let tasks := xs.toArray.map fun (r, w) => Task.spawn fun _ =>
+    match r with
+    | .stuck => (Except.ok #[(Res.stuck, w)] : Except String (Array (Res β × Rat)))
+    | .ok a => do
+      let ys ← (f false a).run
+      return ys.toArray.filterMap fun (p : Res β × Rat) =>
+        if w * p.2 != 0 then some (p.1, w * p.2) else none
+  let mut out : Array (Res β × Rat) := #[]
+  for t in tasks do out := out ++ (← t.get)
+  return out.toList⟩
 end M
 
 /--
@@ -96,6 +115,8 @@ structure ECtx where
   crashed : Bool := false
   locals : List Value := []
   fuel : Nat
+  /-- Whether a statement may split its work into parallel tasks. -/
+  par : Bool := false
 
 /-- Reads a value as a number, failing on any other kind of value. -/
 def asNum : Value → M Rat
@@ -346,9 +367,8 @@ partial def exec (c : ECtx) (locals : List Value) (s : SState) (st : Stmt) : M S
   | .assign i e => do
     let v ← eval ce e
     pure { s with vars := s.vars.set! i v }
-  | .seq a b => do
-    let s' ← M.compact (exec c locals s a)
-    exec c locals s' b
+  | .seq a b =>
+    M.bindSplit c.par (M.compact (exec c locals s a)) fun par s' => exec { c with par } locals s' b
   | .ite cnd t e => do
     if ← asBool (← eval ce cnd) then exec c locals s t else exec c locals s e
   | .choose p t e => do
@@ -361,9 +381,8 @@ partial def exec (c : ECtx) (locals : List Value) (s : SState) (st : Stmt) : M S
       | some (_, b) => exec c locals s b
       | none => exec c locals s dflt
     | v => M.fail s!"runtime: match on non-enum value {repr v}"
-  | .letS v body => do
-    let x ← eval ce v
-    exec c (x :: locals) s body
+  | .letS v body =>
+    M.bindSplit c.par (eval ce v) fun par x => exec { c with par } (x :: locals) s body
   | .assert cnd => do
     if ← asBool (← eval ce cnd) then pure s else pure { s with crashed := true }
 

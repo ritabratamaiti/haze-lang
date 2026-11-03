@@ -202,6 +202,8 @@ structure SProp where
 /-- Top-level declarations and commands as written in the source. -/
 inductive SDecl where
   | logic (l : String)
+  /-- `explore N`: the number of states explored for an unbounded property. -/
+  | explore (n : Nat)
   | enumD (n : String) (ctors : List String)
   | param (n : String) (ty : String) (support : List (SExpr × SExpr))
   | input (n : String) (ty : String) (e : SExpr)
@@ -493,12 +495,27 @@ def givenClause : P (Option SExpr) := do
   if ← isKw "given" then advance; return some (← expr)
   return none
 
+/--
+Parses an optional temporal modality: `after[k]`, `always[k]`, `eventually[k]`, `always` and
+`eventually` without a bound, or `steps until`. Without one, the property is about step 0.
+-/
+def temporalMode : P Temporal := do
+  let bound : P (Option Nat) := do
+    if ← isSym "[" then
+      advance; let k ← number; expectSym "]"; pure (some k.num.toNat)
+    else pure none
+  if ← isKw "always" then
+    advance; return match ← bound with | some k => .always k | none => .alwaysInf
+  else if ← isKw "eventually" then
+    advance; return match ← bound with | some k => .eventually k | none => .eventuallyInf
+  else if ← isKw "after" then
+    advance; expectSym "["; let k ← number; expectSym "]"; return .after k.num.toNat
+  else if (← peekTok).tok == .ident "steps" && (← peekAt 1) == .ident "until" then
+    advance; advance; return .stepsUntil
+  else return .after 0
+
 def prop : P SProp := do
-  let parseMode : P Temporal := do
-    if ← isKw "always" then advance; expectSym "["; let k ← number; expectSym "]"; pure (Temporal.always k.num.toNat)
-    else if ← isKw "eventually" then advance; expectSym "["; let k ← number; expectSym "]"; pure (Temporal.eventually k.num.toNat)
-    else if ← isKw "after" then advance; expectSym "["; let k ← number; expectSym "]"; pure (Temporal.after k.num.toNat)
-    else pure (Temporal.after 0)
+  let parseMode := temporalMode
   if let .ident s := (← peekTok).tok then
     if (← systemArgsAhead).isSome then
       advance; advance
@@ -510,11 +527,7 @@ def prop : P SProp := do
   match (← peekTok).tok, (← peekAt 1) with
   | .ident s, .sym "|=" =>
     advance; advance
-    let mode ← do
-      if ← isKw "always" then advance; expectSym "["; let k ← number; expectSym "]"; pure (Temporal.always k.num.toNat)
-      else if ← isKw "eventually" then advance; expectSym "["; let k ← number; expectSym "]"; pure (Temporal.eventually k.num.toNat)
-      else if ← isKw "after" then advance; expectSym "["; let k ← number; expectSym "]"; pure (Temporal.after k.num.toNat)
-      else pure (Temporal.after 0)
+    let mode ← temporalMode
     let body ← expr
     pure { sys := some s, mode, body, given := ← givenClause }
   | _, _ =>
@@ -531,6 +544,11 @@ def decl : P SDecl := do
   let t ← peekTok
   match t.tok with
   | .ident "logic" => advance; pure (.logic (← ident))
+  | .ident "explore" =>
+    -- a setting only at the start of a declaration, so `explore` can still be used as a name
+    advance; let n ← number
+    unless n.den == 1 && n.num > 0 do failAt "explore expects a positive whole number of states"
+    pure (.explore n.num.toNat)
   | .ident "enum" =>
     advance
     let n ← ident; expectSym "="

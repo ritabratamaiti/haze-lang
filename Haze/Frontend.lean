@@ -28,9 +28,13 @@ queries are evaluated on them. Processing is a pure function from the source tex
 namespace Haze.Frontend
 open Haze.Syntax Haze.Kernel
 
-/-- Command-line options. `fuel` bounds the depth of nested function calls. -/
+/--
+Command-line options. `fuel` bounds the depth of nested function calls, and `states` the number of
+states explored for an unbounded property.
+-/
 structure Options where
   fuel : Nat := 1000
+  states : Nat := Checker.defaultMaxStates
   deriving Inhabited
 
 /--
@@ -134,9 +138,9 @@ def fmtInterval (i : Interval) : String :=
 Builds the model checker for a property. The checker reads only the global variables that the
 property depends on.
 -/
-def checkerFor (env : Env) (fuel : Nat) (spec : PropSpec) : Checker :=
+def checkerFor (env : Env) (fuel : Nat) (spec : PropSpec) (maxStates := Checker.defaultMaxStates) : Checker :=
   let sys := spec.sys.bind (env.systems[·]?)
-  Checker.forSpec env fuel sys spec.body spec.args
+  { Checker.forSpec env fuel sys spec.body spec.args with maxStates }
 
 /-- The degree of truth of a property body, whether it is a `Bool` or a `Deg`. -/
 def asDegree (env : Env) (spec : PropSpec) : Expr :=
@@ -158,15 +162,15 @@ def runConditional (env : Env) (fuel : Nat) (bs : Array Branch) (spec : PropSpec
   let φ := asDegree env spec
   let zero : Expr := .lit (.deg 0)
   let base := { spec with given := none }
-  let num := checkerFor env fuel { base with body := .ite cond φ zero }
-  let cmp := checkerFor env fuel { base with body := .ite cond (.prim .tnot [φ]) zero }
+  let num := { checkerFor env fuel { base with body := .ite cond φ zero } with splitSteps := bs.size < 4 }
+  let cmp := { checkerFor env fuel { base with body := .ite cond (.prim .tnot [φ]) zero } with splitSteps := bs.size < 4 }
   -- a counterexample is a configuration where the condition holds and the property fails
   let wit := checkerFor env fuel { base with body := .ite cond φ (.lit (.deg 1)) }
   let mut rows := #[]
   let mut witness := none
-  for b in bs do
-    let (n, _) ← num.runBranch spec.mode b
-    let (c, _) ← cmp.runBranch spec.mode b
+  let results ← parMapM bs fun b => do
+    return (← num.runBranch spec.mode b, ← cmp.runBranch spec.mode b)
+  for (b, ((n, _), (c, _))) in bs.zip results do
     if n.hi + c.hi == 0 then
       throw s!"the condition after `given` is impossible{if b.assign.isEmpty then "" else
         " when " ++ fmtAssign env b.assign}"
@@ -181,18 +185,46 @@ def runConditional (env : Env) (fuel : Nat) (bs : Array Branch) (spec : PropSpec
 Checks a property on every branch. Returns the result for each branch, and the counterexample
 from the first branch that has one.
 -/
-def runSpec (env : Env) (fuel : Nat) (bs : Array Branch) (spec : PropSpec) :
-    Except String (List BranchResult × Option Witness) := do
+def runSpec (env : Env) (fuel : Nat) (bs : Array Branch) (spec : PropSpec)
+    (maxStates := Checker.defaultMaxStates) : Except String (List BranchResult × Option Witness) := do
   if let some cond := spec.given then
     return ← runConditional env fuel bs spec cond
-  let ck := checkerFor env fuel spec
+  let ck := { checkerFor env fuel spec maxStates with splitSteps := bs.size < 4 }
   let mut rows := #[]
   let mut wit := none
-  for b in bs do
-    let (r, w) ← ck.runBranch spec.mode b
+  -- the parameter assignments are independent, so they are checked in parallel
+  for (r, w) in ← parMapM' bs (ck.runBranch spec.mode) do
     rows := rows.push r
     if wit.isNone then wit := w
   return (rows.toList, wit)
+
+/-- Notes on how an unbounded property was solved, when the result isn't simply exact. -/
+def solverNotes (rows : List BranchResult) (limit : Nat) : List String :=
+  (if rows.any (·.truncated) then
+    [s!"exploration stopped at {limit} states; what follows the unexplored states counts as unknown (raise the limit with `explore N` or --states)"]
+  else []) ++
+  (if rows.all (·.exact) then [] else
+    ["large parts of the state space were solved numerically; the bounds are certified in exact arithmetic"])
+
+/--
+Combines lower (or upper) expectations that may be infinite, written `none`, over the α-cuts of
+the parameter assignments, like `integrateNum`.
+-/
+def integrateExt (rows : List (Rat × Option Rat)) (lower : Bool) : Option Rat := Id.run do
+  let rows := rows.filter (·.1 > 0)
+  let levels := (rows.map (·.1)).eraseDups.mergeSort (fun a b => b ≤ a)
+  let some top := levels.head? | return some 0
+  let mut acc : Option Rat := some 0
+  for (l, n) in levels.zip (levels.drop 1 ++ [0]) do
+    let cut := (rows.filter (·.1 ≥ l)).map (·.2)
+    let finite := cut.filterMap id
+    let pick : Option Rat :=
+      if lower then (if finite.isEmpty then none else some (finite.foldl qmin finite.head!))
+      else (if finite.length < cut.length || finite.isEmpty then none else some (finite.foldl qmax finite.head!))
+    acc := match acc, pick with
+      | some a, some p => some (a + (l - n) * p)
+      | _, _ => none
+  return acc.map (· / top)
 
 /-- The largest number of parameter assignments shown as a full table. -/
 def maxTableRows : Nat := 6
@@ -283,7 +315,7 @@ def doClaim (d : DeclStx) (name : String) (isThm : Bool) (spec : PropSpec) (boun
   let bs ← match ← branchesFor spec with
     | .ok bs => pure bs
     | .error e => emit d.pos "error" e; return
-  match runSpec env s.opts.fuel bs spec with
+  match runSpec env s.opts.fuel bs spec s.opts.states with
   | .error e => emit d.pos "error" e
   | .ok (rows, wit) =>
     let iv := integrate (rows.map fun r => (r.poss, r.lo, r.hi))
@@ -302,7 +334,7 @@ def doClaim (d : DeclStx) (name : String) (isThm : Bool) (spec : PropSpec) (boun
     let (wit, happens) : Option Witness × Bool := match isThm, bound with
       | false, .ge q =>
         if q ≤ iv.bel then (none, false) else
-        match runSpec env s.opts.fuel failing spec with
+        match runSpec env s.opts.fuel failing spec s.opts.states with
         | .ok (_, w) => (w, false)
         | .error _ => (wit, false)
       | false, .le q =>
@@ -310,11 +342,12 @@ def doClaim (d : DeclStx) (name : String) (isThm : Bool) (spec : PropSpec) (boun
         let negMode : Option Temporal := match spec.mode with
           | .after k => some (.after k)
           | .eventually k => some (.always k)
-          | .always _ => none
+          | .eventuallyInf => some .alwaysInf
+          | _ => none
         match negMode with
         | some m =>
           let neg := { spec with body := .prim .tnot [asDegree env spec], mode := m }
-          match runSpec env s.opts.fuel failing neg with
+          match runSpec env s.opts.fuel failing neg s.opts.states with
           | .ok (_, w) => (w, true)
           | .error _ => (none, true)
         | none => (none, true)
@@ -329,10 +362,10 @@ def doClaim (d : DeclStx) (name : String) (isThm : Bool) (spec : PropSpec) (boun
             (fmtConfig env rel sys w.assign w.config ck0.relevantVars).map ("  " ++ ·)
         else
         let what := match spec.mode with
-          | .eventually _ => "never reached on this path"
+          | .eventually _ | .eventuallyInf => "never reached on this path"
           | _ => s!"degree {fmtQ w.degree}"
         let binds := match spec.mode with
-          | .eventually _ => []
+          | .eventually _ | .eventuallyInf => []
           | _ => ck0.counterexample (ck0.ctx w.config) spec.body
         let bindLine := if binds.isEmpty then [] else
           [s!"falsified by {", ".intercalate (binds.map fun (n, v) => s!"{n} = {fmtValue env v}")}"]
@@ -348,8 +381,10 @@ def doClaim (d : DeclStx) (name : String) (isThm : Bool) (spec : PropSpec) (boun
       | false, .le q => (iv.pl ≤ q, if iv.pl ≤ q then s!"bound holds: plausibility ≤ {fmtQ q}"
           else s!"bound fails: plausibility {fmtQ iv.pl} > {fmtQ q}")
       | false, .none => (true, "")
+    let size := if spec.mode.unbounded then s!"{maxN} reachable states" else s!"≤{maxN} states/step"
     let lines := [s!"{fmtInterval iv} — {status g iv}",
-        s!"grade {g} · {rows.length} parameter assignment(s) · ≤{maxN} states/step"]
+        s!"grade {g} · {rows.length} parameter assignment(s) · {size}"]
+      ++ solverNotes rows s.opts.states
       ++ (if verdict.isEmpty then [] else [verdict])
       ++ branchTable env rows
       ++ (if ok then [] else witLines)
@@ -385,9 +420,9 @@ def doClaim (d : DeclStx) (name : String) (isThm : Bool) (spec : PropSpec) (boun
 Computes the exact distribution of the value of an `after[k]` property on one branch. Mass that ran
 out of fuel appears as the outcome `Res.stuck`.
 -/
-def evalDist (env : Env) (fuel : Nat) (b : Branch) (spec : PropSpec) :
+def evalDist (env : Env) (fuel : Nat) (b : Branch) (spec : PropSpec) (splitSteps := true) :
     Except String (List (Res Value × Rat)) := do
-  let ck := checkerFor env fuel spec
+  let ck := { checkerFor env fuel spec with splitSteps }
   let k ← match spec.mode with
     | .after k => pure k
     | _ => throw "kernel: only `after[k]` can be evaluated to a distribution"
@@ -428,10 +463,11 @@ def doQuery (d : DeclStx) (k : QueryKind) (spec : PropSpec) : FM Unit := do
   | .eval =>
     let mut dists := #[]
     let mut js := #[]
-    for b in branches do
-      match evalDist env fuel b spec with
+    let all ← match parMapM' branches (evalDist env fuel · spec (branches.size < 4)) with
+      | .ok r => pure r
       | .error e => emit d.pos "error" e; return
-      | .ok xs =>
+    for (b, xs) in branches.zip all do
+      do
         dists := dists.push (b, fmtDist env xs)
         js := js.push (Json.obj [("parameters", Json.assignment env b.assign),
           ("possibility", Json.rat b.poss), ("distribution", jsonDist env xs)])
@@ -442,19 +478,45 @@ def doQuery (d : DeclStx) (k : QueryKind) (spec : PropSpec) : FM Unit := do
     emit d.pos "info" s!"{d.text}{indent lines}"
       [("kind", .str "eval"), ("query", .str d.text), ("branches", .arr js.toList)]
   | .prob =>
-    match runSpec env fuel branches spec with
+    match runSpec env fuel branches spec s.opts.states with
     | .error e => emit d.pos "error" e
     | .ok (rows, _) =>
       let iv := integrate (rows.map fun r => (r.poss, r.lo, r.hi))
-      emit d.pos "info" s!"{d.text}{indent ([fmtInterval iv] ++ branchTable env rows)}"
+      emit d.pos "info" s!"{d.text}{indent ([fmtInterval iv] ++ solverNotes rows s.opts.states ++ branchTable env rows)}"
         ([("kind", .str "prob"), ("query", .str d.text)] ++ jsonInterval iv ++
           [("branches", jsonBranches env rows)])
   | .expect =>
+    if spec.mode == .stepsUntil then
+      let ck := { checkerFor env fuel spec s.opts.states with splitSteps := branches.size < 4 }
+      let all ← match parMapM' branches ck.expectedSteps with
+        | .ok r => pure r
+        | .error e => emit d.pos "error" e; return
+      let fmtE : Option Rat → String := fun | some q => fmtQ q | none => "∞"
+      let rows := branches.toList.zip all.toList
+      let lo := integrateExt (rows.map fun (b, (l, _)) => (b.poss, l)) true
+      let hi := integrateExt (rows.map fun (b, (_, h, _)) => (b.poss, h)) false
+      let head := if lo == hi then s!"expected steps {fmtE lo}"
+        else s!"lower expectation {fmtE lo} · upper expectation {fmtE hi}"
+      let infinite := if lo.isNone then
+        ["with positive probability the property never holds, so the expectation is infinite"] else []
+      let results : List BranchResult := all.toList.map fun (_, _, n, tr, ex) =>
+        { assign := [], poss := 1, lo := 0, hi := 0, maxStates := n, truncated := tr, exact := ex }
+      let tbl := if rows.length ≤ 1 then [] else
+        "by fuzzy parameter (π = possibility):" :: rows.map fun (b, (l, h, _)) =>
+          s!"  {fmtAssign env b.assign}  π {fmtQ b.poss}  {if l == h then fmtE l else s!"{fmtE l} to {fmtE h}"}"
+      let jsonE : Option Rat → Json := fun | some q => Json.rat q | none => .null
+      emit d.pos "info" s!"{d.text}{indent (head :: infinite ++ solverNotes results s.opts.states ++ tbl)}"
+        [("kind", .str "expect"), ("query", .str d.text), ("lower", jsonE lo), ("upper", jsonE hi),
+         ("branches", .arr (rows.map fun (b, (l, h, _)) =>
+            .obj [("parameters", Json.assignment env b.assign), ("possibility", Json.rat b.poss),
+                  ("lower", jsonE l), ("upper", jsonE h)]))]
+      return
     let mut rows := #[]
-    for b in branches do
-      match evalDist env fuel b spec with
+    let all ← match parMapM' branches (evalDist env fuel · spec (branches.size < 4)) with
+      | .ok r => pure r
       | .error e => emit d.pos "error" e; return
-      | .ok xs =>
+    for (b, xs) in branches.zip all do
+      do
         let mut e : Rat := 0
         for (r, q) in xs do
           match r with
@@ -579,6 +641,7 @@ def processDecl (d : DeclStx) : FM Unit := do
       | .claim n isThm spec bound => doClaim d n isThm spec bound
       | .query k spec => doQuery d k spec
       | .print n => doPrint d n
+      | .explore n => commit; modify fun s => { s with opts := { s.opts with states := n } }
       | _ => commit
 
 /-- Checks a source file and returns the final front-end state. -/

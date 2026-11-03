@@ -259,11 +259,11 @@ Checks a property and returns its type and grade. A property with a nonzero hori
 system. If `allowNum` is `false`, the property must have type `Bool` or `Deg`.
 -/
 def checkSpec (env : Env) (spec : PropSpec) (allowNum : Bool) : CheckM (Ty × Grade) := do
-  let k := match spec.mode with | .after k | .always k | .eventually k => k
+  let k := match spec.mode with | .after k | .always k | .eventually k => k | _ => 0
   if k > maxHorizon then throw s!"kernel: horizon {k} exceeds {maxHorizon}"
   let c ← match spec.sys with
     | none =>
-      if k != 0 then throw "kernel: temporal operators need a system (`S |= ...`)"
+      if k != 0 || spec.mode.unbounded then throw "kernel: temporal operators need a system (`S |= ...`)"
       pure { env : TCtx }
     | some s =>
       let some si := env.systems[s]? | throw s!"kernel: unknown system {s}"
@@ -291,6 +291,10 @@ def checkSpec (env : Env) (spec : PropSpec) (allowNum : Bool) : CheckM (Ty × Gr
     g := g.join gc
   match spec.mode with
   | .after _ => pure ()
+  | .stepsUntil =>
+    unless t == .bool do throw s!"kernel: `steps until` needs a Bool property, got {t}"
+    -- the result is a number of steps, not a degree of truth
+    unless allowNum do throw "kernel: `steps until` gives a number of steps; use it with #expect"
   | _ => unless t == .bool || t == .deg do throw s!"kernel: temporal property must be Bool or Deg, got {t}"
   unless allowNum || t == .bool || t == .deg do throw s!"kernel: claims must be Bool or Deg, got {t}"
   pure (t, g)
@@ -324,6 +328,7 @@ adds a claim itself once the model checker has accepted it.
 -/
 def addDecl (env : Env) : Decl → CheckM Env
   | .logic l => pure { env with logic := l }
+  | .explore _ => pure env
   | .enumD n cs => do
     if env.contains n then throw s!"kernel: {n} already declared"
     if cs.isEmpty then throw "kernel: empty enum"

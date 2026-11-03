@@ -42,24 +42,26 @@ examples/probability_classics.hz:63:1: info: claim all_within_10
   grade prob · 1 parameter assignment(s) · ≤3 states/step
 examples/probability_classics.hz:66:1: info: #expect Coupons |= after[80] draws
   expectation ≈8.333333
-examples/probability_classics.hz:88:1: info: claim fair_win
-  probability ≈0.5 — graded
-  grade prob · 1 parameter assignment(s) · ≤4 states/step
-examples/probability_classics.hz:89:1: info: claim biased_win
-  probability ≈0.228571 — graded
-  grade prob · 1 parameter assignment(s) · ≤4 states/step
-examples/probability_classics.hz:90:1: info: theorem never_negative
+examples/probability_classics.hz:82:1: info: claim fair_win
+  probability 0.5 — graded
+  grade prob · 1 parameter assignment(s) · 7 reachable states
+examples/probability_classics.hz:83:1: info: claim biased_win
+  probability 0.228571 (=8/35) — graded
+  grade prob · 1 parameter assignment(s) · 7 reachable states
+examples/probability_classics.hz:84:1: info: theorem never_negative
   probability 1 — holds with certainty
-  grade prob · 1 parameter assignment(s) · ≤5 states/step
+  grade prob · 1 parameter assignment(s) · 7 reachable states
   theorem accepted
-examples/probability_classics.hz:104:1: info: claim vague_win
-  belief ≈0.360125 · plausibility ≈0.5 — graded
-  grade prob+fuzzy · 3 parameter assignment(s) · ≤4 states/step
+examples/probability_classics.hz:87:1: info: #expect Game(0.5) |= steps until money == 0 or money == 6
+  expected steps 9
+examples/probability_classics.hz:93:1: info: claim vague_win
+  belief 0.360125 (=5193/14420) · plausibility 0.5 — graded
+  grade prob+fuzzy · 3 parameter assignment(s) · 7 reachable states
   by fuzzy parameter (π = possibility):
-    p = 0.4   π 0.3     ≈0.228571
-    p = 0.45  π 0.7     ≈0.353883
-    p = 0.5   π 1       ≈0.5
-examples/probability_classics.hz:113:1: info: observe first == Boy or second == Boy
+    p = 0.4   π 0.3     0.228571 (=8/35)
+    p = 0.45  π 0.7     0.353883 (=729/2060)
+    p = 0.5   π 1       0.5
+examples/probability_classics.hz:102:1: info: observe first == Boy or second == Boy
   evidence probability 0.75; worlds renormalized
-examples/probability_classics.hz:114:1: info: #prob first == Boy and second == Boy
+examples/probability_classics.hz:103:1: info: #prob first == Boy and second == Boy
   probability 0.333333 (=1/3)

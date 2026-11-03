@@ -26,6 +26,9 @@ right.
 - `kernel_errors.hz` contains declarations that the elaborator or the kernel must reject, and
   checks that processing carries on correctly after each error.
 - `parse_error.hz` checks how a syntax error is reported.
+- `unbounded.hz` covers `always`, `eventually` and `steps until` without a bound: exact answers
+  with known closed forms, an infinite expectation, degrees, counterexamples, and systems with
+  infinitely many states, where exploration stops at `explore` states.
 - `systems_and_conditioning.hz` covers system parameters, `given`, computed weights, the summary
   of large parameter tables, and counterexamples for upper bounds. It also checks that the
   reductions that keep checking fast don't change results: twenty independent inputs that only

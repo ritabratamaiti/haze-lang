@@ -1,0 +1,14 @@
+-- A large frontier: a lazy random walk on a 61 x 61 grid for 60 steps.
+system Walk {
+  var x : Num := 0
+  var y : Num := 0
+  step {
+    let d := uniform(0, 4)
+    if d == 1 and x < 30 { x := x + 1 }
+    if d == 2 and x > -30 { x := x - 1 }
+    if d == 3 and y < 30 { y := y + 1 }
+    if d == 4 and y > -30 { y := y - 1 }
+  }
+}
+#prob Walk |= after[60] abs(x) + abs(y) <= 10
+claim stays_near : Walk |= always[60] abs(x) <= 20

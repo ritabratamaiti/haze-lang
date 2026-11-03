@@ -1,0 +1,76 @@
+-- Unbounded properties: `eventually` and `always` without a bound look at the whole infinite
+-- run, and `#expect S |= steps until φ` is the expected number of steps until φ first holds.
+
+-- Gambler's ruin from 20 with a target of 40 and a 0.49 chance of winning each bet. With
+-- r = 51/49, P(win) = (1 - r^20) / (1 - r^40), about 0.310003, and the expected length of the
+-- game is about 379.994606.
+system Gambler {
+  var money : Num := 20
+  step {
+    if money > 0 and money < 40 { money := money + (if flip(0.49) then 1 else -1) }
+  }
+}
+#prob Gambler |= eventually money == 40
+claim ruin : Gambler |= eventually money == 0
+#expect Gambler |= steps until money == 0 or money == 40
+theorem in_range : Gambler |= always (money >= 0 and money <= 40)
+
+-- A fair coin is flipped until heads: 2 flips on average, and never seeing heads has
+-- probability 0.
+system Coin {
+  var heads : Bool := false
+  step { heads := flip(0.5) }
+}
+#expect Coin |= steps until heads
+claim never_heads : Coin |= always not heads
+
+-- A process that stops for good half the time never finishes from there, so the expected
+-- time is infinite.
+system MaybeStuck {
+  var phase : Num := 0
+  step { if phase == 0 { phase := if flip(0.5) then 1 else 2 } }
+}
+#expect MaybeStuck |= steps until phase == 1
+#prob MaybeStuck |= eventually phase == 1
+
+-- Degrees: the highest and the lowest degree reached along the run.
+system Counter {
+  var n : Num := 0
+  step { if n < 3 { n := n + 1 } }
+}
+def near(v : Num) : Deg := ramp_up(v, 0, 3)
+#prob Counter |= eventually near(n)
+#prob Counter |= always near(n)
+#prob Counter |= always n >= 1
+
+-- Counterexamples: the first state where an invariant fails, and for a failed upper bound on
+-- `eventually`, a run where the property holds.
+theorem stays_below_two : Counter |= always n < 2
+claim rarely_three : Counter |= eventually n == 3 with prob <= 0.5
+
+-- Infinitely many states. Exploration stops after `explore` states, and what happens past the
+-- unexplored states counts as unknown, so the answer is an interval that contains the truth.
+explore 300
+-- A queue that empties faster than it fills returns to empty with probability 1, and the
+-- unexplored states are so unlikely that the interval is very narrow.
+system Queue {
+  var len : Num := 5
+  step {
+    if flip(0.3) { len := len + 1 }
+    if len > 0 and flip(0.6) { len := len - 1 }
+  }
+}
+#prob Queue |= eventually len == 0
+-- A walk that drifts down reaches 5 with probability (2/3)^5, about 0.131687. Exploring more
+-- can't settle the upper bound, since most of the probability goes off into the unexplored part.
+system Walk {
+  var x : Num := 0
+  step { x := x + (if flip(0.4) then 1 else -1) }
+}
+#prob Walk |= eventually x == 5
+#expect Walk |= steps until x == 5
+
+-- Errors.
+claim steps_in_claim : Coin |= steps until heads
+#expect Counter |= steps until near(n)
+#prob Counter |= eventually n == 3 given n >= 1

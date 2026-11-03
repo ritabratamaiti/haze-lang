@@ -4,6 +4,7 @@ Released under the PolyForm Noncommercial License 1.0.0 as described in the file
 Authors: Ritabrata Maiti
 -/
 import Haze.Kernel.Eval
+import Haze.Kernel.Solve
 
 /-!
 # Worlds, Fuzzy Parameters and Model Checking
@@ -41,6 +42,42 @@ randomness, they are the necessity and possibility of possibility theory.
 
 namespace Haze.Kernel
 open Std
+
+/-! ## Parallel evaluation -/
+
+/-- Below this many items, work is done on the current thread. -/
+def parThreshold : Nat := 64
+
+/--
+Applies `f` to every element of `xs` and returns the results in order. Large arrays are split into
+chunks that run as parallel tasks, but the result is the same as a sequential map: only the
+scheduling differs, and the first error in order is the one reported.
+-/
+def parMapM (xs : Array α) (f : α → Except String β) : Except String (Array β) := do
+  if xs.size < parThreshold then return ← xs.mapM f
+  let nChunks := min 64 (xs.size / (parThreshold / 2))
+  let size := (xs.size + nChunks - 1) / nChunks
+  let tasks := (Array.range nChunks).map fun c =>
+    Task.spawn fun _ => (xs.extract (c * size) ((c + 1) * size)).mapM f
+  let mut out := Array.mkEmpty xs.size
+  for t in tasks do out := out ++ (← t.get)
+  return out
+
+/--
+Applies `f` to every element of `xs`, running each one as its own parallel task, and returns the
+results in order. Suited to a few expensive items, such as the parameter assignments of a query.
+-/
+def parMapM' (xs : Array α) (f : α → Except String β) : Except String (Array β) := do
+  if xs.size ≤ 1 then return ← xs.mapM f
+  let tasks := xs.map fun x => Task.spawn fun _ => f x
+  tasks.mapM (·.get)
+
+/--
+Like `parMapM`, but every element gives an array of results, and they are concatenated in order.
+-/
+def parFlatMapM (xs : Array α) (f : α → Except String (Array β)) : Except String (Array β) := do
+  let parts ← parMapM xs f
+  return parts.foldl (· ++ ·) #[]
 
 /--
 A world assigns an outcome to every global variable, at the index of the variable in `Env.globals`.
@@ -82,7 +119,7 @@ def addParam (name : String) (support : List (Value × Rat)) (bs : Array Branch)
 /-- Extends every world with the outcome of a new random node. -/
 def addNode (env : Env) (fuel : Nat) (val : Expr) (bs : Array Branch) :
     Except String (Array Branch) :=
-  bs.mapM fun b => do
+  parMapM' bs fun b => do
     let mut out : Array (World × Rat) := #[]
     for (w, p) in b.worlds do
       for (r, q) in ← liftM (eval { env, world := w, fuel } val) do
@@ -397,6 +434,10 @@ structure BranchResult where
   lo : Rat
   hi : Rat
   maxStates : Nat
+  /-- An unbounded property explored only part of the state space. -/
+  truncated : Bool := false
+  /-- Every number was computed exactly, rather than bounded numerically. -/
+  exact : Bool := true
   deriving Inhabited
 
 /--
@@ -416,6 +457,13 @@ structure Checker where
   hold the placeholder `false`, so configurations that differ only in them are merged.
   -/
   relevantVars : Array Bool := #[]
+  /--
+  Whether a step may split its own work into parallel tasks when the frontier is small. Callers
+  that already run many parameter assignments in parallel turn this off.
+  -/
+  splitSteps : Bool := true
+  /-- The number of states explored for an unbounded property. -/
+  maxStates : Nat := 100000
 
 namespace Checker
 
@@ -458,9 +506,9 @@ def values (ck : Checker) (cfg : Config) : Except String (List (Res Value × Rat
 The distribution of successor configurations after one step of the system. Without a system, a
 configuration is its own successor.
 -/
-def step (ck : Checker) (cfg : Config) : Except String (List (Res Config × Rat)) := do
+def step (ck : Checker) (cfg : Config) (par := false) : Except String (List (Res Config × Rat)) := do
   let some si := ck.sys | return [(.ok cfg, 1)]
-  let xs ← liftM (exec (ck.ctx cfg) [] cfg.st si.step)
+  let xs ← liftM (exec { ck.ctx cfg with par } [] cfg.st si.step)
   return xs.map fun (r, q) => match r with
     | .ok st => (.ok { cfg with st }, q)
     | .stuck => (.stuck, q)
@@ -506,16 +554,246 @@ def after (ck : Checker) (b : Branch) (k : Nat) : Except String (List (Config ×
   let mut unk := unk0
   let mut maxN := frontier.length
   for _ in [0:k] do
+    -- a small frontier leaves cores idle, so each step splits its own work instead
+    let par := ck.splitSteps && frontier.length < parThreshold
+    let succ ← parFlatMapM frontier.toArray fun (cfg, w) => do
+      return (← ck.step cfg par).toArray.map fun (r, q) => (r, w * q)
     let mut next : Array (Config × Rat) := #[]
-    for (cfg, w) in frontier do
-      for (r, q) in ← ck.step cfg do
-        match r with
-        | .ok c' => next := next.push (c', w * q)
-        | .stuck => unk := unk + w * q
+    for (r, m) in succ do
+      match r with
+      | .ok c' => next := next.push (c', m)
+      | .stuck => unk := unk + m
     frontier := M.compactList next.toList
     maxN := max maxN frontier.length
     guard maxN
   return (frontier, unk, maxN)
+
+/-! ## Unbounded properties -/
+
+/-- The default number of states explored for an unbounded property. -/
+def defaultMaxStates : Nat := 100000
+
+/--
+The reachable part of a system's state space, explored breadth first. `succ` gives each expanded
+state's successors and `stuck` the probability that its step runs out of fuel. `depth` gives the
+step at which a state was first found, and `parent` the state it was found from, with the
+probability of that transition (or, for an initial state, its initial probability).
+-/
+structure StateSpace where
+  configs : Array Config
+  succ : Array (Array (Nat × Rat))
+  stuck : Array Rat
+  expanded : Array Bool
+  depth : Array Nat
+  parent : Array (Option Nat × Rat)
+  init : Array (Nat × Rat)
+  initUnk : Rat
+  /-- Exploration stopped at `Checker.maxStates`, leaving some states unexpanded. -/
+  truncated : Bool
+
+/--
+The probability of the path along which a state was first found. It is computed only when needed,
+because along deep paths the exact product has a very large numerator and denominator.
+-/
+def StateSpace.pathMass (sp : StateSpace) (s : Nat) : Rat := Id.run do
+  let mut m : Rat := 1
+  let mut cur := s
+  for _ in [0:sp.configs.size] do
+    let (p, q) := sp.parent[cur]!
+    m := m * q
+    match p with
+    | some p' => cur := p'
+    | none => break
+  return m
+
+/--
+Explores the states reachable from the initial configurations of a branch. Each level of the
+search is expanded in parallel. Once `maxStates` states are known, the search stops, and the
+states found but not expanded are left as they are: what happens after them counts as unknown,
+which keeps the result sound for systems with infinitely many states.
+-/
+def explore (ck : Checker) (b : Branch) : Except String StateSpace := do
+  let (cfgs, unk0) ← ck.initial b
+  let mut ix : HashMap Config Nat := {}
+  let mut configs : Array Config := #[]
+  let mut depth : Array Nat := #[]
+  let mut parent : Array (Option Nat × Rat) := #[]
+  let mut init : Array (Nat × Rat) := #[]
+  for (c, w) in cfgs do
+    match ix[c]? with
+    | some i => init := init.push (i, w)
+    | none =>
+      ix := ix.insert c configs.size
+      init := init.push (configs.size, w)
+      configs := configs.push c; depth := depth.push 0; parent := parent.push (none, w)
+  let mut succ : Array (Array (Nat × Rat)) := Array.replicate configs.size #[]
+  let mut stuck : Array Rat := Array.replicate configs.size 0
+  let mut expanded : Array Bool := Array.replicate configs.size false
+  let mut level : Array Nat := Array.range configs.size
+  let mut d := 0
+  let mut truncated := false
+  while !level.isEmpty do
+    if configs.size ≥ ck.maxStates then
+      truncated := true
+      break
+    let par := ck.splitSteps && level.size < parThreshold
+    -- copy out this level's configurations, so that no task holds on to `configs` while it grows
+    let current := level.map (configs[·]!)
+    let results ← parMapM current fun c => ck.step c par
+    let mut next : Array Nat := #[]
+    for (i, xs) in level.zip results do
+      let mut out : Array (Nat × Rat) := #[]
+      let mut st : Rat := 0
+      for (r, q) in xs do
+        match r with
+        | .stuck => st := st + q
+        | .ok c' =>
+          match ix[c']? with
+          | some j => out := out.push (j, q)
+          | none =>
+            let j := configs.size
+            ix := ix.insert c' j
+            configs := configs.push c'; depth := depth.push (d + 1); parent := parent.push (some i, q)
+            succ := succ.push #[]; stuck := stuck.push 0; expanded := expanded.push false
+            next := next.push j
+            out := out.push (j, q)
+      succ := succ.set! i (M.compactList out.toList).toArray
+      stuck := stuck.set! i st
+      expanded := expanded.set! i true
+    guard configs.size
+    level := next
+    d := d + 1
+  return { configs, succ, stuck, expanded, depth, parent, init, initUnk := unk0, truncated }
+
+/--
+Splits the distribution of a property's degree in each state into the probability of a "hit"
+(a degree for which `hit` holds), of an unknown degree, and of the rest.
+-/
+def splitDegrees (degs : Array (List (Res Rat × Rat))) (hit : Rat → Bool) : Array (Rat × Rat × Rat) :=
+  degs.map fun ds => ds.foldl (init := (0, 0, 0)) fun (h, u, c) (r, q) => match r with
+    | .ok d => if hit d then (h + q, u, c) else (h, u, c + q)
+    | .stuck => (h, u + q, c)
+
+/--
+The linear system for the probability of eventually hitting, given the split of each state.
+The lower system counts unknown outcomes as never hitting, and the upper one as hitting.
+-/
+def reachSystem (sp : StateSpace) (split : Array (Rat × Rat × Rat)) (upper : Bool) : Solve.System :=
+  { b := (Array.range sp.configs.size).map fun s =>
+      let (h, u, c) := split[s]!
+      if upper then h + u + c * (if sp.expanded[s]! then sp.stuck[s]! else 1) else h
+    rows := (Array.range sp.configs.size).map fun s =>
+      let (_, _, c) := split[s]!
+      if sp.expanded[s]! && c != 0 then sp.succ[s]!.map fun (t, p) => (t, c * p) else #[] }
+
+/--
+Checks `always φ` or `eventually φ` over the infinite run, on one branch.
+
+For a Boolean property, `eventually φ` is the probability of reaching a state where `φ` holds,
+and `always φ` is one minus the probability of reaching a state where it fails. For a degree,
+`eventually` takes the expected highest degree along the run, and `always` the expected lowest.
+The layer-cake formula `E[X] = Σⱼ (θⱼ - θⱼ₋₁) P(X ≥ θⱼ)` reduces both to probabilities of
+reaching a state where the degree is at least, or below, each value `θⱼ` that it takes.
+-/
+def runUnbounded (ck : Checker) (isAlways : Bool) (b : Branch) :
+    Except String (BranchResult × Option Witness) := do
+  let sp ← ck.explore b
+  let degs ← parMapM sp.configs ck.degrees
+  let n := sp.configs.size
+  let mut seen : HashSet Rat := {}
+  let mut ths : Array Rat := #[1]
+  seen := seen.insert 1
+  for ds in degs do
+    for (r, q) in ds do
+      if let .ok d := r then
+        if d > 0 && q > 0 && !seen.contains d then seen := seen.insert d; ths := ths.push d
+  let thresholds := ths.qsort (· < ·)
+  let all := Array.replicate n true
+  let sols ← parMapM' thresholds fun θ => do
+    let split := splitDegrees degs (if isAlways then (· < θ) else (θ ≤ ·))
+    pure (Solve.solve (reachSystem sp split false) all (some 1),
+          Solve.solve (reachSystem sp split true) all (some 1))
+  let known := sp.init.foldl (fun acc (_, w) => acc + w) 0
+  let mut lo : Rat := 0
+  let mut hi : Rat := 0
+  let mut exact := true
+  let mut prev : Rat := 0
+  for (θ, ((sl, el), (sh, eh))) in thresholds.zip sols do
+    exact := exact && el && eh
+    let pLo := sp.init.foldl (fun acc (s, w) => acc + w * sl[s]!.1) 0
+    let pHi := sp.init.foldl (fun acc (s, w) => acc + w * qmin 1 ((sh[s]!.2).getD 1)) 0
+    if isAlways then
+      lo := lo + (θ - prev) * (known - pHi)
+      hi := hi + (θ - prev) * (known - pLo)
+    else
+      lo := lo + (θ - prev) * pLo
+      hi := hi + (θ - prev) * pHi
+    prev := θ
+  hi := hi + sp.initUnk
+  -- a counterexample: for `always`, the first state found where the property fails; for
+  -- `eventually`, the first state from which it can never fully hold
+  let mut wit : Option Witness := none
+  if isAlways then
+    for s in [0:n] do
+      if let some (d, q) := degs[s]!.findSome? fun (r, q) => match r with
+          | .ok d => if d < 1 && q > 0 then some (d, q) else none
+          | .stuck => none then
+        wit := some { step := sp.depth[s]!, assign := b.assign, config := sp.configs[s]!,
+                      degree := d, mass := sp.pathMass s * q }
+        break
+  else if let some (_, (sh, _)) := sols.back? then
+    for s in [0:n] do
+      if (sh[s]!.2) == some 0 then
+        wit := some { step := sp.depth[s]!, assign := b.assign, config := sp.configs[s]!,
+                      degree := 0, mass := sp.pathMass s }
+        break
+  return ({ assign := b.assign, poss := b.poss, lo, hi, maxStates := n,
+            truncated := sp.truncated, exact }, wit)
+
+/--
+The expected number of steps until a Boolean property first holds, on one branch, as a lower and
+an upper bound, where `none` is +∞. Also returns the number of states, whether exploration was
+truncated, and whether the bounds are exact.
+
+The expectation is infinite from a state where, with positive probability, the property never
+holds and nothing unknown happens; graph search finds these states exactly. From the other
+states, the expectation solves `y = c + c·P y`, where `c` is the probability that the property
+doesn't hold. Unknown outcomes count as taking no more steps for the lower bound, and as taking
+infinitely many for the upper bound.
+-/
+def expectedSteps (ck : Checker) (b : Branch) :
+    Except String (Option Rat × Option Rat × Nat × Bool × Bool) := do
+  let sp ← ck.explore b
+  let degs ← parMapM sp.configs ck.degrees
+  let n := sp.configs.size
+  let split := splitDegrees degs (1 ≤ ·)
+  let cont : Nat → Rat := fun s => (split[s]!).2.2
+  let toUnk : Array Bool := (Array.range n).map fun s =>
+    (split[s]!).2.1 > (0 : Rat) || (cont s > 0 && (!sp.expanded[s]! || sp.stuck[s]! > 0))
+  let toTarget : Array Bool := (Array.range n).map fun s => (split[s]!).1 > (0 : Rat) || toUnk[s]!
+  let succ := (Array.range n).map fun s =>
+    if sp.expanded[s]! && cont s > 0 then sp.succ[s]!.map (·.1) else #[]
+  let never := (Solve.canReach succ toTarget).map (!·)
+  -- `alive`: the property, or something unknown, happens with probability 1
+  let alive := (Solve.canReach succ never).map (!·)
+  let reachUnk := Solve.canReach succ toUnk
+  let sys : Solve.System :=
+    { b := (Array.range n).map fun s => if alive[s]! then cont s else 0
+      rows := (Array.range n).map fun s =>
+        if alive[s]! && sp.expanded[s]! then sp.succ[s]!.map fun (t, p) => (t, cont s * p) else #[] }
+  let (sol, exact) := Solve.solve sys alive none
+  let mut lo : Option Rat := some 0
+  let mut hi : Option Rat := some 0
+  for (s, w) in sp.init do
+    if !alive[s]! then
+      lo := none; hi := none
+    else
+      lo := lo.map (· + w * sol[s]!.1)
+      hi := if reachUnk[s]! then none else match hi, sol[s]!.2 with
+        | some x, some y => some (x + w * y)
+        | _, _ => none
+  if sp.initUnk > 0 then hi := none
+  return (lo, hi, n, sp.truncated, exact)
 
 /--
 Checks a property on one branch. Returns the exact degree interval, together with the first
@@ -528,6 +806,9 @@ def runBranch (ck : Checker) (mode : Temporal) (b : Branch) :
   let mut wit : Option Witness := none
   let mut maxN := 0
   match mode with
+  | .alwaysInf => return ← ck.runUnbounded true b
+  | .eventuallyInf => return ← ck.runUnbounded false b
+  | .stepsUntil => throw "kernel: `steps until` can only be used with #expect"
   | .after k =>
     let (frontier, unk, n) ← ck.after b k
     maxN := n
@@ -551,15 +832,19 @@ def runBranch (ck : Checker) (mode : Temporal) (b : Branch) :
     for t in [0:k+1] do
       -- Each arrival is a successor configuration (or `stuck` if the step ran out of fuel), its
       -- mass, and the running degree of the path that led to it.
-      let mut arrivals : Array (Res Config × Rat × Rat) := #[]
-      if t == 0 then
-        arrivals := cfgs.toArray.map fun (c, w) => (.ok c, w, unit)
-      else
-        for ((cfg, acc), w) in frontier do
-          for (r, q) in ← ck.step cfg do
-            arrivals := arrivals.push (r, w * q, acc)
+      let arrivals : Array ((Res Config × Rat) × Rat) ←
+        if t == 0 then pure (cfgs.toArray.map fun (c, w) => ((.ok c, unit), w))
+        else
+          let par := ck.splitSteps && frontier.length < parThreshold
+          parFlatMapM frontier.toArray fun ((cfg, acc), w) => do
+            return (← ck.step cfg par).toArray.map fun (r, q) => ((r, acc), w * q)
+      -- Merge equal arrivals, so the property is evaluated once per distinct configuration.
+      let arrivals := (M.compactList arrivals.toList).toArray
+      let degs ← parMapM arrivals fun ((r, _), _) => match r with
+        | .ok c' => ck.degrees c'
+        | .stuck => pure []
       let mut next : Array ((Config × Rat) × Rat) := #[]
-      for (r, w, acc) in arrivals do
+      for (((r, acc), w), ds) in arrivals.zip degs do
         match r with
         | .stuck =>
           -- The rest of the path is unknown, so `lo` assumes the worst case and `hi` the best.
@@ -569,7 +854,7 @@ def runBranch (ck : Checker) (mode : Temporal) (b : Branch) :
             lo := lo + w * acc
             hi := hi + w
         | .ok c' =>
-          for (rd, qd) in ← ck.degrees c' do
+          for (rd, qd) in ds do
             let m := w * qd
             match rd with
             | .stuck =>
