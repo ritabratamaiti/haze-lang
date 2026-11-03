@@ -25,12 +25,12 @@ examples/Gallery/reliability.hz:25:1: info: claim voter_correct
     r = 0.99  π 0.7     ≈0.999869
 examples/Gallery/reliability.hz:34:1: info: claim flow
   probability 0.912 — graded
-  grade prob · 3 parameter assignment(s) · ≤8 states/step
+  grade prob · 1 parameter assignment(s) · ≤8 states/step
 examples/Gallery/reliability.hz:52:1: info: claim available_at_50
   probability ≈0.833333 — graded
-  grade prob · 3 parameter assignment(s) · ≤100 states/step
+  grade prob · 1 parameter assignment(s) · ≤2 states/step
 examples/Gallery/reliability.hz:53:1: info: claim no_outage_in_24
   probability ≈0.079766 — graded
-  grade prob · 3 parameter assignment(s) · ≤1 states/step
+  grade prob · 1 parameter assignment(s) · ≤1 states/step
 examples/Gallery/reliability.hz:54:1: info: #expect Server |= after[24] downtime
   expectation ≈3.722222

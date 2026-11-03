@@ -157,6 +157,17 @@ partial def infer (c : TCtx) : Expr → CheckM (Ty × Grade)
       g := g.join ge
     unless total == 1 do throw s!"kernel: categorical weights sum to {fmtQ total}, not 1"
     pure (t0, g)
+  | .catW alts => do
+    let some (e0, _) := alts.head? | throw "kernel: empty categorical distribution"
+    let (t0, _) ← infer c e0
+    let mut g := Grade.probG
+    for (e, w) in alts do
+      let (t, ge) ← infer c e
+      expectTy "categorical alternatives" t0 t
+      let (tw, gw) ← infer c w
+      expectTy "categorical weight" .num tw
+      g := g.join ge |>.join gw
+    pure (t0, g)
   | .letE v b => do
     let (tv, gv) ← infer c v
     let (tb, gb) ← infer { c with locals := tv :: c.locals } b
@@ -232,6 +243,14 @@ def checkDeclared (what : String) (declared : Option Grade) (actual : Grade) : C
       throw s!"kernel: grade mismatch for {what}: declared @{d} but the term is @{actual}"
   | none => pure ()
 
+/-- The indices of the state variables that a statement can assign to. -/
+partial def assignedVars : Stmt → List Nat
+  | .assign i _ => [i]
+  | .seq a b | .ite _ a b | .choose _ a b => assignedVars a ++ assignedVars b
+  | .matchS _ arms d => (arms.flatMap fun (_, b) => assignedVars b) ++ assignedVars d
+  | .letS _ b => assignedVars b
+  | .skip | .assert _ => []
+
 /-- The largest horizon `k` accepted in a temporal property. -/
 def maxHorizon : Nat := 100000
 
@@ -249,7 +268,27 @@ def checkSpec (env : Env) (spec : PropSpec) (allowNum : Bool) : CheckM (Ty × Gr
     | some s =>
       let some si := env.systems[s]? | throw s!"kernel: unknown system {s}"
       pure { env, sysVars := si.vars, inSystem := true, svarGrade := si.grade : TCtx }
+  -- the arguments of a parameterized system are ordinary terms, and their grades count too
+  let mut gArgs := Grade.crisp
+  match spec.sys.bind (env.systems[·]?) with
+  | some si =>
+    unless spec.args.length == si.params do
+      throw s!"kernel: system {si.name} takes {si.params} parameter(s), got {spec.args.length}"
+    for (a, (n, ty)) in spec.args.zip (si.vars.toList.take si.params) do
+      let (ta, ga) ← infer { env } a
+      expectTy s!"parameter {n}" ty ta
+      gArgs := gArgs.join ga
+  | none => unless spec.args.isEmpty do throw "kernel: arguments given without a system"
   let (t, g) ← infer c spec.body
+  let mut g := g.join gArgs
+  -- a conditional property compares two probabilities at the same step
+  if let some cond := spec.given then
+    match spec.mode with
+    | .after _ => pure ()
+    | _ => throw "kernel: `given` is only supported with after[k] or without a modality"
+    let (tc, gc) ← infer c cond
+    expectTy "condition after `given`" .bool tc
+    g := g.join gc
   match spec.mode with
   | .after _ => pure ()
   | _ => unless t == .bool || t == .deg do throw s!"kernel: temporal property must be Bool or Deg, got {t}"
@@ -321,14 +360,20 @@ def addDecl (env : Env) : Decl → CheckM Env
     pure env
   | .system s => do
     if env.contains s.name then throw s!"kernel: {s.name} already declared"
-    unless s.vars.size == s.init.size do throw "kernel: malformed system"
+    unless s.vars.size == s.init.size && s.params ≤ s.vars.size do throw "kernel: malformed system"
+    -- initial values may refer to the parameters, but not to other state variables
+    let paramCtx : TCtx := { env, sysVars := s.vars.extract 0 s.params, inSystem := true }
     let mut g := Grade.crisp
     for h : i in [0:s.vars.size] do
       let (n, t) := s.vars[i]
       let some e := s.init[i]? | throw "kernel: malformed system"
-      let (te, ge) ← infer { env } e
+      let (te, ge) ← infer (if i < s.params then { env } else paramCtx) e
       expectTy s!"initial value of {n}" t te
       g := g.join ge
+    -- parameters are fixed for the whole run
+    for i in assignedVars s.step do
+      if i < s.params then
+        throw s!"kernel: the step of {s.name} assigns to its parameter {(s.vars[i]?.map (·.1)).getD "?"}"
     g := g.join (← checkStmt { env, sysVars := s.vars, inSystem := true } s.step)
     pure { env with systems := env.systems.insert s.name { s with grade := g } }
   | .claim n _ spec bound => do

@@ -54,7 +54,7 @@ def keywords : List String :=
   ["logic", "enum", "param", "input", "def", "observe", "system", "var", "step", "claim",
    "theorem", "with", "prob", "if", "then", "else", "let", "in", "forall", "exists", "match",
    "and", "or", "not", "implies", "is", "very", "true", "false", "assert", "skip",
-   "always", "eventually", "after"]
+   "always", "eventually", "after", "given"]
 
 /--
 The symbols that the lexer recognizes. Multi-character symbols come first, so the lexer always
@@ -191,6 +191,10 @@ to evaluate it on the states of the system `S`.
 -/
 structure SProp where
   sys : Option String := none
+  /-- The arguments of a parameterized system, as in `S(a, b) |= φ`. -/
+  args : List SExpr := []
+  /-- The condition after `given`, if any. -/
+  given : Option SExpr := none
   mode : Temporal := .after 0
   body : SExpr
   deriving Inhabited, Repr
@@ -204,7 +208,8 @@ inductive SDecl where
   | defD (n : String) (params : Option (List (String × String))) (ret : String)
       (grade : Option (List String)) (body : SExpr)
   | observe (e : SExpr)
-  | system (n : String) (vars : List (String × String × SExpr)) (step : List SStmt)
+  | system (n : String) (params : List (String × String)) (vars : List (String × String × SExpr))
+      (step : List SStmt)
   | claim (isThm : Bool) (n : String) (p : SProp) (bound : Option (String × SExpr))
   | query (cmd : String) (p : SProp)
   | print (n : String)
@@ -464,7 +469,44 @@ end
 
 def typeName : P String := ident
 
+/--
+If the tokens ahead are `S(…) |=`, returns the number of tokens up to and including the closing
+parenthesis. Used to tell a property about a parameterized system from a function call.
+-/
+def systemArgsAhead : P (Option Nat) := do
+  unless (← peekAt 1) == .sym "(" do return none
+  let mut depth := 0
+  let mut k := 1
+  for _ in [0:10000] do
+    match ← peekAt k with
+    | .sym "(" => depth := depth + 1
+    | .sym ")" =>
+      depth := depth - 1
+      if depth == 0 then
+        return if (← peekAt (k + 1)) == .sym "|=" then some k else none
+    | .eof => return none
+    | _ => pure ()
+    k := k + 1
+  return none
+
+def givenClause : P (Option SExpr) := do
+  if ← isKw "given" then advance; return some (← expr)
+  return none
+
 def prop : P SProp := do
+  let parseMode : P Temporal := do
+    if ← isKw "always" then advance; expectSym "["; let k ← number; expectSym "]"; pure (Temporal.always k.num.toNat)
+    else if ← isKw "eventually" then advance; expectSym "["; let k ← number; expectSym "]"; pure (Temporal.eventually k.num.toNat)
+    else if ← isKw "after" then advance; expectSym "["; let k ← number; expectSym "]"; pure (Temporal.after k.num.toNat)
+    else pure (Temporal.after 0)
+  if let .ident s := (← peekTok).tok then
+    if (← systemArgsAhead).isSome then
+      advance; advance
+      let args ← sepBy expr "," ")"
+      expectSym ")"; expectSym "|="
+      let mode ← parseMode
+      let body ← expr
+      return { sys := some s, args, mode, body, given := ← givenClause }
   match (← peekTok).tok, (← peekAt 1) with
   | .ident s, .sym "|=" =>
     advance; advance
@@ -473,8 +515,11 @@ def prop : P SProp := do
       else if ← isKw "eventually" then advance; expectSym "["; let k ← number; expectSym "]"; pure (Temporal.eventually k.num.toNat)
       else if ← isKw "after" then advance; expectSym "["; let k ← number; expectSym "]"; pure (Temporal.after k.num.toNat)
       else pure (Temporal.after 0)
-    pure { sys := some s, mode, body := ← expr }
-  | _, _ => pure { body := ← expr }
+    let body ← expr
+    pure { sys := some s, mode, body, given := ← givenClause }
+  | _, _ =>
+    let body ← expr
+    pure { body, given := ← givenClause }
 
 def grade : P (List String) := do
   let mut gs := #[← ident]
@@ -523,6 +568,12 @@ def decl : P SDecl := do
   | .ident "system" =>
     advance
     let n ← ident
+    let params ← if ← isSym "(" then do
+        advance
+        let ps ← sepBy (do let x ← ident; expectSym ":"; let t ← typeName; pure (x, t)) "," ")"
+        expectSym ")"
+        pure ps
+      else pure []
     expectSym "{"
     let mut vars := #[]
     while ← isKw "var" do
@@ -534,7 +585,7 @@ def decl : P SDecl := do
     expectKw "step"
     let body ← block
     expectSym "}"
-    pure (.system n vars.toList body)
+    pure (.system n params vars.toList body)
   | .ident "claim" | .ident "theorem" =>
     let isThm := t.tok == .ident "theorem"
     advance

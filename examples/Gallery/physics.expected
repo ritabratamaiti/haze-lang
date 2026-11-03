@@ -23,4 +23,4 @@ examples/Gallery/physics.hz:40:1: info: #expect Ehrenfest |= after[40] left
   expectation ≈2.00002
 examples/Gallery/physics.hz:54:1: info: claim returns_within_20
   probability ≈0.823803 — graded
-  grade prob · 3 parameter assignment(s) · ≤20 states/step
+  grade prob · 1 parameter assignment(s) · ≤20 states/step

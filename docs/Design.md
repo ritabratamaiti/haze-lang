@@ -99,10 +99,17 @@ as outcomes.
 
 ### Worlds
 
-Haze processes declarations in order and keeps a distribution over worlds. Each random node adds
-one value to every world, so all later references to the node see the same value. `observe`
-keeps only the worlds in which its condition holds and rescales their probabilities by Bayes'
-rule.
+Haze processes declarations in order, and they define a distribution over worlds. Each random
+node adds one value to every world, so all later references to the node see the same value.
+`observe` keeps only the worlds in which its condition holds and rescales their probabilities by
+Bayes' rule.
+
+The worlds aren't built once for the whole file. The front end records the parameters, nodes
+and observations, and each query has the kernel replay them (`Haze.Kernel.buildBranches`),
+including only what the query or an earlier observation can read. The rest get the unknown
+outcome without being evaluated. Twenty independent inputs with a hundred values each would
+otherwise mean 100²⁰ worlds before the first query. A node is still evaluated once when it's
+declared, with what it depends on, so its runtime errors are reported where it is written.
 
 ### Fuzzy parameters
 
@@ -159,9 +166,26 @@ failure for the lower bound and as a success for the upper bound.
 
 Before checking a property, Haze works out which global variables the property can possibly
 read, directly or through node definitions, function calls and the system's initialization and
-step (`Haze.Kernel.relevantGlobals`). Each world is reduced to those variables, and worlds that
-become equal are merged. The result doesn't change, since the property can't see the variables
-that were dropped, but there are far fewer states to explore.
+step (`Haze.Kernel.relevantGlobals`). Only those variables are built into the worlds, and worlds
+that become equal are merged. The result doesn't change, since the property can't see the
+variables that were dropped, but there are far fewer states to explore.
+
+The same applies to fuzzy parameters. A parameter that neither the property nor an observation
+reads doesn't change any assignment's result, and because its possibility distribution is
+normal, every α-cut contains at least one of its values. The minimum and maximum over an α-cut
+are therefore the same with or without it, and Haze doesn't split on it.
+
+State variables get the classic cone-of-influence reduction from model checking
+(`Haze.Kernel.coneOfInfluence`). A state variable depends on the variables read by the
+expressions assigned to it, by the local definitions those expressions use, and by the
+conditions of the `if`, `match` and random choices around the assignment. The cone of a property
+is the set of variables it reads, closed under these dependencies. Variables that an `assert`
+reads are always in the cone, since a crash affects everything, and so are the variables that a
+function call in an assignment depends on, since a call can run out of fuel. Assignments to the
+other variables are removed from the step (`Haze.Kernel.sliceStep`), and those variables stay at
+a placeholder value that nothing reads. In the Raft example, a safety property never reads the
+elapsed time, so the configurations that differ only in it collapse into one, and checking six
+election rounds takes about two seconds instead of not finishing.
 
 ### Claims and theorems
 
@@ -170,13 +194,25 @@ A claim without a bound is always accepted, and Haze records its interval. A cla
 accepted only when `Bel = 1`, which means it holds on every path of positive probability, for
 every parameter assignment of positive possibility, with no unknown outcomes.
 
-When a theorem or bound fails, Haze reports the first configuration that violates the property.
-If the property starts with `forall` quantifiers or conjunctions, it also reports values for the
-quantified variables that make it false.
+A property `φ given ψ` is a conditional probability. For each parameter assignment, Haze
+computes `N`, the probability that `ψ` and `φ` both hold, and `C`, the probability that `ψ`
+holds and `φ` doesn't, each as an interval because of unknown outcomes. The result is the
+interval from `N.lo / (N.lo + C.hi)` to `N.hi / (N.hi + C.lo)`, the least and most favorable
+ratios, and these per-assignment intervals are then combined as above. Both are evaluated at the
+same step, which is why `given` is limited to `after[k]` and properties without a temporal
+operator.
+
+When a theorem or a `with prob >=` bound fails, Haze reports the first configuration that
+violates the property, taken from a parameter assignment whose own result breaks the bound. If
+the property starts with `forall` quantifiers or conjunctions, it also reports values for the
+quantified variables that make it false. When a `with prob <=` bound fails, a violating
+configuration would be one where the property is false, which says nothing useful, so Haze
+instead looks for a configuration where it holds, as a counterexample to the negated property:
+`after[k] ¬φ` for `after[k] φ`, and `always[k] ¬φ` for `eventually[k] φ`.
 
 ## Trust and testing
 
-The trusted part of Haze is the kernel in [`Haze/Kernel`](../Haze/Kernel), about a thousand lines
+The trusted part of Haze is the kernel in [`Haze/Kernel`](../Haze/Kernel), about 1,400 lines
 of Lean including documentation. `Haze.Kernel.addDecl` re-checks every type and grade that the
 elaborator produces, so a mistake in the elaborator can't slip an ill-typed or wrongly graded
 declaration past it.
@@ -191,8 +227,13 @@ test (see the [test suite](../tests/README.md)), and many expected results were 
 2/3 for the Monty Hall problem, a posterior of 19/118 after a positive medical test, a necessity
 and possibility pair, a Łukasiewicz implication, a 0.19³ chance of giving up after three retries,
 a stale-read risk of 0.128, and a root-cause posterior of 567/955. The models in
-[`examples/Gallery`](../examples/Gallery) are also checked against independent calculations by
-[`scripts/verify_gallery.py`](../scripts/verify_gallery.py).
+[`examples/Gallery`](../examples/Gallery), [`examples/Agents`](../examples/Agents),
+[`examples/Protocols`](../examples/Protocols) and [`examples/Privacy`](../examples/Privacy) are
+also checked against independent calculations by
+[`scripts/verify_gallery.py`](../scripts/verify_gallery.py), 121 checks in all. The test
+[`tests/systems_and_conditioning.hz`](../tests/systems_and_conditioning.hz) covers the
+reductions above, including a dependency chain long enough to catch a closure that stops
+early.
 
 ## References
 

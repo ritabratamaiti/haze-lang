@@ -1,6 +1,6 @@
 examples/payments_retry.hz:92:1: info: claim delivered
   belief ≈0.998319 · plausibility ≈0.99997 — graded
-  grade prob+fuzzy · 4 parameter assignment(s) · ≤4 states/step
+  grade prob+fuzzy · 4 parameter assignment(s) · ≤1 states/step
   bound holds: belief ≥ 0.99
   by fuzzy parameter (π = possibility):
     loss = 0.01  π 0.6     ≈0.999992
@@ -18,7 +18,7 @@ examples/payments_retry.hz:97:1: error: theorem naive_single_charge
     loss = 0.1   π 0.2     0.9028
   counterexample at step 3 (path mass ≈9.801e-5 (=9801/100000000), degree 0):
     parameters: loss = 0.01
-    state: phase = Waiting, attempts = 2, charges = 2, acked = false, latency = 1000
+    state: phase = Waiting, attempts = 2, charges = 2
 examples/payments_retry.hz:98:1: info: claim double_charge_risk
   belief ≈0.013989 · plausibility ≈0.044319 — graded
   grade prob+fuzzy · 4 parameter assignment(s) · ≤5 states/step
@@ -37,7 +37,7 @@ examples/payments_retry.hz:103:1: info: theorem ack_implies_charged
   theorem accepted
 examples/payments_retry.hz:107:1: info: claim snappy
   belief ≈0.951894 · plausibility ≈0.985977 — graded
-  grade prob+fuzzy · 4 parameter assignment(s) · ≤5 states/step
+  grade prob+fuzzy · 4 parameter assignment(s) · ≤4 states/step
   by fuzzy parameter (π = possibility):
     loss = 0.01  π 0.6     ≈0.990069
     loss = 0.02  π 1       ≈0.979838

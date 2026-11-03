@@ -1,0 +1,153 @@
+examples/Agents/support_agent.hz:33:1: info: claim pass_1
+  probability 0.61202 — graded
+  grade prob · 1 parameter assignment(s) · ≤4 states/step
+examples/Agents/support_agent.hz:34:1: info: claim pass_2
+  probability ≈0.42949 — graded
+  grade prob · 1 parameter assignment(s) · ≤4 states/step
+examples/Agents/support_agent.hz:35:1: info: claim pass_8
+  probability ≈0.236493 — graded
+  grade prob · 1 parameter assignment(s) · ≤4 states/step
+  bound holds: plausibility ≤ 0.25
+examples/Agents/support_agent.hz:104:1: info: theorem one_payment
+  probability 1 — holds with certainty
+  grade prob+fuzzy · 18 parameter assignment(s) · ≤84 states/step
+  theorem accepted
+examples/Agents/support_agent.hz:105:1: info: theorem checked_before_paying
+  probability 1 — holds with certainty
+  grade prob+fuzzy · 18 parameter assignment(s) · ≤90 states/step
+  theorem accepted
+examples/Agents/support_agent.hz:106:1: info: theorem large_refunds_approved
+  probability 1 — holds with certainty
+  grade prob+fuzzy · 18 parameter assignment(s) · ≤84 states/step
+  theorem accepted
+examples/Agents/support_agent.hz:107:1: info: theorem always_finishes
+  probability 1 — holds with certainty
+  grade prob+fuzzy · 18 parameter assignment(s) · ≤33 states/step
+  theorem accepted
+examples/Agents/support_agent.hz:111:1: info: claim correct
+  belief ≈0.87761 · plausibility ≈0.935933 — graded
+  grade prob+fuzzy · 18 parameter assignment(s) · ≤84 states/step
+  by fuzzy parameter (π = possibility), 18 assignments:
+    lowest          understands = 0.95, decides_well = 0.9, checker_catches = 0.8   π 0.6     ≈0.854893
+    highest         understands = 0.99, decides_well = 0.97, checker_catches = 0.8  π 0.5     ≈0.96018
+    most plausible  understands = 0.97, decides_well = 0.94, checker_catches = 0.9  π 1       ≈0.911686
+  what moves the result most (each parameter varied alone, the others at their most plausible values):
+    decides_well: 0.9 → ≈0.872891, 0.94 → ≈0.911686, 0.97 → ≈0.940782  (range ≈0.067892)
+    understands: 0.95 → ≈0.892888, 0.97 → ≈0.911686, 0.99 → ≈0.930484  (range ≈0.037595)
+    checker_catches: 0.8 → ≈0.911686, 0.9 → ≈0.911686  (range 0)
+examples/Agents/support_agent.hz:112:1: info: claim wrong_refund
+  belief ≈8.68013e-4 · plausibility ≈0.002841 — graded
+  grade prob+fuzzy · 18 parameter assignment(s) · ≤84 states/step
+  by fuzzy parameter (π = possibility), 18 assignments:
+    lowest          understands = 0.99, decides_well = 0.97, checker_catches = 0.9  π 0.5     ≈5.3886e-4
+    highest         understands = 0.95, decides_well = 0.9, checker_catches = 0.8   π 0.6     ≈0.003936
+    most plausible  understands = 0.97, decides_well = 0.94, checker_catches = 0.9  π 1       ≈0.001197
+  what moves the result most (each parameter varied alone, the others at their most plausible values):
+    checker_catches: 0.8 → ≈0.002394, 0.9 → ≈0.001197  (range ≈0.001197)
+    decides_well: 0.9 → ≈0.001724, 0.94 → ≈0.001197, 0.97 → ≈8.02182e-4  (range ≈9.21627e-4)
+    understands: 0.95 → ≈0.001452, 0.97 → ≈0.001197, 0.99 → ≈9.41987e-4  (range ≈5.10356e-4 (=204142479/400000000000))
+examples/Agents/support_agent.hz:113:1: info: claim wrong_refund_large
+  belief ≈4.79565e-6 · plausibility ≈1.5694e-5 (=7847019/500000000000) — graded
+  grade prob+fuzzy · 18 parameter assignment(s) · ≤84 states/step
+  by fuzzy parameter (π = possibility), 18 assignments:
+    lowest          understands = 0.99, decides_well = 0.97, checker_catches = 0.9  π 0.5     ≈2.97713e-6
+    highest         understands = 0.95, decides_well = 0.9, checker_catches = 0.8   π 0.6     ≈2.17473e-5 (=695913/32000000000)
+    most plausible  understands = 0.97, decides_well = 0.94, checker_catches = 0.9  π 1       ≈6.61417e-6
+  what moves the result most (each parameter varied alone, the others at their most plausible values):
+    checker_catches: 0.8 → ≈1.32283e-5 (=10582677/800000000000), 0.9 → ≈6.61417e-6  (range ≈6.61417e-6)
+    decides_well: 0.9 → ≈9.52381e-6 (=3047619/320000000000), 0.94 → ≈6.61417e-6, 0.97 → ≈4.43195e-6  (range ≈5.09186e-6)
+    understands: 0.95 → ≈8.024e-6 (=2567679/320000000000), 0.97 → ≈6.61417e-6, 0.99 → ≈5.20435e-6  (range ≈2.81965e-6 (=1127859/400000000000))
+examples/Agents/support_agent.hz:114:1: info: claim wrongly_declined
+  belief ≈0.054351 · plausibility ≈0.103925 — graded
+  grade prob+fuzzy · 18 parameter assignment(s) · ≤84 states/step
+  by fuzzy parameter (π = possibility), 18 assignments:
+    lowest          understands = 0.99, decides_well = 0.97, checker_catches = 0.8  π 0.5     ≈0.033741
+    highest         understands = 0.95, decides_well = 0.9, checker_catches = 0.8   π 0.6     ≈0.123235
+    most plausible  understands = 0.97, decides_well = 0.94, checker_catches = 0.9  π 1       ≈0.074961
+  what moves the result most (each parameter varied alone, the others at their most plausible values):
+    decides_well: 0.9 → ≈0.107937, 0.94 → ≈0.074961, 0.97 → ≈0.050229  (range ≈0.057708)
+    understands: 0.95 → ≈0.090939, 0.97 → ≈0.074961, 0.99 → ≈0.058983  (range ≈0.031956)
+    checker_catches: 0.8 → ≈0.074961, 0.9 → ≈0.074961  (range 0)
+examples/Agents/support_agent.hz:115:1: info: #eval Agent |= after[8] phase
+  when understands = 0.95, decides_well = 0.9, checker_catches = 0.8 (π 0.6):
+    Refunded   ↦ ≈0.730595
+    Declined   ↦ ≈0.251469
+    Escalated  ↦ ≈0.017936
+  when understands = 0.95, decides_well = 0.9, checker_catches = 0.9 (π 0.6):
+    Refunded   ↦ ≈0.728627
+    Declined   ↦ ≈0.251469
+    Escalated  ↦ ≈0.019904
+  when understands = 0.95, decides_well = 0.94, checker_catches = 0.8 (π 0.6):
+    Refunded   ↦ ≈0.76186
+    Declined   ↦ ≈0.224872
+    Escalated  ↦ ≈0.013268
+  when understands = 0.95, decides_well = 0.94, checker_catches = 0.9 (π 0.6):
+    Refunded   ↦ ≈0.760407
+    Declined   ↦ ≈0.224872
+    Escalated  ↦ ≈0.014721
+  when understands = 0.95, decides_well = 0.97, checker_catches = 0.8 (π 0.5):
+    Refunded   ↦ ≈0.785308
+    Declined   ↦ ≈0.204924
+    Escalated  ↦ ≈0.009768
+  when understands = 0.95, decides_well = 0.97, checker_catches = 0.9 (π 0.5):
+    Refunded   ↦ ≈0.784243
+    Declined   ↦ ≈0.204924
+    Escalated  ↦ ≈0.010833
+  when understands = 0.97, decides_well = 0.9, checker_catches = 0.8 (π 0.6):
+    Refunded   ↦ ≈0.745405
+    Declined   ↦ ≈0.23887
+    Escalated  ↦ ≈0.015725
+  when understands = 0.97, decides_well = 0.9, checker_catches = 0.9 (π 0.6):
+    Refunded   ↦ ≈0.743681
+    Declined   ↦ ≈0.23887
+    Escalated  ↦ ≈0.017449
+  when understands = 0.97, decides_well = 0.94, checker_catches = 0.8 (π 0.6):
+    Refunded   ↦ ≈0.777327
+    Declined   ↦ ≈0.211714
+    Escalated  ↦ ≈0.010959
+  when understands = 0.97, decides_well = 0.94, checker_catches = 0.9 (π 1):
+    Refunded   ↦ ≈0.77613
+    Declined   ↦ ≈0.211714
+    Escalated  ↦ ≈0.012156
+  when understands = 0.97, decides_well = 0.97, checker_catches = 0.8 (π 0.5):
+    Refunded   ↦ ≈0.801269
+    Declined   ↦ ≈0.191346
+    Escalated  ↦ ≈0.007385
+  when understands = 0.97, decides_well = 0.97, checker_catches = 0.9 (π 0.5):
+    Refunded   ↦ ≈0.800467
+    Declined   ↦ ≈0.191346
+    Escalated  ↦ ≈0.008187
+  when understands = 0.99, decides_well = 0.9, checker_catches = 0.8 (π 0.5):
+    Refunded   ↦ ≈0.760214
+    Declined   ↦ ≈0.226272
+    Escalated  ↦ ≈0.013514
+  when understands = 0.99, decides_well = 0.9, checker_catches = 0.9 (π 0.5):
+    Refunded   ↦ ≈0.758735
+    Declined   ↦ ≈0.226272
+    Escalated  ↦ ≈0.014993
+  when understands = 0.99, decides_well = 0.94, checker_catches = 0.8 (π 0.5):
+    Refunded   ↦ ≈0.792795
+    Declined   ↦ ≈0.198555
+    Escalated  ↦ ≈0.00865
+  when understands = 0.99, decides_well = 0.94, checker_catches = 0.9 (π 0.5):
+    Refunded   ↦ ≈0.791853
+    Declined   ↦ ≈0.198555
+    Escalated  ↦ ≈0.009592
+  when understands = 0.99, decides_well = 0.97, checker_catches = 0.8 (π 0.5):
+    Refunded   ↦ ≈0.817231
+    Declined   ↦ ≈0.177768
+    Escalated  ↦ ≈0.005002
+  when understands = 0.99, decides_well = 0.97, checker_catches = 0.9 (π 0.5):
+    Refunded   ↦ ≈0.816692
+    Declined   ↦ ≈0.177768
+    Escalated  ↦ ≈0.00554
+examples/Agents/support_agent.hz:116:1: info: #expect Agent |= after[8] (if phase == Refunded and not eligible then amount else 0)
+  lower expectation ≈0.078409 · upper expectation ≈0.256598
+  by fuzzy parameter (π = possibility), 18 assignments:
+    lowest          understands = 0.99, decides_well = 0.97, checker_catches = 0.9  π 0.5     E ≈0.048676
+    highest         understands = 0.95, decides_well = 0.9, checker_catches = 0.8   π 0.6     E ≈0.355568
+    most plausible  understands = 0.97, decides_well = 0.94, checker_catches = 0.9  π 1       E ≈0.108142
+  what moves the result most (each parameter varied alone, the others at their most plausible values):
+    checker_catches: 0.8 → ≈0.216283, 0.9 → ≈0.108142  (range ≈0.108142)
+    decides_well: 0.9 → ≈0.155714, 0.94 → ≈0.108142, 0.97 → ≈0.072462  (range ≈0.083252)
+    understands: 0.95 → ≈0.131192, 0.97 → ≈0.108142, 0.99 → ≈0.085091  (range ≈0.046101)

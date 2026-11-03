@@ -1,0 +1,65 @@
+-- Randomized response: privacy in a survey, checked exactly
+--
+-- A survey asks a sensitive question, say whether someone has ever cheated on their taxes. Many
+-- people won't answer honestly unless their answer can't be held against them. Randomized
+-- response (Warner, Journal of the American Statistical Association, 1965) solves this by adding
+-- deliberate noise. In its common forced-response form (Boruch, 1971), each respondent privately
+-- rolls a die and tells the truth only if it shows 1 to 3; on 4 or 5 the answer is "yes", and on
+-- 6 it is "no". No single answer proves anything, yet the survey can still estimate the share of
+-- cheaters.
+--
+-- Differential privacy makes "proves nothing" precise. A mechanism is ε-differentially private
+-- if every answer is at most e^ε times as likely for one respondent as for any other. SampCert
+-- proves guarantees of this kind in Lean for the discrete Gaussian sampler used by AWS Clean Rooms.
+-- Here Haze computes the probabilities exactly, so the guarantee becomes a set of checked bounds,
+-- and it can also say what an observer learns about a person and how accurate the survey is.
+
+input cheated : Bool ~ flip(0.5)
+input die : Num ~ uniform(1, 6)
+def answer : Bool := if die <= 3 then cheated else die <= 5
+
+-- A cheater answers "yes" with probability 1/2 + 1/3 = 5/6 and someone honest with 1/3, so "yes"
+-- is at most 5/2 times as likely for one as for the other. "No" has probabilities 1/6 and 2/3, a
+-- ratio of 4, so the mechanism is ln 4-differentially private, about ε = 1.39. The coin that
+-- decides `cheated` doesn't affect these numbers, because they are conditioned on it.
+#prob answer given cheated
+#prob answer given not cheated
+claim yes_if_cheated : answer given cheated with prob <= 5/6
+claim yes_if_honest : answer given not cheated with prob >= 1/3
+claim no_if_cheated : not answer given cheated with prob >= 1/6
+claim no_if_honest : not answer given not cheated with prob <= 2/3
+
+-- What does an answer reveal about one person? That depends on how common cheating is, which is
+-- known only roughly. Before the survey, an observer believes about 10% of people cheat, maybe
+-- 5% or 20%.
+param base_rate : Num ~= {0.05: 0.5, 0.1: 1, 0.2: 0.5}
+input person_cheated : Bool ~ flip(base_rate)
+input die1 : Num ~ uniform(1, 6)
+def first_answer : Bool := if die1 <= 3 then person_cheated else die1 <= 5
+
+-- After a "yes", the observer's odds that this person cheated grow by at most 5/2: from 10% to
+-- about 22%. Suppose the survey promises that no answer leaves an observer thinking a respondent
+-- more likely than not to have cheated. One answer keeps that promise even at the 20% rate.
+#prob person_cheated given first_answer
+claim one_answer_private : person_cheated given first_answer with prob <= 0.5
+
+-- Asking the same person again, with a fresh roll, leaks more. Two "yes" answers multiply the
+-- odds by 25/4, so the guarantee weakens to 2ε, and if cheating is as common as 20% the promise
+-- is broken. A survey that repeats a question across waves has to account for this.
+input die2 : Num ~ uniform(1, 6)
+def second_answer : Bool := if die2 <= 3 then person_cheated else die2 <= 5
+#prob person_cheated given first_answer and second_answer
+claim two_answers_private : person_cheated given first_answer and second_answer
+  with prob <= 0.5
+
+-- The survey's estimate. With 200 respondents and a true rate r, the number of "yes" answers is
+-- binomial with p = r/2 + 1/3, so the share s of "yes" answers estimates r as 2(s - 1/3).
+input yes_count : Num ~ binomial(200, base_rate / 2 + 1 / 3)
+def estimate : Num := 2 * (yes_count / 200 - 1 / 3)
+#expect estimate
+#prob abs(estimate - base_rate) <= 0.05
+
+-- The same survey asked directly, if everyone answered honestly. The privacy costs accuracy.
+input direct_count : Num ~ binomial(200, base_rate)
+def direct_estimate : Num := direct_count / 200
+#prob abs(direct_estimate - base_rate) <= 0.05

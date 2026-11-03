@@ -123,6 +123,52 @@ def observe (env : Env) (fuel : Nat) (cond : Expr) (bs : Array Branch) :
   if out.isEmpty then throw "kernel: observation is impossible under every parameter assignment"
   pure { branches := out, evidence, dropped }
 
+/--
+A declaration that shapes the distribution over worlds. Every `param` and `node` adds one global
+variable, in the order of `Env.globals`.
+-/
+inductive WorldOp where
+  | param (name : String) (support : List (Value × Rat))
+  | node (val : Expr)
+  | observe (cond : Expr)
+  deriving Inhabited
+
+/--
+Builds the branches for a query by replaying the declarations in order. Only the parameters and
+nodes that `keep` marks are included; the others get the outcome `Res.stuck`. This is exact for
+any query whose property, and every observation, reads only marked variables:
+
+* the joint distribution of the marked nodes doesn't depend on the unmarked ones, and
+* a parameter that nothing reads doesn't change any branch's result. Its membership function is
+  normal, so every α-cut of it is non-empty, and the minimum and maximum over an α-cut are the
+  same with or without it.
+
+It avoids building the joint distribution of every random input in the program, which grows
+exponentially with the number of inputs, and splitting on parameters that don't matter.
+
+Also returns the result of the last observation, if there is one.
+-/
+def buildBranches (env : Env) (fuel : Nat) (ops : Array WorldOp) (keep : Array Bool) :
+    Except String (Array Branch × Option ObserveResult) := do
+  let mut bs : Array Branch := #[{}]
+  let mut last := none
+  let mut gi := 0
+  for op in ops do
+    match op with
+    | .param n sup =>
+      if keep[gi]?.getD true then bs := addParam n sup bs
+      else bs := bs.map fun b => { b with worlds := b.worlds.map fun (w, p) => (w.push .stuck, p) }
+      gi := gi + 1
+    | .node v =>
+      if keep[gi]?.getD true then bs ← addNode env fuel v bs
+      else bs := bs.map fun b => { b with worlds := b.worlds.map fun (w, p) => (w.push .stuck, p) }
+      gi := gi + 1
+    | .observe c =>
+      let r ← observe env fuel c bs
+      bs := r.branches
+      last := some r
+  return (bs, last)
+
 /-! ## Fuzzy integration -/
 
 /--
@@ -174,10 +220,11 @@ Projecting worlds onto these variables and merging worlds that become equal does
 result, because the property can't observe the other variables. It does make the state space
 smaller.
 -/
-partial def relevantGlobals (env : Env) (sys : Option SysInfo) (body : Expr) : Array Bool := Id.run do
+partial def relevantGlobals (env : Env) (sys : Option SysInfo) (body : Expr) (args : List Expr := []) :
+    Array Bool := Id.run do
   let mut seen : Array Bool := Array.replicate env.globals.size false
   let mut seenFns : List String := []
-  let mut work : List Expr := body :: (match sys with
+  let mut work : List Expr := body :: args ++ (match sys with
     | some si => si.init.toList ++ stmtExprs si.step
     | none => [])
   for _ in [0:100000] do
@@ -200,6 +247,7 @@ partial def relevantGlobals (env : Env) (sys : Option SysInfo) (body : Expr) : A
       | .prim _ args | .rand _ args => work := args ++ work
       | .ite a b c | .choose a b c => work := a :: b :: c :: work
       | .cat alts => work := alts.map (·.1) ++ work
+      | .catW alts => work := alts.map (·.1) ++ alts.map (·.2) ++ work
       | .letE a b => work := a :: b :: work
       | .quant _ _ _ a b c => work := a :: b :: c :: work
       | .matchE s arms d => work := s :: arms.map (·.2) ++ d.toList ++ work
@@ -213,6 +261,106 @@ where
     | .ite c a b | .choose c a b => c :: stmtExprs a ++ stmtExprs b
     | .matchS s arms d => s :: (arms.flatMap fun (_, b) => stmtExprs b) ++ stmtExprs d
     | .letS v b => v :: stmtExprs b
+
+/--
+The state variables that `e` reads, directly or through local variables. `locals` gives, for each
+local variable in scope, the state variables its value was computed from. Function bodies and
+nodes can't read state variables, so a call depends only on its arguments.
+-/
+partial def exprVars (locals : List (List Nat)) : Expr → List Nat
+  | .svar i => [i]
+  | .bvar i => locals[i]?.getD []
+  | .prim _ args | .rand _ args | .call _ args => args.flatMap (exprVars locals)
+  | .ite a b c | .choose a b c => [a, b, c].flatMap (exprVars locals)
+  | .cat alts => alts.flatMap fun (e, _) => exprVars locals e
+  | .catW alts => alts.flatMap fun (e, w) => exprVars locals e ++ exprVars locals w
+  | .letE v b => let d := exprVars locals v; d ++ exprVars (d :: locals) b
+  | .quant _ _ _ lo hi b =>
+    let d := exprVars locals lo ++ exprVars locals hi
+    d ++ exprVars (d :: locals) b
+  | .matchE s arms d =>
+    exprVars locals s ++ arms.flatMap (fun (_, b) => exprVars locals b) ++
+      (d.map (exprVars locals)).getD []
+  | _ => []
+
+/-- Whether `e` calls a function, and so might run out of fuel. -/
+partial def hasCall : Expr → Bool
+  | .call _ _ => true
+  | .prim _ args | .rand _ args => args.any hasCall
+  | .ite a b c | .choose a b c => hasCall a || hasCall b || hasCall c
+  | .cat alts => alts.any (hasCall ·.1)
+  | .catW alts => alts.any fun (e, w) => hasCall e || hasCall w
+  | .letE v b => hasCall v || hasCall b
+  | .quant _ _ _ lo hi b => hasCall lo || hasCall hi || hasCall b
+  | .matchE s arms d => hasCall s || arms.any (hasCall ·.2) || d.any hasCall
+  | _ => false
+
+/--
+The dependencies of a step. For each state variable, the result lists the state variables its new
+value can depend on, through the assigned expression, the local variables it uses, or the
+conditions that decide whether the assignment runs. It also returns the roots: state variables that
+must always be kept, because assertions read them or because an assignment that might run out of
+fuel depends on them.
+-/
+partial def stepDeps (n : Nat) (step : Stmt) : Array (List Nat) × List Nat :=
+  go step [] [] (Array.replicate n [], [])
+where
+  go (st : Stmt) (locals : List (List Nat)) (ctl : List Nat) (acc : Array (List Nat) × List Nat) :
+      Array (List Nat) × List Nat :=
+    let (deps, roots) := acc
+    match st with
+    | .skip => acc
+    | .assign i e =>
+      let d := exprVars locals e ++ ctl
+      let deps := deps.modify i (d ++ ·)
+      if hasCall e then (deps, i :: d ++ roots) else (deps, roots)
+    | .assert c => (deps, exprVars locals c ++ ctl ++ roots)
+    | .seq a b => go b locals ctl (go a locals ctl acc)
+    | .ite c a b | .choose c a b =>
+      let ctl := exprVars locals c ++ ctl
+      go b locals ctl (go a locals ctl acc)
+    | .matchS sc arms d =>
+      let ctl := exprVars locals sc ++ ctl
+      go d locals ctl (arms.foldl (fun acc (_, b) => go b locals ctl acc) acc)
+    | .letS v b =>
+      let acc := if hasCall v then (deps, exprVars locals v ++ ctl ++ roots) else acc
+      go b (exprVars locals v :: locals) ctl acc
+
+/--
+Marks the state variables of `si` that can influence `body`, its cone of influence. The other
+variables can't affect the property: nothing that the property reads is computed from them, and no
+assertion or possibly stuck computation reads them.
+-/
+def coneOfInfluence (si : SysInfo) (body : Expr) : Array Bool := Id.run do
+  let n := si.vars.size
+  let (deps, roots) := stepDeps n si.step
+  let deps := deps.map (·.eraseDups)
+  let mut seen : Array Bool := Array.replicate n false
+  let mut work := exprVars [] body ++ roots
+  -- each entry of `work` and of every dependency list is taken from the work list at most once
+  for _ in [0:work.length + deps.foldl (· + ·.length) 0 + 1] do
+    match work with
+    | [] => break
+    | i :: rest =>
+      work := rest
+      if i < n && !seen[i]! then
+        seen := seen.set! i true
+        work := deps[i]! ++ work
+  return seen
+
+/--
+Removes assignments to the state variables that `relevant` doesn't mark. Those variables then keep
+their initial values, which nothing reads.
+-/
+partial def sliceStep (relevant : Array Bool) : Stmt → Stmt
+  | .assign i e => if relevant[i]?.getD true then .assign i e else .skip
+  | .seq a b => .seq (sliceStep relevant a) (sliceStep relevant b)
+  | .ite c a b => .ite c (sliceStep relevant a) (sliceStep relevant b)
+  | .choose c a b => .choose c (sliceStep relevant a) (sliceStep relevant b)
+  | .matchS sc arms d =>
+    .matchS sc (arms.map fun (k, b) => (k, sliceStep relevant b)) (sliceStep relevant d)
+  | .letS v b => .letS v (sliceStep relevant b)
+  | st => st
 
 /--
 Replaces the value of every irrelevant global variable in each world by `Res.stuck`, and merges
@@ -261,8 +409,25 @@ structure Checker where
   sys : Option SysInfo
   body : Expr
   relevant : Array Bool := #[]
+  /-- The values of the system's parameters. -/
+  args : List Expr := []
+  /--
+  Marks the state variables in the property's cone of influence. The others are never assigned and
+  hold the placeholder `false`, so configurations that differ only in them are merged.
+  -/
+  relevantVars : Array Bool := #[]
 
 namespace Checker
+
+/--
+The checker for a property. It reads only the global variables and state variables that can
+influence the property, and runs a step without the assignments to the other state variables.
+-/
+def forSpec (env : Env) (fuel : Nat) (sys : Option SysInfo) (body : Expr) (args : List Expr) :
+    Checker :=
+  let relVars := (sys.map (coneOfInfluence · body)).getD #[]
+  let sys := sys.map fun si => { si with step := sliceStep relVars si.step }
+  { env, fuel, sys, body, args, relevant := relevantGlobals env sys body args, relevantVars := relVars }
 
 /-- The evaluation context for a configuration. -/
 def ctx (ck : Checker) (cfg : Config) : ECtx :=
@@ -313,12 +478,16 @@ def initial (ck : Checker) (b : Branch) : Except String (List (Config × Rat) ×
     | none => out := out.push ({ world := w, st := { vars := #[] } }, p)
     | some si =>
       let ctx : ECtx := { env := ck.env, world := w, fuel := ck.fuel }
-      let m : M (Array Value) := si.init.foldlM (init := #[]) fun arr e => do
-        let v ← eval ctx e
+      -- the parameters take the property's arguments; later initial values may refer to them
+      let inits := ck.args.toArray ++ si.init.extract ck.args.length si.init.size
+      let m : M (Array Value) := inits.foldlM (init := #[]) fun arr e => do
+        let v ← eval { ctx with vars := arr } e
         pure (arr.push v)
       for (r, q) in ← liftM m do
         match r with
-        | .ok vars => out := out.push ({ world := w, st := { vars } }, p * q)
+        | .ok vars =>
+          let vars := vars.mapIdx fun i v => if ck.relevantVars[i]?.getD true then v else .bool false
+          out := out.push ({ world := w, st := { vars } }, p * q)
         | .stuck => unk := unk + p * q
   return (M.compactList out.toList, unk)
 

@@ -153,6 +153,18 @@ Semicolons between statements are optional. If an `assert` fails, the system _cr
 rest of the step is skipped and the state never changes again. Properties can check for this
 with `crashed`.
 
+A system can take parameters, which makes it easy to compare variants of one design. Parameters
+are read like state variables but can't be assigned, and the initial values of state variables
+can use them. A property gives a value for every parameter:
+
+```haze
+system Pipeline(generated_tests : Bool, review : Bool) {
+  var stage : Stage := Writing
+  …
+}
+claim wrong_merge : Pipeline(true, false) |= after[3] (stage == Merged and wrong)
+```
+
 ### 8. Claims and Theorems
 
 Claims and theorems are the questions you ask about a model. A claim asks how strongly a
@@ -185,9 +197,25 @@ A property is a term of type `Bool` or `Deg`, optionally about a system:
 In a property about `S`, you can use the state variables of `S` and `crashed`. For a `Deg`
 property, `always` takes the lowest degree along each path and `eventually` the highest.
 
-When a theorem or bound is rejected, Haze shows a counterexample: the parameter values, inputs
-and state at the first step where the property fails, and values for any leading `forall`
-variables that make it false.
+A property can be conditioned with `given`, which asks how likely it is among the runs or
+worlds where a condition holds:
+
+```haze
+#prob Pipeline(true, true) |= after[3] wrong given stage == Merged
+claim precision_target : Pipeline(true, true) |= after[3] wrong given stage == Merged
+  with prob <= 0.02
+```
+
+The condition is checked at the same step as the property, so `given` works with `after[k]` and
+with properties that have no temporal operator, in claims, theorems and `#prob`. The condition
+must be possible for every parameter value.
+
+When a theorem or a `with prob >=` bound is rejected, Haze shows a counterexample: the parameter
+values, inputs and state at the first step where the property fails, and values for any leading
+`forall` variables that make it false. When a `with prob <=` bound is rejected, it shows a run
+where the property does hold, since that is what the bound was meant to rule out. Either way the
+example comes from a parameter value that breaks the bound. Variables that can't affect the
+property aren't shown.
 
 ### 9. Queries
 
@@ -232,8 +260,10 @@ distributions, which list values with their probabilities:
 {Small: 0.6, Medium: 0.3, Large: 0.1}
 ```
 
-The weights of a categorical distribution must be constants, and the kernel checks that they
-sum to 1.
+The weights can be constants, in which case the kernel checks that they sum to 1, or terms
+that depend on parameters and other values, such as `{Correct: solves, Wrong: 1 - solves}`.
+Computed weights are checked when the distribution is evaluated: none may be negative, and
+together they must sum to exactly 1.
 
 ### Built-in Functions
 
@@ -275,7 +305,7 @@ definition sets an upper limit.
 * The keywords are `logic`, `enum`, `param`, `input`, `def`, `observe`, `system`, `var`,
   `step`, `claim`, `theorem`, `with`, `prob`, `if`, `then`, `else`, `let`, `in`,
   `forall`, `exists`, `match`, `and`, `or`, `not`, `implies`, `is`, `very`, `true`,
-  `false`, `assert`, `skip`, `always`, `eventually` and `after`.
+  `false`, `assert`, `skip`, `always`, `eventually`, `after` and `given`.
 * The symbols `≈`, `≤`, `≥`, `≠`, `⊨`, `→` and `⇒` may be written instead of `~=`, `<=`,
   `>=`, `!=`, `|=`, `->` and `=>`.
 
@@ -289,6 +319,12 @@ is a single probability. Otherwise it's a pair: the _belief_, how strongly the m
 guarantees the property, and the _plausibility_, how strongly it allows it. If the result
 depends on the values of fuzzy parameters, a table shows the result for each value together
 with its possibility `π`. [`Design.md`](Design.md) gives the precise definitions.
+
+With more than six parameter assignments, the table is replaced by a summary. It shows the
+assignments with the lowest, highest and most plausible results, and then varies each parameter
+on its own, keeping the others at their most plausible values, to rank the parameters by how
+much they move the result. That ranking says which estimate is worth improving first. Parameters
+that a property can't read are left out.
 
 All numbers are exact. A number with a long decimal expansion is rounded and marked with `≈`,
 followed by the exact fraction when it's short, as in `0.666667 (=2/3)`. Numbers below 0.001 are
@@ -319,7 +355,8 @@ print). Records that carry a result also have a `kind` and the fields below:
 
 `branches` lists the result for each assignment of the fuzzy parameters, with its `parameters`
 and `possibility`; for properties it has the `lower` and `upper` bounds. A `counterexample` has
-the `step`, `parameters`, `inputs` and `state` at which a property fails, or is `null`.
+the `step`, `parameters`, `inputs` and `state` of the example described under
+[Claims and Theorems](#8-claims-and-theorems), or is `null`.
 
 Numbers stay exact: probabilities and numeric values are strings such as `"2/3"`, which
 exact-fraction libraries (Python's `fractions.Fraction`, for example) read directly. Booleans
@@ -331,5 +368,11 @@ Haze gets exact answers by enumerating every state, so models have to be finite 
 large. Temporal properties can look at most 100,000 steps ahead, `uniform` ranges and quantifier
 ranges can have at most 100,000 values, and `binomial` allows at most 10,000 trials. At most
 2,000,000 distinct configurations are kept per step, after merging equal configurations and
-dropping variables the property can't read. For scale, the models in this repository have up to
+dropping variables the property can't read.
+
+Two reductions keep this manageable. Each query builds only the inputs and parameters that it,
+or an earlier observation, can read, so unrelated inputs don't multiply the number of worlds. And
+a state variable that can't influence the property, directly or through the variables it's
+computed from and the conditions around its assignments, isn't tracked at all. A clock or a
+counter that a property never reads doesn't split its states. For scale, the models in this repository have up to
 about a thousand states per step, and each file checks in well under a minute.

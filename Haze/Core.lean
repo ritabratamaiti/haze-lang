@@ -169,6 +169,11 @@ inductive Expr where
   | rand (r : RandPrim) (args : List Expr)
   /-- A categorical choice with exact weights. The kernel checks that the weights sum to 1. -/
   | cat (alts : List (Expr × Rat))
+  /--
+  A categorical choice whose weights are computed, for example from fuzzy parameters. The weights
+  are checked when they are evaluated: they must be non-negative and sum to 1.
+  -/
+  | catW (alts : List (Expr × Expr))
   | letE (v b : Expr)
   /--
   A bounded quantifier over the integers from `lo` to `hi`, which binds `bvar 0` in `body`.
@@ -218,6 +223,10 @@ structure PropSpec where
   sys : Option String
   mode : Temporal
   body : Expr
+  /-- The values of the system's parameters, if it has any. -/
+  args : List Expr := []
+  /-- A condition, for the conditional probability of `body` given that the condition holds. -/
+  given : Option Expr := none
   deriving Repr, Inhabited
 
 /--
@@ -283,6 +292,11 @@ structure SysInfo where
   init : Array Expr
   step : Stmt
   grade : Grade := .crisp
+  /--
+  The number of parameters. The first `params` state variables are the parameters: each property
+  about the system supplies their values, and the step may not assign to them.
+  -/
+  params : Nat := 0
   deriving Repr, Inhabited
 
 /--

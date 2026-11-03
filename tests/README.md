@@ -26,6 +26,12 @@ right.
 - `kernel_errors.hz` contains declarations that the elaborator or the kernel must reject, and
   checks that processing carries on correctly after each error.
 - `parse_error.hz` checks how a syntax error is reported.
+- `systems_and_conditioning.hz` covers system parameters, `given`, computed weights, the summary
+  of large parameter tables, and counterexamples for upper bounds. It also checks that the
+  reductions that keep checking fast don't change results: twenty independent inputs that only
+  stay cheap if unused ones aren't built, an observation that must still condition later
+  queries, and a dependency chain long enough to catch a cone-of-influence closure that stops
+  early.
 - `reference.hz` contains the snippets from the
   [language reference](../docs/Language-Reference.md), so the reference can't silently drift
   out of date.
@@ -39,8 +45,9 @@ probabilities, make the best tests.
 ## Independent checks
 
 Golden tests catch changes, but they can't tell whether the original answer was right. For the
-models in [`examples/Gallery`](../examples/Gallery), [`scripts/verify_gallery.py`](../scripts/verify_gallery.py)
-recomputes every result without Haze, from closed-form answers or an exact step-by-step
+models in [`examples/Gallery`](../examples/Gallery), [`examples/Agents`](../examples/Agents),
+[`examples/Protocols`](../examples/Protocols) and [`examples/Privacy`](../examples/Privacy),
+[`scripts/verify_gallery.py`](../scripts/verify_gallery.py) recomputes every result without Haze, from closed-form answers or an exact step-by-step
 calculation in Python, and compares them with what `haze` prints. Run it with
 `python scripts/verify_gallery.py` after `lake build`.
 

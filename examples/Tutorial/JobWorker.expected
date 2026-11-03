@@ -33,7 +33,7 @@ examples/Tutorial/JobWorker.hz:138:1: error: theorem first_try
   counterexample at step 3 (path mass 0.0285, degree 0):
     parameters: outage = 0
     inputs: size = Small
-    state: phase = Succeeded, calls = 2, waited = 100
+    state: phase = Succeeded, calls = 2
 examples/Tutorial/JobWorker.hz:142:1: info: claim mostly_succeeds
   belief ≈0.916353 · plausibility 0.948688 (=15179/16000) — graded
   grade prob+fuzzy · 3 parameter assignment(s) · ≤3 states/step

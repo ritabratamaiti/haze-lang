@@ -43,11 +43,11 @@ examples/Gallery/game_physics.hz:97:1: info: #eval Bounce |= after[60] y
   0
 examples/Gallery/game_physics.hz:133:1: info: theorem fixed_step_reaches_ledge
   probability 1 — proved
-  grade crisp · 3 parameter assignment(s) · ≤1 states/step
+  grade crisp · 1 parameter assignment(s) · ≤1 states/step
   theorem accepted
 examples/Gallery/game_physics.hz:134:1: info: claim variable_step_reaches_ledge
   belief ≈0.548117 · plausibility ≈0.833748 — graded
-  grade prob+fuzzy · 3 parameter assignment(s) · ≤54 states/step
+  grade prob+fuzzy · 3 parameter assignment(s) · ≤18 states/step
   by fuzzy parameter (π = possibility):
     drop_rate = 0.02  π 1       ≈0.833748
     drop_rate = 0.1   π 0.5     ≈0.38742
@@ -76,10 +76,10 @@ examples/Gallery/game_physics.hz:135:1: info: #eval VariableStepJump |= after[25
     40  ↦ ≈9.76563e-4 (=1/1024)
 examples/Gallery/game_physics.hz:153:1: info: claim jetpack_reaches_platform
   probability ≈0.972796 — graded
-  grade prob · 3 parameter assignment(s) · ≤229 states/step
+  grade prob · 1 parameter assignment(s) · ≤229 states/step
 examples/Gallery/game_physics.hz:154:1: info: #expect Jetpack |= after[30] y
   expectation ≈10.585467
 examples/Gallery/game_physics.hz:155:1: info: theorem fuel_never_negative
   probability 1 — holds with certainty
-  grade prob · 3 parameter assignment(s) · ≤1132 states/step
+  grade prob · 1 parameter assignment(s) · ≤1 states/step
   theorem accepted

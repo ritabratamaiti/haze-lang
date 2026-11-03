@@ -60,7 +60,7 @@ payments_retry.hz:97:1: error: theorem naive_single_charge
   theorem rejected: belief is ≈0.955681, not 1
   counterexample at step 3 (path mass ≈9.801e-5 (=9801/100000000), degree 0):
     parameters: loss = 0.01
-    state: phase = Waiting, attempts = 2, charges = 2, acked = false, latency = 1000
+    state: phase = Waiting, attempts = 2, charges = 2
 ```
 
 Giving each payment an idempotency key fixes this, and with that change Haze proves the theorem
@@ -87,6 +87,31 @@ After that, the [`examples`](examples) folder has models of common reliability p
 | [`canary_rollout.hz`](examples/canary_rollout.hz) | Whether a defective build can reach all traffic during a staged rollout. |
 | [`incident_triage.hz`](examples/incident_triage.hz) | The likely root cause of an incident, given which alerts fired. |
 | [`probability_classics.hz`](examples/probability_classics.hz) | Textbook problems with known answers, such as the birthday problem, gambler's ruin and the boy–girl paradox. |
+
+### AI agents
+
+AI agents are software whose steps succeed only some of the time, which is the kind of system
+Haze was built for. The models in [`examples/Agents`](examples/Agents) start from published
+measurements and ask what they mean for a deployment:
+
+| Example | What it checks |
+|---|---|
+| [`support_agent.hz`](examples/Agents/support_agent.hz) | Why an agent that solves 61% of tasks on one try (τ-bench) solves under 25% of them on all of eight tries, and, for a refund agent with a policy checker and human approval for large refunds, proofs that it never pays twice or pays without both checks, plus how often it refunds the wrong customer. |
+| [`coding_agent_ci.hz`](examples/Agents/coding_agent_ci.hz) | How often a coding agent's wrong patch gets merged when CI only runs the existing tests, using the PatchDiff study's rates, and how much generated tests and code review reduce it. With nine parameter assignments per question, Haze also ranks which uncertain rate moves the answer most. |
+
+### Lean projects with a probabilistic side
+
+Lean is used to prove properties of systems that involve chance. A Lean proof holds for every
+size and parameter, which Haze can't match, since it checks one concrete model at a time. What
+Haze adds is the exact probabilities for that model, including quantities that nobody has
+proved anything about yet, such as how long an election takes:
+
+| Example | Lean counterpart | What it checks |
+|---|---|---|
+| [`raft_election.hz`](examples/Protocols/raft_election.hz) | [Veil](https://github.com/verse-lab/veil), which proves safety properties of distributed protocols | That Raft's leader election never elects two leaders in a term, that it can livelock forever without randomized timeouts, and exactly how likely and how fast it elects a leader with them. |
+| [`randomized_response.hz`](examples/Privacy/randomized_response.hz) | [SampCert](https://github.com/leanprover/SampCert), a verified sampler for differential privacy used in AWS Clean Rooms | The privacy guarantee of a randomized-response survey as exact conditional probabilities, what an observer learns about one person when the base rate is only roughly known, how asking twice weakens the guarantee, and what the privacy costs in accuracy. |
+
+### Other fields
 
 Haze isn't limited to software. The models in [`examples/Gallery`](examples/Gallery) come from
 other fields, and each of their answers has been checked against a closed-form result or an

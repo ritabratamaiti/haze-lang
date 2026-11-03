@@ -1,6 +1,6 @@
 examples/canary_rollout.hz:41:1: info: claim bad_build_contained
   belief ≈0.622817 · plausibility 1 — graded
-  grade prob+fuzzy · 4 parameter assignment(s) · ≤3 states/step
+  grade prob+fuzzy · 4 parameter assignment(s) · ≤2 states/step
   by fuzzy parameter (π = possibility):
     defect = 0      π 1       1
     defect = 0.005  π 0.8     ≈0.528521
@@ -8,7 +8,7 @@ examples/canary_rollout.hz:41:1: info: claim bad_build_contained
     defect = 0.1    π 0.2     ≈1
 examples/canary_rollout.hz:42:1: info: claim reaches_full
   belief ≈0.355932 · plausibility 1 — graded
-  grade prob+fuzzy · 4 parameter assignment(s) · ≤3 states/step
+  grade prob+fuzzy · 4 parameter assignment(s) · ≤2 states/step
   by fuzzy parameter (π = possibility):
     defect = 0      π 1       1
     defect = 0.005  π 0.8     ≈0.471479
@@ -32,5 +32,5 @@ examples/canary_rollout.hz:44:1: info: #outcomes Rollout |= after[4] stage
     (all worlds)  P 1         ⇒ RolledBack ≈1 | Full ≈1.36891e-7
 examples/canary_rollout.hz:48:1: info: theorem ships_when_clean
   probability 1 — holds with certainty
-  grade prob+fuzzy · 4 parameter assignment(s) · ≤4 states/step
+  grade prob+fuzzy · 4 parameter assignment(s) · ≤2 states/step
   theorem accepted

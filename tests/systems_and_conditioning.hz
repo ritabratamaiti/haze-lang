@@ -1,0 +1,106 @@
+-- Parameterized systems, conditional probabilities, computed weights, and the two reductions
+-- that keep checking fast: building only the worlds a query can observe, and tracking only the
+-- state variables in a property's cone of influence.
+
+-- Twenty independent inputs would give 100^20 joint worlds if they were all built. A query
+-- reads one of them, so only that one is built.
+input x1 : Num ~ uniform(1, 100)
+input x2 : Num ~ uniform(1, 100)
+input x3 : Num ~ uniform(1, 100)
+input x4 : Num ~ uniform(1, 100)
+input x5 : Num ~ uniform(1, 100)
+input x6 : Num ~ uniform(1, 100)
+input x7 : Num ~ uniform(1, 100)
+input x8 : Num ~ uniform(1, 100)
+input x9 : Num ~ uniform(1, 100)
+input x10 : Num ~ uniform(1, 100)
+input x11 : Num ~ uniform(1, 100)
+input x12 : Num ~ uniform(1, 100)
+input x13 : Num ~ uniform(1, 100)
+input x14 : Num ~ uniform(1, 100)
+input x15 : Num ~ uniform(1, 100)
+input x16 : Num ~ uniform(1, 100)
+input x17 : Num ~ uniform(1, 100)
+input x18 : Num ~ uniform(1, 100)
+input x19 : Num ~ uniform(1, 100)
+input x20 : Num ~ uniform(1, 100)
+#prob x7 <= 25
+#prob x1 + x20 <= 3
+
+-- An observation constrains later queries, even ones that don't mention the observed inputs.
+input y : Num ~ uniform(1, 4)
+input z : Num ~ if flip(0.5) then y else 1
+observe z == 4
+#prob y == 4
+
+-- A node whose evaluation fails is still reported where it is declared, even though no query
+-- reads it.
+def broken : Num := uniform(5, 1)
+
+-- Conditional probability, with and without a system.
+input die : Num ~ uniform(1, 6)
+#prob die == 6 given die >= 4
+claim not_six : die != 6 given die >= 4 with prob >= 0.8
+#expect die given die >= 4
+
+-- Computed weights, and weights that don't add up to 1 at run time.
+param p : Num ~= {0.2: 1, 0.4: 0.5}
+def pick : Num := {1: p, 2: 1 - p}
+#prob pick == 1
+def bad_pick : Num := {1: p, 2: p}
+
+-- A parameterized system. Parameters can't be assigned and must all be given.
+system Counter(limit : Num, noisy : Bool) {
+  var n : Num := 0
+  var log : Num := 0               -- outside the cone of influence of `n <= limit`
+  step {
+    if n < limit { n := n + (if noisy then uniform(0, 1) else 1) }
+    log := log + uniform(1, 50)
+  }
+}
+theorem bounded : Counter(3, true) |= always[6] n <= 3
+#prob Counter(3, true) |= after[3] n == 3
+#prob Counter(3, true) |= after[3] n == 3 given n >= 2
+#prob Counter(3) |= after[3] n == 3
+system Bad(k : Num) {
+  var n : Num := 0
+  step { k := k + 1 }
+}
+#prob Counter(3, true) |= always[3] n <= 3 given n >= 1
+
+-- A long chain of local definitions between the variable a property reads and the variable that
+-- controls it. Every dependency must be followed, however many intermediate values there are.
+system Chain {
+  var scale : Num := 1
+  var done : Bool := false
+  var t : Num := 0
+  step {
+    if not done {
+      let a := uniform(1, 4) * scale
+      let b := a + a + a + a
+      let c := b + b + b + b + a
+      let d := c + c + c + c + b + a
+      let e := d + d + d + d + c + b + a
+      done := e > 400
+      t := t + (if e > 0 then 1 else 0)
+    }
+  }
+}
+#expect Chain |= after[2] t
+#prob Chain |= after[2] t == 2
+
+-- When an upper bound fails, the example is a run where the event happens, taken from a
+-- parameter assignment that breaks the bound.
+param q : Num ~= {0.1: 1, 0.6: 0.5}
+system Coin {
+  var heads : Num := 0
+  step { if flip(q) { heads := heads + 1 } }
+}
+claim rarely_two : Coin |= after[2] heads == 2 with prob <= 0.1
+
+-- With more than six parameter assignments, results are summarized, with the parameters ranked
+-- by how much each one moves the result.
+param a1 : Num ~= {0.1: 0.5, 0.2: 1, 0.3: 0.5}
+param a2 : Num ~= {0.4: 0.5, 0.5: 1, 0.6: 0.5}
+input both : Bool ~ flip(a1) and flip(a2)
+#prob both

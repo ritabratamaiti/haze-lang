@@ -42,6 +42,8 @@ weight 0 are dropped.
 -/
 def bind (m : M α) (f : α → M β) : M β := ⟨do
   let xs ← m.run
+  -- Most terms are deterministic, so skip the general loop when the first part is certain.
+  if let [(.ok a, 1)] := xs then return ← (f a).run
   let mut out : Array (Res β × Rat) := #[]
   for (r, w) in xs do
     match r with
@@ -70,6 +72,7 @@ Merges equal outcomes by adding their weights and drops outcomes of weight 0. Ou
 order of their first occurrence, so the output is deterministic.
 -/
 def compactList [BEq α] [Hashable α] (xs : List (α × Rat)) : List (α × Rat) := Id.run do
+  if let [(_, w)] := xs then return if w == 0 then [] else xs
   let mut ix : HashMap α Nat := {}
   let mut out : Array (α × Rat) := #[]
   for (a, w) in xs do
@@ -275,6 +278,16 @@ partial def eval (c : ECtx) : Expr → M Value
   | .rand r args => M.compact do evalRand r (← evalArgs c args)
   | .cat alts => M.compact do
     let i ← M.ofList (alts.mapIdx fun i (_, w) => (i, w))
+    match alts[i]? with
+    | some (e, _) => eval c e
+    | none => M.fail "runtime: bad categorical index"
+  | .catW alts => M.compact do
+    let ws ← evalArgs c (alts.map (·.2))
+    let qs ← ws.mapM asNum
+    if qs.any (· < 0) then M.fail "runtime: negative weight in a distribution" else
+    let total := qs.foldl (· + ·) 0
+    if total != 1 then M.fail s!"runtime: distribution weights sum to {fmtQ total}, not 1" else
+    let i ← M.ofList (qs.mapIdx fun i q => (i, q))
     match alts[i]? with
     | some (e, _) => eval c e
     | none => M.fail "runtime: bad categorical index"

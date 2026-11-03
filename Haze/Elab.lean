@@ -40,6 +40,8 @@ structure Scope where
   env : Env
   locals : List (String × Ty) := []
   sysVars : Array (String × Ty) := #[]
+  /-- How many of `sysVars` are parameters, which can't be assigned to. -/
+  sysParams : Nat := 0
   inSystem : Bool := false
   /-- The signature of the function being defined, which recursive calls refer to. -/
   selfFun : Option (String × List Ty × Ty) := none
@@ -224,11 +226,16 @@ partial def elabExpr : SExpr → ElabM (Expr × Ty)
     let vs ← alts.mapM fun (v, _) => elabExpr v
     let some (_, t0) := vs.head? | err "empty distribution"
     let ty ← vs.foldlM (fun acc (_, t) => unify acc t) t0
+    -- constant weights are checked statically; computed ones when they are evaluated
+    if alts.all fun (_, w) => (constQ w).isSome then
+      let mut out := #[]
+      for ((x, tx), (_, w)) in vs.zip alts do
+        out := out.push (← coerce x tx ty, (constQ w).getD 0)
+      return (.cat out.toList, ty)
     let mut out := #[]
     for ((x, tx), (_, w)) in vs.zip alts do
-      let some q := constQ w | err "distribution weights must be constant numbers"
-      out := out.push (← coerce x tx ty, q)
-    return (.cat out.toList, ty)
+      out := out.push (← coerce x tx ty, ← elabNum w)
+    return (.catW out.toList, ty)
   | .letE n v b => do
     let (vx, vt) ← elabExpr v
     let (bx, bt) ← withLocal n vt (elabExpr b)
@@ -292,7 +299,9 @@ def varIndex (n : String) : ElabM (Nat × Ty) := do
   let s ← read
   if s.locals.any (·.1 == n) then err s!"cannot assign to local {n}; only state variables are mutable"
   match s.sysVars.findIdx? (·.1 == n) with
-  | some i => pure (i, s.sysVars[i]!.2)
+  | some i =>
+    if i < s.sysParams then err s!"cannot assign to {n}; it is a parameter of the system"
+    pure (i, s.sysVars[i]!.2)
   | none => err s!"unknown state variable {n}"
 
 def seqS : Stmt → Stmt → Stmt
@@ -353,14 +362,27 @@ Elaborates a property. If the property names a system, the state variables of th
 scope in its body.
 -/
 def elabProp (p : SProp) : ElabM (PropSpec × Ty) := do
+  let elabGiven (sc : Scope → Scope) : ElabM (Option Expr) :=
+    p.given.mapM fun g => withReader sc (elabAs g .bool)
   match p.sys with
   | none =>
     let (b, t) ← elabExpr p.body
-    return ({ sys := none, mode := p.mode, body := b }, t)
+    return ({ sys := none, mode := p.mode, body := b, given := ← elabGiven id }, t)
   | some s =>
     let some si := (← read).env.systems[s]? | err s!"unknown system {s}"
-    let (b, t) ← withReader (fun sc => { sc with sysVars := si.vars, inSystem := true }) (elabExpr p.body)
-    return ({ sys := some s, mode := p.mode, body := b }, t)
+    unless p.args.length == si.params do
+      err s!"system {s} takes {si.params} parameter{if si.params == 1 then "" else "s"}, but got {p.args.length}"
+    let args ← (p.args.zip (si.vars.toList.take si.params)).mapM fun (a, (_, t)) => elabAs a t
+    let inSys := fun (sc : Scope) => { sc with sysVars := si.vars, inSystem := true }
+    let (b, t) ← withReader inSys (elabExpr p.body)
+    return ({ sys := some s, mode := p.mode, body := b, args, given := ← elabGiven inSys }, t)
+
+/-- A value of each type, used as the placeholder initial value of a system parameter. -/
+def defaultValue : Ty → ElabM Value
+  | .bool => pure (.bool false)
+  | .num => pure (.num 0)
+  | .deg => pure (.deg 0)
+  | .enum n => pure (.tag n 0)
 
 def elabLiteral (e : SExpr) (ty : Ty) : ElabM Value := do
   match ← elabAs e ty with
@@ -380,6 +402,7 @@ partial def callsSelf (n : String) : Expr → Bool
   | .prim _ args | .rand _ args => args.any (callsSelf n)
   | .ite a b c | .choose a b c => callsSelf n a || callsSelf n b || callsSelf n c
   | .cat alts => alts.any (callsSelf n ·.1)
+  | .catW alts => alts.any fun (e, w) => callsSelf n e || callsSelf n w
   | .letE a b => callsSelf n a || callsSelf n b
   | .quant _ _ _ a b c => callsSelf n a || callsSelf n b || callsSelf n c
   | .matchE s arms d => callsSelf n s || arms.any (callsSelf n ·.2) || (d.map (callsSelf n)).getD false
@@ -418,13 +441,23 @@ def elabDecl : SDecl → ElabM Decl
         locals := ps.reverse ++ s.locals, selfFun := some sig }) (elabAs body ty)
     pure (.fn { name := n, params := ps, ret := ty, body, recursive := callsSelf n body } g)
   | .observe e => return .observe (← elabAs e .bool)
-  | .system n vars step => do
+  | .system n params vars step => do
+    -- parameters come first; their initial values are placeholders that each property replaces
+    let ps ← params.mapM fun (x, t) => do
+      let t ← resolveTy t
+      pure (x, t, Expr.lit (← defaultValue t))
+    let paramVars : Array (String × Ty) := (ps.map fun (x, t, _) => (x, t)).toArray
     let vs ← vars.mapM fun (x, t, e) => do
       let t ← resolveTy t
-      pure (x, t, ← elabAs e t)
-    let sysVars := (vs.map fun (x, t, _) => (x, t)).toArray
-    let step ← withReader (fun s => { s with sysVars, inSystem := true }) (elabBlock step)
-    pure (.system { name := n, vars := sysVars, init := (vs.map (·.2.2)).toArray, step })
+      let v ← withReader (fun s => { s with sysVars := paramVars, inSystem := true }) (elabAs e t)
+      pure (x, t, v)
+    let all := ps ++ vs
+    let sysVars := (all.map fun (x, t, _) => (x, t)).toArray
+    let step ← withReader (fun s => { s with sysVars, sysParams := ps.length, inSystem := true })
+      (elabBlock step)
+    let init : Array Expr := (all.map fun (_, _, e) => e).toArray
+    let info : SysInfo := { name := n, vars := sysVars, init := init, step := step, params := ps.length }
+    pure (.system info)
   | .claim isThm n p bound => do
     let (spec, t) ← elabProp p
     unless t == .bool || t == .deg do err s!"a claim must be Bool or Deg, got {t}"
@@ -439,6 +472,8 @@ def elabDecl : SDecl → ElabM Decl
     let k := match c with
       | "#check" => QueryKind.check | "#eval" => .eval | "#prob" => .prob
       | "#expect" => .expect | _ => .outcomes
+    if spec.given.isSome && !(k == .prob || k == .check) then
+      err s!"{c} doesn't support `given`; use #prob or a claim"
     pure (.query k spec)
   | .print n => pure (.print n)
 

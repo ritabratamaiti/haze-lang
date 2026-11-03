@@ -8,15 +8,15 @@ examples/Conformance/payments/payments.hz:56:1: info: theorem ack_means_charged
   theorem accepted
 examples/Conformance/payments/payments.hz:57:1: info: theorem bounded_attempts
   probability 1 — holds with certainty
-  grade prob+fuzzy · 4 parameter assignment(s) · ≤5 states/step
+  grade prob+fuzzy · 4 parameter assignment(s) · ≤4 states/step
   theorem accepted
 examples/Conformance/payments/payments.hz:58:1: info: theorem terminates
   probability 1 — holds with certainty
-  grade prob+fuzzy · 4 parameter assignment(s) · ≤2 states/step
+  grade prob+fuzzy · 4 parameter assignment(s) · ≤1 states/step
   theorem accepted
 examples/Conformance/payments/payments.hz:61:1: info: claim delivered
   belief ≈0.998319 · plausibility ≈0.99997 — graded
-  grade prob+fuzzy · 4 parameter assignment(s) · ≤5 states/step
+  grade prob+fuzzy · 4 parameter assignment(s) · ≤4 states/step
   bound holds: belief ≥ 0.99
   by fuzzy parameter (π = possibility):
     loss = 0.01  π 0.6     ≈0.999992

@@ -1,14 +1,14 @@
 examples/circuit_breaker.hz:53:1: info: theorem never_overloads
   probability 1 — holds with certainty
-  grade prob+fuzzy · 4 parameter assignment(s) · ≤36 states/step
+  grade prob+fuzzy · 4 parameter assignment(s) · ≤6 states/step
   theorem accepted
 examples/circuit_breaker.hz:54:1: info: theorem no_crash
   probability 1 — holds with certainty
-  grade prob+fuzzy · 4 parameter assignment(s) · ≤36 states/step
+  grade prob+fuzzy · 4 parameter assignment(s) · ≤6 states/step
   theorem accepted
 examples/circuit_breaker.hz:55:1: info: theorem open_has_cooldown
   probability 1 — holds with certainty
-  grade prob+fuzzy · 4 parameter assignment(s) · ≤36 states/step
+  grade prob+fuzzy · 4 parameter assignment(s) · ≤6 states/step
   theorem accepted
 examples/circuit_breaker.hz:58:1: info: claim trips_quickly
   belief ≈0.019184 · plausibility 0.32542 — graded
@@ -20,7 +20,7 @@ examples/circuit_breaker.hz:58:1: info: claim trips_quickly
     fail_rate = 0.9   π 0.2     0.9477
 examples/circuit_breaker.hz:60:1: info: claim closed_at_20
   belief ≈0.691211 · plausibility ≈0.983352 — graded
-  grade prob+fuzzy · 4 parameter assignment(s) · ≤36 states/step
+  grade prob+fuzzy · 4 parameter assignment(s) · ≤6 states/step
   by fuzzy parameter (π = possibility):
     fail_rate = 0.05  π 0.3     ≈0.999625
     fail_rate = 0.2   π 1       ≈0.976378
