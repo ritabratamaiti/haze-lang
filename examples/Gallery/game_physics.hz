@@ -1,21 +1,22 @@
--- Video game physics: proofs about fixed-timestep simulation.
+-- Proofs about the fixed-timestep physics that video games use.
 --
--- Game engines advance physics in discrete ticks. Haze steps the same update rules
--- with exact rational arithmetic, so it can prove properties for every initial
--- condition in a range, and find the exact tick where a bug appears. Units are
--- arbitrary: positions in pixels, velocities in pixels per tick.
+-- Game engines advance physics in discrete ticks. Haze runs the same update rules
+-- with exact rational arithmetic, so it can prove a property for every initial
+-- condition in a range, or find the exact tick where a bug first shows up. The
+-- units are arbitrary; think of positions in pixels and velocities in pixels per
+-- tick.
 
 -- 1. Tunneling ---------------------------------------------------------------------
--- A projectile moves right towards a wall that covers x from 20 to 24. A naive
--- engine checks only whether the new position is inside the wall, so a fast
--- projectile can jump over it in a single tick. A swept check tests the whole
--- segment that the projectile travels during the tick.
+-- A projectile moves right toward a wall that covers x from 20 to 24. A naive
+-- engine only checks whether the new position lies inside the wall, so a fast
+-- projectile can jump clean over it in a single tick. A swept check instead tests
+-- the whole segment that the projectile travels during the tick.
 
 def wall : Num := 20
 def thickness : Num := 4
 
--- Every speed from 1 to 12 and every start from 0 to 5: each pair is one world, and a
--- theorem must hold in all of them.
+-- The inputs cover every speed from 1 to 12 and every start from 0 to 5. Each pair
+-- is a separate world, and a theorem has to hold in all 72 of them.
 input speed : Num ~ uniform(1, 12)
 input start : Num ~ uniform(0, 5)
 
@@ -43,20 +44,21 @@ system SweptCollision {
   }
 }
 
--- The naive engine lets projectiles pass through the wall; the counterexample names
--- the speed, the start position and the tick.
+-- This theorem fails, because the naive engine lets some projectiles pass through
+-- the wall. The counterexample gives the speed, the start position and the tick.
 theorem naive_never_tunnels : NaiveCollision |= always[30] x < wall + thickness
--- The classic rule of thumb, proved: the naive check is safe when the speed is at
--- most the thickness of the wall.
+-- The usual rule of thumb does hold, and Haze proves it: the naive check is safe as
+-- long as the speed is at most the thickness of the wall.
 theorem naive_safe_when_slow : NaiveCollision |= always[30] (speed <= thickness implies x < wall + thickness)
 -- The swept check is safe at every speed.
 theorem swept_never_tunnels : SweptCollision |= always[30] x < wall + thickness
 theorem swept_always_hits : SweptCollision |= eventually[30] hit
 
 -- 2. Integrators and energy -------------------------------------------------------------
--- A ball falls freely under gravity 1 from height 100. Its energy is v²/2 + g·y.
--- Explicit Euler updates the position with the old velocity; semi-implicit
--- (symplectic) Euler, used by most game engines, uses the new one.
+-- A ball is dropped from height 100 under gravity g = 1, and its energy is
+-- v²/2 + g·y. Explicit Euler moves the ball using the velocity from before the
+-- update, while semi-implicit (symplectic) Euler, which most game engines use,
+-- moves it with the updated velocity.
 
 system ExplicitEuler {
   var y : Num := 100
@@ -69,15 +71,18 @@ system SemiImplicitEuler {
   step { v := v - 1; y := y + v }
 }
 
--- Explicit Euler gains g²/2 of energy every tick, so objects slowly speed up.
+-- Explicit Euler gains g²/2 of energy every tick (in free fall the ball ends up too
+-- high: 55 after ten ticks instead of the exact 50), and the first theorem is refuted. Semi-implicit Euler never gains energy.
 theorem explicit_conserves_energy : ExplicitEuler |= always[10] v * v / 2 + y <= 100
 theorem semi_implicit_never_gains : SemiImplicitEuler |= always[10] v * v / 2 + y <= 100
-#eval ExplicitEuler |= after[10] v * v / 2 + y        -- 100 + 10 · 1/2
-#eval SemiImplicitEuler |= after[10] v * v / 2 + y    -- 100 - 10 · 1/2
+#eval ExplicitEuler |= after[10] v * v / 2 + y        -- 100 + 10 · 1/2, half a unit gained per tick
+#eval SemiImplicitEuler |= after[10] v * v / 2 + y    -- 100 - 10 · 1/2, half a unit lost per tick
 
 -- 3. Bouncing -------------------------------------------------------------------------------
--- A ball bounces on the floor with restitution 1/2. Snapping the ball back to the
--- floor after it has sunk below it is a common way to resolve the collision.
+-- A ball bounces on the floor with restitution 1/2, so each bounce keeps half its
+-- speed. When a tick leaves the ball below the floor, the code snaps it back up to
+-- the floor, which is a common way to resolve the collision. The theorems check
+-- that the ball stays above the floor and never gains energy.
 system Bounce {
   var y : Num := 30
   var v : Num := 0
@@ -92,10 +97,11 @@ theorem bounce_never_gains_energy : Bounce |= always[60] v * v / 2 + y <= 30
 #eval Bounce |= after[60] y
 
 -- 4. Frame-rate dependent jumps -------------------------------------------------------------
--- A platformer jump with initial speed 10 and gravity 1. With a fixed timestep the
--- jump always peaks at 45, just enough for a ledge at height 45. With a variable
--- timestep, a dropped frame advances the simulation by two ticks at once, and the
--- peak changes. How often a frame drops is only known roughly.
+-- A platformer jump starts with upward speed 10 under gravity 1. With a fixed
+-- timestep the jump always peaks at exactly 45, just enough to reach a ledge at
+-- height 45. With a variable timestep, a dropped frame advances the simulation by
+-- two ticks at once, which changes the peak. How often frames drop is only known
+-- roughly, so the drop rate is a fuzzy parameter.
 param drop_rate : Num ~= {0.02: 1, 0.1: 0.5, 0.25: 0.2}
 
 system FixedStepJump {
@@ -129,9 +135,9 @@ claim variable_step_reaches_ledge : VariableStepJump |= eventually[25] y >= 45
 #eval VariableStepJump |= after[25] peak
 
 -- 5. A jetpack with gusts of wind --------------------------------------------------------------
--- The jetpack has 12 ticks of fuel and pushes up with 2 against gravity 1. In each
--- tick a gust of wind pushes the player down by 1 with probability 0.3. Can the
--- player reach a platform at height 40?
+-- A jetpack has 12 ticks of fuel and pushes up with 2 against gravity 1. In each
+-- tick, with probability 0.3, a gust of wind also pushes the player down by 1. The
+-- question is whether the player still reaches a platform at height 40.
 system Jetpack {
   var y : Num := 0
   var v : Num := 0

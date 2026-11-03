@@ -1,58 +1,58 @@
-examples/Gallery/game_physics.hz:48:1: error: theorem naive_never_tunnels
+examples/Gallery/game_physics.hz:49:1: error: theorem naive_never_tunnels
   probability 0.666667 (=2/3) — graded
   grade prob · 1 parameter assignment(s) · ≤72 states/step
   theorem rejected: belief is 0.666667 (=2/3), not 1
   counterexample at step 2 (path mass 0.013889 (=1/72), degree 0):
     inputs: speed = 10, start = 4
     state: x = 24, hit = false
-examples/Gallery/game_physics.hz:51:1: info: theorem naive_safe_when_slow
+examples/Gallery/game_physics.hz:52:1: info: theorem naive_safe_when_slow
   probability 1 — holds with certainty
   grade prob · 1 parameter assignment(s) · ≤72 states/step
   theorem accepted
-examples/Gallery/game_physics.hz:53:1: info: theorem swept_never_tunnels
+examples/Gallery/game_physics.hz:54:1: info: theorem swept_never_tunnels
   probability 1 — holds with certainty
   grade prob · 1 parameter assignment(s) · ≤72 states/step
   theorem accepted
-examples/Gallery/game_physics.hz:54:1: info: theorem swept_always_hits
+examples/Gallery/game_physics.hz:55:1: info: theorem swept_always_hits
   probability 1 — holds with certainty
   grade prob · 1 parameter assignment(s) · ≤72 states/step
   theorem accepted
-examples/Gallery/game_physics.hz:73:1: error: theorem explicit_conserves_energy
+examples/Gallery/game_physics.hz:76:1: error: theorem explicit_conserves_energy
   probability 0 — refuted
   grade crisp · 1 parameter assignment(s) · ≤1 states/step
   theorem rejected: belief is 0, not 1
   counterexample at step 1 (path mass 1, degree 0):
     state: y = 100, v = -1
-examples/Gallery/game_physics.hz:74:1: info: theorem semi_implicit_never_gains
+examples/Gallery/game_physics.hz:77:1: info: theorem semi_implicit_never_gains
   probability 1 — proved
   grade crisp · 1 parameter assignment(s) · ≤1 states/step
   theorem accepted
-examples/Gallery/game_physics.hz:75:1: info: #eval ExplicitEuler |= after[10] v * v / 2 + y
+examples/Gallery/game_physics.hz:78:1: info: #eval ExplicitEuler |= after[10] v * v / 2 + y
   105
-examples/Gallery/game_physics.hz:76:1: info: #eval SemiImplicitEuler |= after[10] v * v / 2 + y
+examples/Gallery/game_physics.hz:79:1: info: #eval SemiImplicitEuler |= after[10] v * v / 2 + y
   95
-examples/Gallery/game_physics.hz:90:1: info: theorem bounce_stays_above_floor
+examples/Gallery/game_physics.hz:95:1: info: theorem bounce_stays_above_floor
   probability 1 — proved
   grade crisp · 1 parameter assignment(s) · ≤1 states/step
   theorem accepted
-examples/Gallery/game_physics.hz:91:1: info: theorem bounce_never_gains_energy
+examples/Gallery/game_physics.hz:96:1: info: theorem bounce_never_gains_energy
   probability 1 — proved
   grade crisp · 1 parameter assignment(s) · ≤1 states/step
   theorem accepted
-examples/Gallery/game_physics.hz:92:1: info: #eval Bounce |= after[60] y
+examples/Gallery/game_physics.hz:97:1: info: #eval Bounce |= after[60] y
   0
-examples/Gallery/game_physics.hz:127:1: info: theorem fixed_step_reaches_ledge
+examples/Gallery/game_physics.hz:133:1: info: theorem fixed_step_reaches_ledge
   probability 1 — proved
   grade crisp · 3 parameter assignment(s) · ≤1 states/step
   theorem accepted
-examples/Gallery/game_physics.hz:128:1: info: claim variable_step_reaches_ledge
+examples/Gallery/game_physics.hz:134:1: info: claim variable_step_reaches_ledge
   belief ≈0.548117 · plausibility ≈0.833748 — graded
   grade prob+fuzzy · 3 parameter assignment(s) · ≤54 states/step
   by fuzzy parameter (π = possibility):
     drop_rate = 0.02  π 1       ≈0.833748
     drop_rate = 0.1   π 0.5     ≈0.38742
     drop_rate = 0.25  π 0.2     ≈0.075085
-examples/Gallery/game_physics.hz:129:1: info: #eval VariableStepJump |= after[25] peak
+examples/Gallery/game_physics.hz:135:1: info: #eval VariableStepJump |= after[25] peak
   when drop_rate = 0.02 (π 1):
     45  ↦ ≈0.833748
     44  ↦ ≈0.155915
@@ -74,12 +74,12 @@ examples/Gallery/game_physics.hz:129:1: info: #eval VariableStepJump |= after[25
     45  ↦ ≈0.075085
     41  ↦ 0.036621 (=75/2048)
     40  ↦ ≈9.76563e-4 (=1/1024)
-examples/Gallery/game_physics.hz:147:1: info: claim jetpack_reaches_platform
+examples/Gallery/game_physics.hz:153:1: info: claim jetpack_reaches_platform
   probability ≈0.972796 — graded
   grade prob · 3 parameter assignment(s) · ≤229 states/step
-examples/Gallery/game_physics.hz:148:1: info: #expect Jetpack |= after[30] y
+examples/Gallery/game_physics.hz:154:1: info: #expect Jetpack |= after[30] y
   expectation ≈10.585467
-examples/Gallery/game_physics.hz:149:1: info: theorem fuel_never_negative
+examples/Gallery/game_physics.hz:155:1: info: theorem fuel_never_negative
   probability 1 — holds with certainty
   grade prob · 3 parameter assignment(s) · ≤1132 states/step
   theorem accepted

@@ -1,4 +1,4 @@
-examples/payments_retry.hz:85:1: info: claim delivered
+examples/payments_retry.hz:92:1: info: claim delivered
   belief ≈0.998319 · plausibility ≈0.99997 — graded
   grade prob+fuzzy · 4 parameter assignment(s) · ≤4 states/step
   bound holds: belief ≥ 0.99
@@ -7,7 +7,7 @@ examples/payments_retry.hz:85:1: info: claim delivered
     loss = 0.02  π 1       ≈0.999938
     loss = 0.05  π 0.5     ≈0.999073
     loss = 0.1   π 0.2     0.993141
-examples/payments_retry.hz:88:1: error: theorem naive_single_charge
+examples/payments_retry.hz:97:1: error: theorem naive_single_charge
   belief ≈0.955681 · plausibility ≈0.986011 — graded
   grade prob+fuzzy · 4 parameter assignment(s) · ≤5 states/step
   theorem rejected: belief is ≈0.955681, not 1
@@ -19,7 +19,7 @@ examples/payments_retry.hz:88:1: error: theorem naive_single_charge
   counterexample at step 3 (path mass ≈9.801e-5 (=9801/100000000), degree 0):
     parameters: loss = 0.01
     state: phase = Waiting, attempts = 2, charges = 2, acked = false, latency = 1000
-examples/payments_retry.hz:89:1: info: claim double_charge_risk
+examples/payments_retry.hz:98:1: info: claim double_charge_risk
   belief ≈0.013989 · plausibility ≈0.044319 — graded
   grade prob+fuzzy · 4 parameter assignment(s) · ≤5 states/step
   by fuzzy parameter (π = possibility):
@@ -27,15 +27,15 @@ examples/payments_retry.hz:89:1: info: claim double_charge_risk
     loss = 0.02  π 1       ≈0.019976
     loss = 0.05  π 0.5     0.049638 (=3971/80000)
     loss = 0.1   π 0.2     0.0972
-examples/payments_retry.hz:92:1: info: theorem idempotent_single_charge
+examples/payments_retry.hz:102:1: info: theorem idempotent_single_charge
   probability 1 — holds with certainty
   grade prob+fuzzy · 4 parameter assignment(s) · ≤5 states/step
   theorem accepted
-examples/payments_retry.hz:93:1: info: theorem ack_implies_charged
+examples/payments_retry.hz:103:1: info: theorem ack_implies_charged
   probability 1 — holds with certainty
   grade prob+fuzzy · 4 parameter assignment(s) · ≤5 states/step
   theorem accepted
-examples/payments_retry.hz:96:1: info: claim snappy
+examples/payments_retry.hz:107:1: info: claim snappy
   belief ≈0.951894 · plausibility ≈0.985977 — graded
   grade prob+fuzzy · 4 parameter assignment(s) · ≤5 states/step
   by fuzzy parameter (π = possibility):
@@ -43,14 +43,14 @@ examples/payments_retry.hz:96:1: info: claim snappy
     loss = 0.02  π 1       ≈0.979838
     loss = 0.05  π 0.5     ≈0.947475
     loss = 0.1   π 0.2     0.88866
-examples/payments_retry.hz:97:1: info: #expect Idempotent |= after[6] latency
+examples/payments_retry.hz:108:1: info: #expect Idempotent |= after[6] latency
   lower expectation ≈108.672073 · upper expectation ≈179.45239
   by fuzzy parameter (π = possibility):
     loss = 0.01  π 0.6     E ≈100.30326
     loss = 0.02  π 1       E ≈121.225291
     loss = 0.05  π 0.5     E ≈187.858961
     loss = 0.1   π 0.2     E 312.41028
-examples/payments_retry.hz:98:1: info: #eval Idempotent |= after[6] phase
+examples/payments_retry.hz:109:1: info: #eval Idempotent |= after[6] phase
   when loss = 0.01 (π 0.6):
     Done    ↦ ≈0.999992
     GaveUp  ↦ ≈7.8806e-6 (=7880599/1000000000000)

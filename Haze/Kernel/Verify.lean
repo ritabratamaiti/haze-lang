@@ -8,29 +8,30 @@ import Haze.Kernel.Eval
 /-!
 # Worlds, Fuzzy Parameters and Model Checking
 
-This file checks properties of whole programs. It builds the distribution over worlds,
-conditions it on observations, model-checks bounded temporal properties of transition
-systems, and combines the results for each fuzzy parameter assignment into a
-belief–plausibility interval.
+This file checks properties of whole programs. It builds the distribution over worlds, conditions
+it on observations, model-checks bounded temporal properties of transition systems, and combines
+the results for the different fuzzy parameter assignments into a belief–plausibility interval.
 
-A fuzzy parameter is a possibility distribution `π` over a finite set of values. Drawing
-`α` uniformly from the interval `(0, 1]` gives the α-cut `{v | π v ≥ α}`, the set of values
-that are admissible at level `α`. For each joint parameter assignment `y` the program is a
-finite Markov chain, and the model checker computes an exact interval `[lo y, hi y]` for the
-property; `hi y - lo y` is the probability of the outcomes that ran out of fuel. Then
+A fuzzy parameter is described by a possibility distribution `π` over a finite set of values. For
+a level `α` between 0 and 1, the α-cut `{v | π v ≥ α}` is the set of values that are admissible
+at that level, and drawing `α` uniformly from the interval `(0, 1]` gives a random set of
+values. For each joint parameter assignment `y` the program is a finite Markov chain, and the
+model checker computes an exact interval `[lo y, hi y]` for the property. The two ends differ
+only because of outcomes that ran out of fuel, and the gap is at most their probability.
+Combining the assignments gives the final interval:
 
-* belief is the integral over `α` of the minimum of `lo y` over the α-cut, and
-* plausibility is the integral over `α` of the maximum of `hi y` over the α-cut.
+* belief, the integral over `α` of the minimum of `lo y` over the α-cut, and
+* plausibility, the integral over `α` of the maximum of `hi y` over the α-cut.
 
 Without fuzzy parameters, belief and plausibility both equal the exact probability. Without
 randomness, they are the necessity and possibility of possibility theory.
 
 ## Main Definitions
 
-* `Haze.Kernel.addParam`, `Haze.Kernel.addNode`, `Haze.Kernel.observe`: build and condition
-  the worlds.
-* `Haze.Kernel.Checker.runBranch`: model-checks a property on one parameter assignment.
-* `Haze.Kernel.integrate`: combines the per-assignment results.
+* `Haze.Kernel.addParam`, `Haze.Kernel.addNode`, `Haze.Kernel.observe`: build the worlds and
+  condition them on evidence.
+* `Haze.Kernel.Checker.runBranch`: model-checks a property for one parameter assignment.
+* `Haze.Kernel.integrate`: combines the results for all assignments.
 
 ## References
 
@@ -48,7 +49,7 @@ abbrev World := Array (Res Value)
 
 /--
 One joint assignment of the fuzzy parameters, with its possibility and the distribution of worlds
-under that assignment.
+under that assignment. The front end keeps one branch per assignment.
 -/
 structure Branch where
   assign : List (String × Value) := []
@@ -56,20 +57,22 @@ structure Branch where
   worlds : List (World × Rat) := [(#[], 1)]
   deriving Inhabited
 
-/-- A configuration of a transition system: the world and the mutable state. -/
+/--
+A configuration of a transition system: the world together with the state that steps can change.
+-/
 structure Config where
   world : World
   st : SState
   deriving DecidableEq, Hashable, Inhabited
 
-/-- The outcomes of an evaluation, as a list. -/
+/-- Runs a computation and returns its weighted outcomes as a list, or its runtime error. -/
 def liftM (m : M α) : Except String (List (Res α × Rat)) := m.run
 
 /-! ## Building worlds -/
 
 /--
-Splits every branch by the values of a new fuzzy parameter. The possibility of a branch is the
-minimum of the memberships of its values.
+Splits every branch by the values of a new fuzzy parameter, skipping values of membership 0. The
+possibility of a branch is the minimum of the memberships of the values it assigns.
 -/
 def addParam (name : String) (support : List (Value × Rat)) (bs : Array Branch) : Array Branch :=
   bs.flatMap fun b => (support.filter (·.2 > 0)).toArray.map fun (v, m) =>
@@ -87,15 +90,19 @@ def addNode (env : Env) (fuel : Nat) (val : Expr) (bs : Array Branch) :
     pure { b with worlds := M.compactList out.toList }
 
 /--
-The result of conditioning: the remaining branches, the probability of the evidence in each branch
-and the number of branches that contradict the evidence.
+The result of conditioning: the remaining branches, the probability of the evidence in each
+branch, and the number of branches that were dropped because they contradict the evidence.
 -/
 structure ObserveResult where
   branches : Array Branch
   evidence : List (List (String × Value) × Rat)
   dropped : Nat
 
-/-- Conditions the worlds of every branch on a Boolean observation, using Bayes' rule. -/
+/--
+Conditions the worlds of every branch on a Boolean observation, using Bayes' rule. A branch in
+which the observation has probability 0 is dropped, and it is an error if every branch is dropped
+or if the observation can't be decided within the fuel bound.
+-/
 def observe (env : Env) (fuel : Nat) (cond : Expr) (bs : Array Branch) :
     Except String ObserveResult := do
   let mut out : Array Branch := #[]
@@ -119,9 +126,9 @@ def observe (env : Env) (fuel : Nat) (cond : Expr) (bs : Array Branch) :
 /-! ## Fuzzy integration -/
 
 /--
-Combines per-assignment results into a belief–plausibility interval by integrating over α-cuts.
-Each row is `(π y, lo y, hi y)`. If conditioning removed every assignment of possibility 1, the
-possibilities are rescaled by their maximum.
+Combines the results for the different parameter assignments into a belief–plausibility interval
+by integrating over α-cuts. Each row is `(π y, lo y, hi y)`. If conditioning removed every
+assignment of possibility 1, the possibilities are rescaled by their maximum.
 -/
 def integrate (rows : List (Rat × Rat × Rat)) : Interval := Id.run do
   let rows := rows.filter (·.1 > 0)
@@ -139,8 +146,9 @@ def integrate (rows : List (Rat × Rat × Rat)) : Interval := Id.run do
   return { bel := bel / top, pl := pl / top }
 
 /--
-Combines per-assignment expectations into lower and upper expectations by integrating over
-α-cuts. These are the lower and upper Choquet integrals.
+Combines the expectations for the different parameter assignments into lower and upper
+expectations by integrating over α-cuts. These are the lower and upper Choquet integrals. Each
+row is `(π y, expectation for y)`.
 -/
 def integrateNum (rows : List (Rat × Rat)) : Interval := Id.run do
   let rows := rows.filter (·.1 > 0)
@@ -159,11 +167,12 @@ def integrateNum (rows : List (Rat × Rat)) : Interval := Id.run do
 /-! ## Relevance: Projecting Worlds onto the Variables a Property Reads -/
 
 /--
-Marks the global variables, by world index, that `body` can read directly or through node
-definitions, called functions and the initialization and step of `sys`.
+Marks, by world index, the global variables that `body` can read, either directly or through
+node definitions, called functions, and the initialization and step of `sys`.
 
-Projecting worlds onto these variables and merging equal projections doesn't change the result,
-because the property can't observe the other coordinates. It does make the state space smaller.
+Projecting worlds onto these variables and merging worlds that become equal doesn't change the
+result, because the property can't observe the other variables. It does make the state space
+smaller.
 -/
 partial def relevantGlobals (env : Env) (sys : Option SysInfo) (body : Expr) : Array Bool := Id.run do
   let mut seen : Array Bool := Array.replicate env.globals.size false
@@ -206,8 +215,8 @@ where
     | .letS v b => v :: stmtExprs b
 
 /--
-Replaces the coordinates of each world that are not relevant by `Res.stuck`, merging worlds that
-become equal.
+Replaces the value of every irrelevant global variable in each world by `Res.stuck`, and merges
+worlds that become equal.
 -/
 def Branch.project (b : Branch) (relevant : Array Bool) : Branch :=
   { b with worlds := M.compactList (b.worlds.map fun (w, p) =>
@@ -215,12 +224,12 @@ def Branch.project (b : Branch) (relevant : Array Bool) : Branch :=
 
 /-! ## Bounded model checking -/
 
-/-- The largest number of configurations kept for one step. -/
+/-- The largest number of configurations kept for one step. Larger state spaces are rejected. -/
 def maxFrontier : Nat := 2000000
 
 /--
-A configuration that violates a property, with the step at which it occurs, the probability mass of
-the path and the degree of the property there.
+A configuration that violates a property, with the step at which it occurs, the parameter
+assignment, the probability mass of the path, and the degree of the property there.
 -/
 structure Witness where
   step : Nat
@@ -231,7 +240,8 @@ structure Witness where
   deriving Inhabited
 
 /--
-The degree interval of a property on one branch, with the assignment and possibility of the branch.
+The degree interval `[lo, hi]` of a property on one branch, with the assignment and possibility
+of the branch and the largest number of configurations reached at any step.
 -/
 structure BranchResult where
   assign : List (String × Value)
@@ -254,11 +264,14 @@ structure Checker where
 
 namespace Checker
 
-/-- The evaluation context of a configuration. -/
+/-- The evaluation context for a configuration. -/
 def ctx (ck : Checker) (cfg : Config) : ECtx :=
   { env := ck.env, world := cfg.world, vars := cfg.st.vars, crashed := cfg.st.crashed, fuel := ck.fuel }
 
-/-- Reads a truth value as a degree, with `true` as 1 and `false` as 0. -/
+/--
+Reads the value of a property as a degree. `true` is 1, `false` is 0, and degrees and numbers are
+taken as they are.
+-/
 def toDeg : Value → Except String Rat
   | .bool b => pure (if b then 1 else 0)
   | .deg q => pure q
@@ -276,7 +289,10 @@ def degrees (ck : Checker) (cfg : Config) : Except String (List (Res Rat × Rat)
 def values (ck : Checker) (cfg : Config) : Except String (List (Res Value × Rat)) :=
   liftM (eval (ck.ctx cfg) ck.body)
 
-/-- The distribution of successor configurations after one step of the system. -/
+/--
+The distribution of successor configurations after one step of the system. Without a system, a
+configuration is its own successor.
+-/
 def step (ck : Checker) (cfg : Config) : Except String (List (Res Config × Rat)) := do
   let some si := ck.sys | return [(.ok cfg, 1)]
   let xs ← liftM (exec (ck.ctx cfg) [] cfg.st si.step)
@@ -284,7 +300,10 @@ def step (ck : Checker) (cfg : Config) : Except String (List (Res Config × Rat)
     | .ok st => (.ok { cfg with st }, q)
     | .stuck => (.stuck, q)
 
-/-- The initial configurations, and the probability mass whose initialization ran out of fuel. -/
+/--
+The initial configurations of a branch, after projecting its worlds onto the relevant variables,
+and the probability mass whose initialization ran out of fuel.
+-/
 def initial (ck : Checker) (b : Branch) : Except String (List (Config × Rat) × Rat) := do
   let b := b.project ck.relevant
   let mut out : Array (Config × Rat) := #[]
@@ -330,8 +349,8 @@ def after (ck : Checker) (b : Branch) (k : Nat) : Except String (List (Config ×
   return (frontier, unk, maxN)
 
 /--
-Checks a property on one branch. Returns the exact degree interval and the first configuration
-that violates the property, if there is one.
+Checks a property on one branch. Returns the exact degree interval, together with the first
+configuration found that violates the property, if there is one.
 -/
 def runBranch (ck : Checker) (mode : Temporal) (b : Branch) :
     Except String (BranchResult × Option Witness) := do
@@ -357,10 +376,12 @@ def runBranch (ck : Checker) (mode : Temporal) (b : Branch) :
     let unit : Rat := if isAlways then 1 else 0
     let (cfgs, unk0) ← ck.initial b
     hi := hi + unk0
-    -- frontier: (configuration, running min (always) / max (eventually) degree) ↦ mass
+    -- The frontier maps a configuration, paired with the running degree of the path that reached
+    -- it (the minimum so far for `always`, the maximum for `eventually`), to its probability mass.
     let mut frontier : List ((Config × Rat) × Rat) := []
     for t in [0:k+1] do
-      -- arrivals: (successor or divergence, mass, accumulator of the incoming path)
+      -- Each arrival is a successor configuration (or `stuck` if the step ran out of fuel), its
+      -- mass, and the running degree of the path that led to it.
       let mut arrivals : Array (Res Config × Rat × Rat) := #[]
       if t == 0 then
         arrivals := cfgs.toArray.map fun (c, w) => (.ok c, w, unit)
@@ -372,7 +393,7 @@ def runBranch (ck : Checker) (mode : Temporal) (b : Branch) :
       for (r, w, acc) in arrivals do
         match r with
         | .stuck =>
-          -- the rest of the path is unknown: worst case for `lo`, best case for `hi`
+          -- The rest of the path is unknown, so `lo` assumes the worst case and `hi` the best.
           if isAlways then
             hi := hi + w * acc
           else
@@ -413,7 +434,7 @@ def runBranch (ck : Checker) (mode : Temporal) (b : Branch) :
 
 /--
 Finds values for the leading `forall` quantifiers and conjunctions of a failed property that
-falsify it. The result is used only in messages and isn't part of the checked result.
+falsify it. The result only makes messages more helpful and isn't part of the checked result.
 -/
 partial def counterexample (ck : Checker) (c : ECtx) (e : Expr) : List (String × Value) :=
   let certain (c : ECtx) (e : Expr) : Bool := match liftM (eval c e) with

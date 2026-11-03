@@ -1,16 +1,16 @@
-examples/circuit_breaker.hz:46:1: info: theorem never_overloads
+examples/circuit_breaker.hz:53:1: info: theorem never_overloads
   probability 1 — holds with certainty
   grade prob+fuzzy · 4 parameter assignment(s) · ≤36 states/step
   theorem accepted
-examples/circuit_breaker.hz:47:1: info: theorem no_crash
+examples/circuit_breaker.hz:54:1: info: theorem no_crash
   probability 1 — holds with certainty
   grade prob+fuzzy · 4 parameter assignment(s) · ≤36 states/step
   theorem accepted
-examples/circuit_breaker.hz:48:1: info: theorem open_has_cooldown
+examples/circuit_breaker.hz:55:1: info: theorem open_has_cooldown
   probability 1 — holds with certainty
   grade prob+fuzzy · 4 parameter assignment(s) · ≤36 states/step
   theorem accepted
-examples/circuit_breaker.hz:51:1: info: claim trips_quickly
+examples/circuit_breaker.hz:58:1: info: claim trips_quickly
   belief ≈0.019184 · plausibility 0.32542 — graded
   grade prob+fuzzy · 4 parameter assignment(s) · ≤3 states/step
   by fuzzy parameter (π = possibility):
@@ -18,7 +18,7 @@ examples/circuit_breaker.hz:51:1: info: claim trips_quickly
     fail_rate = 0.2   π 1       0.0272
     fail_rate = 0.5   π 0.6     0.3125
     fail_rate = 0.9   π 0.2     0.9477
-examples/circuit_breaker.hz:53:1: info: claim closed_at_20
+examples/circuit_breaker.hz:60:1: info: claim closed_at_20
   belief ≈0.691211 · plausibility ≈0.983352 — graded
   grade prob+fuzzy · 4 parameter assignment(s) · ≤36 states/step
   by fuzzy parameter (π = possibility):
@@ -26,14 +26,14 @@ examples/circuit_breaker.hz:53:1: info: claim closed_at_20
     fail_rate = 0.2   π 1       ≈0.976378
     fail_rate = 0.5   π 0.6     ≈0.699071
     fail_rate = 0.9   π 0.2     ≈0.10516
-examples/circuit_breaker.hz:55:1: info: #expect CB |= after[20] rejected
+examples/circuit_breaker.hz:62:1: info: #expect CB |= after[20] rejected
   lower expectation ≈0.178519 · upper expectation ≈3.459874
   by fuzzy parameter (π = possibility):
     fail_rate = 0.05  π 0.3     E ≈0.004098
     fail_rate = 0.2   π 1       E ≈0.253271
     fail_rate = 0.5   π 0.6     E ≈3.201937
     fail_rate = 0.9   π 0.2     E ≈10.388952
-examples/circuit_breaker.hz:59:1: info: claim slo_rejections
+examples/circuit_breaker.hz:67:1: info: claim slo_rejections
   belief ≈0.659435 · plausibility ≈0.985254 — graded
   grade prob+fuzzy · 4 parameter assignment(s) · ≤36 states/step
   by fuzzy parameter (π = possibility):

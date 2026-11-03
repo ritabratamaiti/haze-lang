@@ -9,17 +9,17 @@ import Haze.Syntax
 /-!
 # Elaborator
 
-The elaborator translates syntax trees into kernel terms, in the role of `Lean.Elab`. It
-resolves names to de Bruijn indices, inserts coercions and performs type-directed
-translation. Like Lean's elaborator it is not trusted: the kernel checks everything it
-produces again.
+The elaborator turns syntax trees into kernel terms, much as `Lean.Elab` does for Lean. It
+resolves names to de Bruijn indices and uses the types of subterms to decide what each construct
+means, inserting coercions where needed. Like Lean's elaborator it is not trusted, because the
+kernel checks everything it produces again.
 
-The type-directed rules specific to Haze are:
+The rules that depend on types are specific to Haze:
 
 * `if c then a else b` is an ordinary conditional when `c : Bool`. When `c : Deg` it becomes
   the stochastic conditional `Expr.choose`, which takes `a` with probability `c`.
-* `and`, `or`, `not` and `implies` are Boolean on `Bool`. As soon as a `Deg` is involved they
-  use the connectives of the active `Logic`, with `Bool` embedded as the degrees 0 and 1.
+* `and`, `or`, `not` and `implies` are Boolean on `Bool`. As soon as a `Deg` is involved, they
+  use the connectives of the active `Logic`, and a `Bool` operand counts as the degree 0 or 1.
 * A `Deg` can be used where a `Num` is expected. A number can be used where a `Deg` is
   expected if it lies between 0 and 1.
 
@@ -45,7 +45,7 @@ structure Scope where
   selfFun : Option (String × List Ty × Ty) := none
   pos : Pos := {}
 
-/-- The elaboration monad. Errors carry the source position of the innermost enclosing term. -/
+/-- The elaboration monad. An error carries the source position of the innermost enclosing term. -/
 abbrev ElabM := ReaderT Scope (Except (Pos × String))
 
 def err (msg : String) : ElabM α := do throw ((← read).pos, msg)
@@ -63,7 +63,7 @@ def resolveTy (n : String) : ElabM Ty := do
   | "Deg" => pure .deg
   | _ => if (← read).env.enums.contains n then pure (.enum n) else err s!"unknown type {n}"
 
-/-- Resolves a grade annotation such as `prob+fuzzy`. -/
+/-- Resolves a grade annotation such as `prob+fuzzy` into a `Grade`. -/
 def resolveGrade (gs : List String) : ElabM Grade :=
   gs.foldlM (init := Grade.crisp) fun g n => match n with
     | "crisp" => pure g
@@ -76,7 +76,8 @@ def resolveGrade (gs : List String) : ElabM Grade :=
 Coerces `e` from type `from_` to type `to`.
 
 `Bool` embeds into `Deg` as the degrees 0 and 1, and `Deg` embeds into `Num`. A `Num` used as a
-`Deg` is checked to lie between 0 and 1, statically for literals and at runtime otherwise.
+`Deg` must lie between 0 and 1. This is checked during elaboration for literals and at runtime
+for other terms.
 -/
 def coerce (e : Expr) (from_ to : Ty) : ElabM Expr := do
   if from_ == to then return e
@@ -91,7 +92,10 @@ def coerce (e : Expr) (from_ to : Ty) : ElabM Expr := do
   | .bool, .num, _ => err "expected a number, got a Bool"
   | _, _, _ => err s!"type mismatch: expected {to}, got {from_}"
 
-/-- The least common type of two branches, in the order `Bool`, `Deg`, `Num`. -/
+/--
+Finds a common type for the two branches of a conditional or match. `Bool` and `Deg` give `Deg`,
+`Deg` and `Num` give `Num`, and any other pair of different types is an error.
+-/
 def unify (a b : Ty) : ElabM Ty := do
   if a == b then return a
   match a, b with
@@ -99,7 +103,11 @@ def unify (a b : Ty) : ElabM Ty := do
   | .num, .deg | .deg, .num => pure .num
   | _, _ => err s!"branches have incompatible types {a} and {b}"
 
-/-- Evaluates a constant numeric expression, such as a categorical weight or a membership. -/
+/--
+Evaluates a constant numeric expression, such as a categorical weight or a membership degree.
+Returns `none` unless the expression is built from number literals with `+`, `-`, `*` and `/`
+and never divides by zero.
+-/
 partial def constQ : SExpr → Option Rat
   | .num q => some q
   | .atPos _ e => constQ e
@@ -136,8 +144,8 @@ partial def elabTruth (a b : SExpr) (boolOp : Prim) (degOp : Logic → Prim) : E
 /--
 Elaborates an expression, returning the kernel term and its type.
 
-A condition of type `Deg` turns `if` into the stochastic conditional `Expr.choose`, and connectives
-on degrees use the active `Logic`.
+A condition of type `Deg` turns `if` into the stochastic conditional `Expr.choose`, and the
+connectives use the active `Logic` when an operand is a degree.
 -/
 partial def elabExpr : SExpr → ElabM (Expr × Ty)
   | .atPos p e => withPos p (elabExpr e)
@@ -294,8 +302,8 @@ def seqS : Stmt → Stmt → Stmt
 
 mutual
 /--
-Elaborates a block of statements. A `let` statement binds a local variable for the rest of the
-block.
+Elaborates a block of statements. A `let` statement binds a local variable that is visible in the
+rest of the block.
 -/
 partial def elabBlock : List SStmt → ElabM Stmt
   | [] => pure .skip
@@ -341,7 +349,8 @@ end
 /-! ## Declarations -/
 
 /--
-Elaborates a property. If the property names a system, the system's state variables are in scope.
+Elaborates a property. If the property names a system, the state variables of that system are in
+scope in its body.
 -/
 def elabProp (p : SProp) : ElabM (PropSpec × Ty) := do
   match p.sys with
@@ -362,7 +371,10 @@ def elabLiteral (e : SExpr) (ty : Ty) : ElabM Value := do
     | some q, .deg => pure (.deg q)
     | _, _ => err "fuzzy parameter support must consist of literals"
 
-/-- Checks whether a term calls the function `n`. Functions that call themselves are recursive. -/
+/--
+Checks whether a term contains a call to the function `n`. A function whose body calls itself is
+marked as recursive.
+-/
 partial def callsSelf (n : String) : Expr → Bool
   | .call f args => f == n || args.any (callsSelf n)
   | .prim _ args | .rand _ args => args.any (callsSelf n)
@@ -374,8 +386,8 @@ partial def callsSelf (n : String) : Expr → Bool
   | _ => false
 
 /--
-Elaborates a top-level declaration into a kernel declaration. `Haze.Kernel.addDecl` checks the
-result again.
+Elaborates a top-level declaration into a kernel declaration. The result is not trusted:
+`Haze.Kernel.addDecl` checks it again.
 -/
 def elabDecl : SDecl → ElabM Decl
   | .logic l => match l with

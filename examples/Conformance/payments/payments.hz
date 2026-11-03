@@ -1,13 +1,14 @@
--- Specification of the payment client in payments_client.py.
+-- The specification of the payment client in payments_client.py.
 --
--- The client sends a charge request to the payment server and retries after a
--- timeout, up to three attempts. Requests and responses can each be lost. The
--- server deduplicates requests by idempotency key, so a retried request never
--- charges the card again. The loss rate of the network is only known vaguely.
+-- The client sends a charge request to the payment server and, if no answer arrives
+-- before the timeout, tries again, making at most three attempts. The network can
+-- lose either the request or the response, and we only know its loss rate vaguely.
+-- The server deduplicates requests by idempotency key, so a retried request never
+-- charges the card a second time.
 --
--- This file is the specification: the theorems and bounds below must hold,
--- and test_conformance.py checks that the Python implementation has exactly the
--- outcome distributions computed here.
+-- The theorems and bounds below must hold for the specification to be accepted.
+-- test_conformance.py then checks that the Python implementation produces exactly
+-- the outcome distributions that Haze computes here.
 
 enum Phase = Sending | Waiting | Done | GaveUp
 
@@ -49,16 +50,17 @@ system Client {
   }
 }
 
--- Safety: these must hold on every path, for every admissible loss rate.
+-- Safety, and a deadline: these must hold on every path and for every admissible
+-- loss rate.
 theorem single_charge : Client |= always[6] charges <= 1
 theorem ack_means_charged : Client |= always[6] (acked implies charges == 1)
 theorem bounded_attempts : Client |= always[6] attempts <= max_attempts
 theorem terminates : Client |= eventually[6] (phase == Done or phase == GaveUp)
 
--- Service-level requirement.
+-- The service-level requirement: at least 99% of payments are acknowledged.
 claim delivered : Client |= after[6] acked with prob >= 0.99
 
--- Outcome distributions that the implementation must match exactly.
+-- The outcome distributions that the implementation must match exactly.
 #eval Client |= after[6] phase
 #eval Client |= after[6] charges
 #eval Client |= after[6] attempts

@@ -1,24 +1,24 @@
-examples/Gallery/finance.hz:14:1: info: #eval Stock |= after[3] price
+examples/Gallery/finance.hz:15:1: info: #eval Stock |= after[3] price
   129.6  ↦ 0.375
   97.2   ↦ 0.375
   172.8  ↦ 0.125
   72.9   ↦ 0.125
-examples/Gallery/finance.hz:15:1: info: #expect Stock |= after[3] max(price - 100, 0) / discount
+examples/Gallery/finance.hz:16:1: info: #expect Stock |= after[3] max(price - 100, 0) / discount
   expectation 17.449519 (=161600/9261)
-examples/Gallery/finance.hz:16:1: info: #expect Stock |= after[3] max(100 - price, 0) / discount
+examples/Gallery/finance.hz:17:1: info: #expect Stock |= after[3] max(100 - price, 0) / discount
   expectation 3.833279 (=35500/9261)
-examples/Gallery/finance.hz:18:1: info: #expect Stock |= after[3] (max(price - 100, 0) - max(100 - price, 0)) / discount
+examples/Gallery/finance.hz:19:1: info: #expect Stock |= after[3] (max(price - 100, 0) - max(100 - price, 0)) / discount
   expectation 13.61624 (=126100/9261)
-examples/Gallery/finance.hz:31:1: info: #expect VagueStock |= after[3] max(price - 100, 0) / discount
+examples/Gallery/finance.hz:33:1: info: #expect VagueStock |= after[3] max(price - 100, 0) / discount
   lower expectation ≈17.78706 · upper expectation ≈22.966008
   by fuzzy parameter (π = possibility):
     up = 1.1  π 0.5     E ≈15.194952
     up = 1.2  π 1       E ≈20.379169
     up = 1.3  π 0.5     E ≈25.552847
-examples/Gallery/finance.hz:47:1: info: claim ruin_within_20
+examples/Gallery/finance.hz:51:1: info: claim ruin_within_20
   probability ≈0.445995 — graded
   grade prob · 3 parameter assignment(s) · ≤22 states/step
-examples/Gallery/finance.hz:48:1: info: theorem ruin_is_final
+examples/Gallery/finance.hz:52:1: info: theorem ruin_is_final
   probability 1 — holds with certainty
   grade prob · 3 parameter assignment(s) · ≤26 states/step
   theorem accepted

@@ -1,74 +1,90 @@
 /-
 # Tutorial: A Background Job Worker
 
-This file introduces Haze by modeling a worker that takes jobs from a queue, calls a
-downstream service and retries failed calls. Run it with
+This tutorial introduces Haze through one small, familiar system: a worker that takes jobs
+from a queue, calls a downstream service for each job, and retries when a call fails. Each
+section adds one idea, and by the end you will have proved properties of the worker and
+measured how well it meets a vague performance target.
+
+Run the file with
 
     lake exe haze examples/Tutorial/JobWorker.hz
 
-Each command prints a message. The expected output is in `JobWorker.expected` next to this
-file. Read the two side by side.
+Every command prints a message, and the expected output is in `JobWorker.expected` next to
+this file. It helps to read the two side by side.
 -/
 
 /-
 ## 1. Random Values
 
-`input` declares a random value. It has one value in each *world*, and Haze keeps the
-exact probability of every world. Here a job is small, medium or large, with exact weights
-that must sum to 1.
+Jobs come in different sizes, and you don't know in advance which size the next job will
+be. `input` declares a random value like this. Haze thinks in terms of *worlds*: in each
+world the input has one value, and Haze tracks the exact probability of every world. Here a
+job is small, medium or large, and the weights must sum to 1.
 -/
 
 enum Size = Small | Medium | Large
 
 input size : Size ~ {Small: 0.6, Medium: 0.3, Large: 0.1}
 
--- `def` without parameters also declares a value with one value per world.
+-- A `def` without parameters is also a value with exactly one value in each world. Here
+-- the time a job takes follows from its size.
 def work_ms : Num := match size { Small => 40, Medium => 200, Large => 900 }
 
 -- `#eval` prints the exact distribution of a term.
 #eval work_ms
 
--- `#prob` prints the probability of a Boolean term, and `#expect` an expectation.
+-- `#prob` prints the probability that a Boolean term is true, and `#expect` prints the
+-- expected value of a number.
 #prob work_ms > 100
 #expect work_ms
 
 /-
 ## 2. Functions Are Sampled on Every Call
 
-A `def` with parameters is a function. Each call makes fresh random choices, which is what a
-call to an unreliable service needs.
+A `def` with parameters is a function, and unlike a value it makes fresh random choices
+each time you call it. That is exactly how a call to an unreliable service behaves: two
+calls with the same arguments can still have different outcomes. Below, a call succeeds
+with probability 0.95 if the job fits within the timeout, and only 0.2 otherwise.
 -/
 
 def call_succeeds(timeout : Num) : Bool :=
   if work_ms <= timeout then flip(0.95) else flip(0.2)
 
--- `#check` prints the type and the grade. `prob` means the term depends on random choices.
+-- `#check` prints the type of a term and its grade, which records the kinds of
+-- uncertainty it can carry. The grade `prob` means the term depends on random choices.
 #check call_succeeds(500)
 
 /-
 ## 3. Fuzzy Parameters
 
-Some quantities are not random but only vaguely known. "The downstream service is usually
-healthy" is a statement about our knowledge, not a probability. A fuzzy parameter lists the
-values it could have, each with a degree of possibility. At least one value must have
-possibility 1.
+Some quantities are not random at all; you just don't know them precisely. "The downstream
+service is usually healthy" describes what you know about the service, not the outcome of
+a coin flip. Haze models this with a fuzzy parameter, which lists the values the quantity
+could have and gives each a degree of possibility between 0 and 1. At least one value must
+have possibility 1. Here an outage rate of 0 is fully possible, while rates of 0.1 and 0.5
+are less possible but can't be ruled out.
 -/
 
 param outage : Num ~= {0: 1, 0.1: 0.5, 0.5: 0.2}
 
--- When fuzzy parameters are involved, results are intervals: belief is what the evidence
--- guarantees, and plausibility is what it allows.
+-- Once fuzzy parameters are involved, results become intervals. The lower end, the
+-- belief, is what the evidence guarantees, and the upper end, the plausibility, is what
+-- the evidence still allows.
 claim no_outage : outage == 0
 
 /-
 ## 4. A Transition System
 
-A `system` has state variables with initial values and a `step` that runs once per time
-step. Here the worker calls the service, retries up to three times, and records how many
-calls it made.
+So far everything has happened in a single moment. To describe behavior over time you
+write a `system`: it has state variables with initial values, and a `step` block that runs
+once per time step. This worker calls the service, backs off and retries after a failure,
+gives up after three calls, and keeps track of how many calls it made and how long it
+waited.
 
-`if flip(p)` branches on a random choice. `assert` states something that must hold whenever
-the step runs; if it fails, the system is marked as `crashed`.
+`if flip(p)` branches on a random choice that is true with probability `p`. `assert`
+states something that must hold every time the step runs. If an assertion fails, the
+system is marked as `crashed`.
 -/
 
 enum Phase = Calling | Backoff | Succeeded | Failed
@@ -90,7 +106,7 @@ system Worker {
         }
       }
       Backoff => {
-        waited := waited + 100 * calls        -- linear backoff
+        waited := waited + 100 * calls        -- linear backoff: 100 ms per call made so far
         if calls < 3 { phase := Calling } else { phase := Failed }
       }
       _ => skip
@@ -102,32 +118,41 @@ system Worker {
 /-
 ## 5. Properties
 
-A property of a system has the form `S |= modality φ`:
+Now you can ask questions about the worker. A property of a system has the form
+`S |= modality φ`, where the modality says which steps to look at:
 
 * `always[k] φ` holds when `φ` holds at every step from 0 to `k`,
 * `eventually[k] φ` holds when `φ` holds at some step from 0 to `k`, and
 * `after[k] φ` looks at step `k` only.
 
-A `theorem` must hold on every path and for every possible value of the fuzzy parameters.
-If it doesn't, Haze rejects it and prints a counterexample.
+There are two ways to state a property. A `theorem` is a hard guarantee: it must hold on
+every path and for every possible value of the fuzzy parameters, and if it doesn't, Haze
+rejects it and prints a counterexample. A `claim` is softer, and is described below.
 -/
 
 theorem bounded_calls : Worker |= always[8] calls <= 3
 theorem never_crashes : Worker |= always[8] not crashed
 
--- This theorem is false: a job can succeed on its second call.
+-- This theorem is false, because a job can succeed on its second call. Haze rejects it
+-- and shows you such a run.
 theorem first_try : Worker |= always[8] (phase == Succeeded implies calls == 1)
 
--- A `claim` with a bound is accepted if the bound holds for the whole interval.
+-- A `claim` reports the interval for a property instead of demanding certainty. If you
+-- give it a bound, it is accepted when the whole interval satisfies the bound.
 claim mostly_succeeds : Worker |= eventually[8] phase == Succeeded with prob >= 0.8
 
 /-
 ## 6. Fuzzy Requirements
 
-Requirements such as "the job finishes quickly" are themselves vague. A function returning a
-`Deg` describes a fuzzy set, and `x is quick` gives the degree to which `x` belongs to it.
-Hedges such as `very` make the requirement stricter.
+Requirements are often vague too. "The job finishes quickly" has no sharp cutoff, since no
+single number of milliseconds separates quick from slow. Haze describes such a requirement
+with a fuzzy set, which is a function returning a `Deg` (a degree between 0 and 1).
+`x is quick` then gives the degree to which `x` belongs to the set. Hedges such as `very`
+make the requirement stricter (`very` squares the degree).
 -/
+
+-- A wait of 0 ms is fully quick, and the degree falls linearly to 0 at 600 ms. The claims
+-- apply it to the total time the worker spent backing off.
 
 def quick(ms : Num) : Deg := ramp_down(ms, 0, 600)
 
@@ -137,13 +162,16 @@ claim finishes_very_quickly : Worker |= after[8] waited is very quick
 /-
 ## 7. Outcomes and Observations
 
-`#outcomes` lists the formal outcome of a term for each value of the inputs, which shows how
-variable states lead to different results.
+When a result varies, you usually want to know why. `#outcomes` breaks a result down by the
+values of the inputs, with the probability of each, so you can see which inputs lead to
+which results. Here it shows that a large job is far more likely to fail than a small or
+medium one.
 -/
 
 #outcomes Worker |= after[8] phase
 
--- `observe` conditions every world on what was seen, using Bayes' rule. After seeing a slow
--- job, large jobs are much more likely.
+-- Finally, `observe` conditions every world on something you saw, using Bayes' rule, and
+-- it affects every declaration after it. Once you have seen that a job was slow, a large
+-- job becomes much more likely.
 observe work_ms > 100
 #eval size

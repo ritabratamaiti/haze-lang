@@ -1,49 +1,50 @@
-# Sample: Checking an Implementation Against a Haze Model
+# Checking Real Code Against a Haze Model
 
-This sample shows one way to use Haze alongside real code, following a pattern that is common
-with Lean in industry: write a model, prove its properties, and then test the implementation
-against the model. It is an example, not part of Haze: the only Haze feature it relies on is the
-JSON output of `haze` (see the [language reference](../../docs/Language-Reference.md#json-output)).
+A Haze model is most useful when it describes code that actually runs. This sample shows one
+way to keep the two in step, using a pattern that teams working with Lean use in industry:
+write a model of the component, prove what it must guarantee, and then test the real
+implementation against the model. Haze itself only provides the model checking and its
+[JSON output](../../docs/Language-Reference.md#json-output); everything else here is ordinary
+Python.
 
-The [`payments`](payments) folder contains:
-
-- [`payments.hz`](payments/payments.hz): the Haze model of a payment client, which serves as its
-  specification;
-- [`payments_client.py`](payments/payments_client.py): the implementation, in Python;
-- [`test_conformance.py`](payments/test_conformance.py): a test that checks the implementation
-  against the model.
-
-Run the test from the repository root after `lake build`:
+The [`payments`](payments) folder holds three files: the model,
+[`payments.hz`](payments/payments.hz), which serves as the specification; the implementation, a
+small Python payment client in [`payments_client.py`](payments/payments_client.py); and
+[`test_conformance.py`](payments/test_conformance.py), which checks one against the other. To run
+the test, build Haze and run it from the repository root:
 
 ```sh
+lake build
 python examples/Conformance/payments/test_conformance.py
 ```
 
-## The Pattern
+## The idea
 
-1. **Write the model.** A Haze file describes the component: its state, how it reacts to
-   random events, and which quantities are only known vaguely. The model is short, so it can
-   be reviewed like a design document.
-2. **State the requirements.** Safety requirements are theorems, and service-level
-   requirements are claims with probability bounds. Haze proves the theorems or gives a
-   counterexample, and computes exact probabilities for the claims.
-3. **Check the model in continuous integration.** `haze` exits with status 1 if any theorem or
-   bound fails, so a change to the model that breaks a requirement fails the build.
-4. **Test the implementation against the model.** A conformance test runs the real
-   implementation, compares its behavior with the model, and fails if they differ.
-5. **Change both together.** When the design changes, change the model first, let Haze check
-   the requirements, and then change the implementation until the conformance test passes.
+You start by writing a model of the component: its state, how it reacts to random events such
+as lost messages, and which rates you only know roughly. A model like this is short enough to
+review the way you'd review a design document.
 
-The model is the specification, and the conformance test connects it to the code. Neither one
-alone is enough: the model can be proved correct but may not describe the code, and the code
-can be tested but random testing rarely finds the rare paths that the model checker
-enumerates.
+Next you write down what the component must guarantee. Safety requirements, such as "never
+charge a customer twice", become theorems, and service levels, such as "at least 99% of
+payments go through", become claims with probability bounds. Haze either proves each theorem or
+shows a run that breaks it, and computes the exact probability behind each claim. Since `haze`
+exits with an error when a requirement fails, you can run it in CI, and a change to the model
+that breaks a guarantee will fail the build.
 
-## The Model and Its Requirements
+The model only helps if it matches the code, which is what the conformance test checks. It runs
+the real implementation, compares its behavior with the model, and fails if the two disagree.
+When the design changes, you change the model first, let Haze check the requirements, and then
+change the code until the conformance test passes again.
 
-[`payments.hz`](payments/payments.hz) models a client that sends a charge request, retries
-after a timeout up to three times, and talks to a server that deduplicates requests by
-idempotency key. The loss rate of the network is a fuzzy parameter:
+You need both halves. A model can be proved correct and still not describe the code, and code
+can pass many tests and still fail on a rare path that only an exhaustive check would reach.
+
+## The model
+
+[`payments.hz`](payments/payments.hz) describes a client that sends a charge request and, after
+a timeout, retries up to three times. The server deduplicates requests by idempotency key, so a
+retry never charges the card again. Each request and each reply can be lost, and the loss rate
+is only known roughly, so it's a fuzzy parameter:
 
 ```haze
 param loss : Num ~= {0.01: 0.6, 0.02: 1, 0.05: 0.5, 0.1: 0.2}
@@ -56,25 +57,26 @@ claim delivered : Client |= after[6] acked with prob >= 0.99
 #eval Client |= after[6] latency
 ```
 
-The `#eval` commands compute the exact distributions of the outcomes that the implementation
-must reproduce.
+The `#eval` lines ask Haze for the exact distribution of each outcome, which is what the
+implementation will be compared against.
 
-## The Conformance Test
+## The conformance test
 
-[`test_conformance.py`](payments/test_conformance.py) checks the implementation as follows:
+The test first runs `haze --json` on the model and stops if any theorem or claim is rejected,
+since there's no point testing code against a specification that is itself wrong.
 
-1. It runs `haze --json` on the model and stops if any theorem or claim is rejected.
-2. The implementation receives its network as a parameter, so the test can decide which
-   messages are lost. The test runs the implementation once for every possible pattern of lost
-   messages. Each pattern has an exact probability for a given loss rate, so the test obtains
-   the exact distribution of the implementation's outcomes.
-3. It compares these distributions with the model's, for every loss rate in the model, as
-   exact fractions. It also checks the theorems on every run.
-4. It runs the same comparison on deliberately broken versions of the implementation, called
-   mutants, and requires each one to be caught. This shows that the test is strong enough to
-   detect real bugs.
+Then it runs the implementation. The client takes its network as a parameter, so the test can
+decide exactly which messages get lost. It runs the client once for every possible pattern of
+lost messages; a run makes at most six such decisions, so there are only fifteen patterns.
+Because each pattern has an exact probability for a given loss rate, adding them up gives the
+exact distribution of the client's outcomes. The test compares these distributions with the
+model's, as exact fractions, for every loss rate in the model, and it checks the theorems on
+every run as well.
 
-The output looks like this:
+Finally, it makes sure the comparison is sharp enough to matter. It repeats the check on three
+deliberately broken versions of the client (one that retries once too often, one with the wrong
+timeout, and one whose server ignores idempotency keys) and requires each of them to fail. The
+output looks like this:
 
 ```
 2. Comparing the implementation with the model, exactly, for every loss rate
@@ -88,20 +90,18 @@ The output looks like this:
 PASS
 ```
 
-Exhaustive comparison is possible when every run of the implementation makes a small number of
-random decisions, as here (at most six). For larger implementations, run the implementation
-many times with real randomness instead, and compare the observed frequencies with the model's
-probabilities using a statistical test. The model's exact probabilities make such tests
-precise, because only the sampling error of the implementation remains.
+Trying every pattern only works when each run makes a handful of random decisions, as it does
+here. For larger code, run the implementation many times with real randomness and compare the
+observed frequencies with the model's probabilities using a statistical test. Because the
+model's numbers are exact, the only uncertainty left is the sampling error on the
+implementation's side.
 
-## Applying the Pattern to Your Own Code
+## Using this with your own code
 
-* Make the sources of randomness and failure in the implementation injectable: the network,
-  the clock, the random number generator. This is good practice anyway, and it makes
-  exhaustive or seeded testing possible.
-* Model only the decisions that matter for the requirements. A model of a retry policy needs
-  the outcome of each request, not the contents of the messages.
-* Use a fuzzy parameter for every rate that isn't known precisely. The conformance test then
-  checks the implementation at each admissible value.
-* Keep the model next to the code, review changes to both in the same pull request, and run
-  `haze` and the conformance test in continuous integration.
+The first step is to make the sources of failure in your code injectable: the network, the
+clock, the random number generator. That's good practice anyway, and it's what makes exhaustive
+or seeded testing possible. Keep the model focused on the decisions that matter for your
+requirements; a model of a retry policy needs to know whether each request got through, not
+what was in it. Use a fuzzy parameter for any rate you don't know precisely, so that the
+conformance test checks the code at every plausible value. And keep the model next to the
+code, so that changes to both are reviewed in the same pull request and checked by the same CI.

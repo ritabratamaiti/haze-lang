@@ -10,10 +10,14 @@ import Haze.Kernel.Verify
 /-!
 # Front End
 
-The front end processes a source file one declaration at a time, in the role of
-`Lean.Elab.Frontend`. Each declaration is elaborated, checked by the kernel and then
-executed: random nodes extend the worlds, observations condition them, and claims and
-queries are evaluated. Processing is a pure function from the source text to messages.
+The front end processes a source file one declaration at a time, much as `Lean.Elab.Frontend`
+does for Lean. Each declaration is elaborated, checked by the kernel and then executed.
+
+Between declarations, the front end keeps the environment and a list of branches, one for each
+joint assignment of the fuzzy parameters declared so far. Each branch holds an exact distribution
+over worlds, where a world assigns an outcome to every global variable. Executing a declaration
+updates this state: random nodes extend the worlds, observations condition them, and claims and
+queries are evaluated on them. Processing is a pure function from the source text to messages.
 
 ## Main Definitions
 
@@ -30,7 +34,8 @@ structure Options where
   deriving Inhabited
 
 /--
-The state of the front end: the environment, the current branches and the messages produced so far.
+The state of the front end: the environment, the current branches (one per joint assignment of the
+fuzzy parameters) and the messages produced so far.
 -/
 structure FState where
   file : String
@@ -42,12 +47,12 @@ structure FState where
   records : Array String := #[]
   errors : Nat := 0
 
-/-- The front-end monad. -/
+/-- The front-end monad, a state monad over `FState`. -/
 abbrev FM := StateM FState
 
 /--
 Records a message at a source position, together with structured `data` for the JSON output.
-Messages with severity `error` are counted as errors.
+A message with severity `error` also increments the error count.
 -/
 def emit (pos : Pos) (sev : String) (msg : String) (data : List (String × Json) := []) :
     FM Unit := modify fun s =>
@@ -57,16 +62,19 @@ def emit (pos : Pos) (sev : String) (msg : String) (data : List (String × Json)
            records := s.records.push record.render,
            errors := if sev == "error" then s.errors + 1 else s.errors }
 
-/-- The JSON form of an interval. -/
+/-- The JSON fields for a belief–plausibility interval. -/
 def jsonInterval (i : Interval) : List (String × Json) :=
   [("belief", Json.rat i.bel), ("plausibility", Json.rat i.pl)]
 
-/-- The JSON form of the result of a property on each parameter assignment. -/
+/-- The JSON form of the result of a property for each fuzzy parameter assignment. -/
 def jsonBranches (env : Env) (rows : List BranchResult) : Json :=
   .arr (rows.map fun r => .obj [("parameters", Json.assignment env r.assign),
     ("possibility", Json.rat r.poss), ("lower", Json.rat r.lo), ("upper", Json.rat r.hi)])
 
-/-- The JSON form of a distribution. The unknown outcome has the value `null`. -/
+/--
+The JSON form of a distribution. The unknown outcome, from running out of fuel, has the value
+`null`.
+-/
 def jsonDist (env : Env) (xs : List (Res Value × Rat)) : Json :=
   .arr (xs.map fun (r, q) => .obj [("value", match r with
       | .ok v => Json.value env v
@@ -108,7 +116,7 @@ def fmtConfig (env : Env) (relevant : Array Bool) (sys : Option SysInfo)
       [s!"state: {", ".intercalate vs}{if c.st.crashed then "  [crashed]" else ""}"]
   ps ++ ins ++ st
 
-/-- Renders an interval, or a single probability when belief equals plausibility. -/
+/-- Renders an interval, or a single probability when the belief equals the plausibility. -/
 def fmtInterval (i : Interval) : String :=
   if i.bel == i.pl then s!"probability {fmtQ i.bel}"
   else s!"belief {fmtQ i.bel} · plausibility {fmtQ i.pl}"
@@ -116,15 +124,16 @@ def fmtInterval (i : Interval) : String :=
 /-! ## Running properties -/
 
 /--
-The model checker for a property, reading only the global variables that the property depends on.
+Builds the model checker for a property. The checker reads only the global variables that the
+property depends on.
 -/
 def checkerFor (env : Env) (fuel : Nat) (spec : PropSpec) : Checker :=
   let sys := spec.sys.bind (env.systems[·]?)
   { env, fuel, sys, body := spec.body, relevant := relevantGlobals env sys spec.body }
 
 /--
-Checks a property on every branch, returning the result for each branch and the first
-counterexample.
+Checks a property on every branch. Returns the result for each branch, and the counterexample
+from the first branch that has one.
 -/
 def runSpec (env : Env) (fuel : Nat) (bs : Array Branch) (spec : PropSpec) :
     Except String (List BranchResult × Option Witness) := do
@@ -137,7 +146,10 @@ def runSpec (env : Env) (fuel : Nat) (bs : Array Branch) (spec : PropSpec) :
     if wit.isNone then wit := w
   return (rows.toList, wit)
 
-/-- A table of results per parameter assignment, omitted when every assignment gives the same result. -/
+/--
+Formats the results for each fuzzy parameter assignment as a table. The table is omitted when every
+assignment gives the same result.
+-/
 def branchTable (env : Env) (rows : List BranchResult) : List String :=
   let same := match rows with
     | r :: rs => rs.all fun x => x.lo == r.lo && x.hi == r.hi
@@ -149,15 +161,19 @@ def branchTable (env : Env) (rows : List BranchResult) : List String :=
     let v := if r.lo == r.hi then fmtQ r.lo else s!"[{fmtQ r.lo}, {fmtQ r.hi}]"
     s!"  {padRight (label r) w}  π {padRight (fmtQ r.poss) 6}  {v}"
 
-/-- Describes a result as proved, refuted, certain, impossible or graded. -/
+/--
+Describes a result in words. A belief of 1 means the property is proved, and a plausibility of 0
+means it is refuted. When the grade involves randomness or fuzziness, these are reported as
+holding or failing with certainty instead. Any other result is graded.
+-/
 def status (g : Grade) (i : Interval) : String :=
   if i.bel == 1 then (if g.prob || g.fuzzy then "holds with certainty" else "proved")
   else if i.pl == 0 then (if g.prob || g.fuzzy then "fails with certainty" else "refuted")
   else "graded"
 
 /--
-Checks a claim or theorem, reports the result and adds the claim to the environment if it is
-accepted.
+Checks a claim or theorem and reports the result. If it is rejected, the report includes a
+counterexample when the model checker found one. An accepted claim is added to the environment.
 -/
 def doClaim (d : DeclStx) (name : String) (isThm : Bool) (spec : PropSpec) (bound : Bound) : FM Unit := do
   let s ← get
@@ -225,7 +241,10 @@ def doClaim (d : DeclStx) (name : String) (isThm : Bool) (spec : PropSpec) (boun
     else
       emit d.pos "error" s!"{kind} {name}{indent lines}" data
 
-/-- The exact distribution of the value of a property after `k` steps, on one branch. -/
+/--
+Computes the exact distribution of the value of an `after[k]` property on one branch. Mass that ran
+out of fuel appears as the outcome `Res.stuck`.
+-/
 def evalDist (env : Env) (fuel : Nat) (b : Branch) (spec : PropSpec) :
     Except String (List (Res Value × Rat)) := do
   let ck := checkerFor env fuel spec
@@ -249,7 +268,7 @@ def fmtDist (env : Env) (xs : List (Res Value × Rat)) : List String :=
   shown.map (fun (r, q) => s!"{padRight (fmtRes env r) w}  ↦ {fmtQ q}")
     ++ (if xs.length > 12 then [s!"… {xs.length - 12} more outcomes"] else [])
 
-/-- Runs a query command and reports its result. -/
+/-- Runs a query command (`#check`, `#eval`, `#prob`, `#expect` or `#outcomes`) and reports its result. -/
 def doQuery (d : DeclStx) (k : QueryKind) (spec : PropSpec) : FM Unit := do
   let s ← get
   let env := s.env
@@ -323,7 +342,7 @@ def doQuery (d : DeclStx) (k : QueryKind) (spec : PropSpec) : FM Unit := do
       | .error e => emit d.pos "error" e; return
       | .ok (frontier, unk, _) =>
         if !b.assign.isEmpty then lines := lines.push s!"when {fmtAssign env b.assign} (π {fmtQ b.poss}):"
-        -- group by the visible input assignment
+        -- Group the configurations by the values of the inputs that the property can read.
         let mut groups : Array (String × Rat × List (Res Value × Rat)) := #[]
         for (cfg, w) in frontier do
           let key := ", ".intercalate ((inputsOf env ck.relevant cfg.world).map fun (n, v) => s!"{n} = {v}")
@@ -346,7 +365,7 @@ def doQuery (d : DeclStx) (k : QueryKind) (spec : PropSpec) : FM Unit := do
         if unk != 0 then lines := lines.push s!"diverged (out of fuel): {fmtQ unk}"
     emit d.pos "info" s!"{d.text}{indent lines.toList}"
 
-/-- Prints a summary of a declaration. -/
+/-- Reports a one-line summary of the named declaration, for `#print`. -/
 def doPrint (d : DeclStx) (n : String) : FM Unit := do
   let env := (← get).env
   if let some c := env.claims[n]? then
@@ -368,8 +387,8 @@ def doPrint (d : DeclStx) (n : String) : FM Unit := do
 /-! ## Driver -/
 
 /--
-Processes one declaration: elaborates it, checks it with the kernel and runs its semantic action.
-The environment changes only if all three steps succeed.
+Processes one declaration: elaborates it, checks it with the kernel and then executes it. The
+environment changes only if all three steps succeed.
 -/
 def processDecl (d : DeclStx) : FM Unit := do
   let s ← get
@@ -380,7 +399,7 @@ def processDecl (d : DeclStx) : FM Unit := do
     | .error msg => emit d.pos "error" msg
     | .ok env' =>
       let fuel := s.opts.fuel
-      -- commit the kernel-checked environment only once the semantic action succeeded
+      -- Commit the kernel-checked environment only after the declaration has executed successfully.
       let commit := modify fun s => { s with env := env' }
       match decl with
       | .param n _ sup =>
@@ -411,18 +430,20 @@ def processDecl (d : DeclStx) : FM Unit := do
       | .print n => doPrint d n
       | _ => commit
 
-/-- Checks a source file, returning the final front-end state. -/
+/-- Checks a source file and returns the final front-end state. -/
 def runState (file src : String) (opts : Options := {}) : FState :=
   match Syntax.program src with
   | .error (p, msg) => ((emit p "error" msg).run { file, opts }).2
   | .ok decls => ((decls.forM processDecl).run { file, opts }).2
 
-/-- Checks a source file, returning its messages and the number of errors. -/
+/--
+Checks a source file and returns its messages, separated by newlines, with the number of errors.
+-/
 def run (file src : String) (opts : Options := {}) : String × Nat :=
   let s := runState file src opts
   ("\n".intercalate s.out.toList, s.errors)
 
-/-- Checks a source file, returning one JSON record per message and the number of errors. -/
+/-- Checks a source file and returns one JSON record per line, with the number of errors. -/
 def runJson (file src : String) (opts : Options := {}) : String × Nat :=
   let s := runState file src opts
   ("\n".intercalate s.records.toList, s.errors)

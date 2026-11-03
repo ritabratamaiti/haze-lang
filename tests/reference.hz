@@ -1,29 +1,32 @@
--- Snippets from docs/Language-Reference.md, kept here so that the reference stays accurate.
+-- Snippets from docs/Language-Reference.md. Running them as a test keeps the
+-- reference accurate, because any change in their output shows up here.
 
 logic zadeh
 enum Size = Small | Medium | Large
 input size : Size ~ {Small: 0.6, Medium: 0.3, Large: 0.1}
 def work_ms : Num := match size { Small => 40, Medium => 200, Large => 900 }
 
--- Unicode symbols and ASCII alternatives
+-- Unicode symbols and their ASCII spellings mean the same thing
 param drop : Num ≈ {0.01: 1, 0.2: 0.3}
 #check work_ms ≤ 100 → work_ms ≠ 40
 #check work_ms <= 100 -> work_ms != 40
 
--- functions make fresh choices on every call; values don't
+-- A function makes fresh random choices on every call, while a value is drawn
+-- once and then reused.
 def stored() : Bool := not flip(drop)
 def once : Bool := not flip(drop)
 #prob stored() and stored()
 #prob once and once
 
--- let … in, quantifiers, hedges
+-- let … in, quantifiers and hedges
 #eval let x := 3 in x * x
 #eval exists x in 1..5, x * x == 16
 def hot(x : Num) : Deg := ramp_up(x, 25, 35)
 #eval 30 is not very hot
 #eval not (30 is very hot)
 
--- statements: optional `then`, single-statement arms, missing arms do nothing, let
+-- Statement syntax: `then` is optional, a match arm can be a single statement, a
+-- missing match arm does nothing, and let works inside step.
 enum Light = Red | Green | Off
 system L {
   var light : Light := Red

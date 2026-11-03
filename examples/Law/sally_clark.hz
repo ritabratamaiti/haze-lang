@@ -1,7 +1,8 @@
 -- R v Clark: the "1 in 73 million" statistic
 --
 -- Sally Clark was convicted in 1999 of murdering her two baby sons and cleared on appeal
--- in 2003. Every number below comes from the case or from the published analysis of it:
+-- in 2003. This file walks through the statistical evidence in the case. Every number
+-- below comes from the case or from the published analysis of it:
 --   * 1 in 8,543 and 700,000 births a year: Roy Meadow's evidence at the trial, as recorded
 --     in the Court of Appeal's 2003 judgment (R v Clark [2003] EWCA Crim 1020).
 --   * A dependence factor of 5 to 10, and odds of 4.5:1 to 9:1 for double cot death
@@ -10,24 +11,28 @@
 
 enum Explanation = DoubleSIDS | DoubleHomicide | Neither
 
--- Meadow: the chance of one cot death (SIDS) in a family like the Clarks' is 1 in 8,543,
--- so two are 1 in 8,543², "1 in 73 million", which with 700,000 births a year would
--- happen about once a century.
+-- Meadow told the jury that the chance of one cot death (SIDS) in a family like the
+-- Clarks' is 1 in 8,543. He squared it to get the chance of two, 1 in 8,543², or "1 in
+-- 73 million", and with 700,000 births a year that would happen about once a century.
 def one_sids : Num := 1 / 8543
 #eval one_sids * one_sids
 #eval 1 / (700000 * one_sids * one_sids)
 
--- Hill: a first cot death makes a second 5 to 10 times more likely, so squaring is wrong.
+-- Squaring assumes the two deaths are independent. Hill points out that a first cot
+-- death makes a second 5 to 10 times more likely, so squaring is wrong. Both ends of
+-- that range are fully possible here.
 param dependence : Num ~= {5: 1, 10: 1}
 def two_sids : Num := one_sids * dependence * one_sids
 #eval 1 / (700000 * two_sids)
 
--- Hill: double cot death is 4.5 to 9 times as likely as double homicide.
+-- Hill also estimates that double cot death is 4.5 to 9 times as likely as double
+-- homicide.
 param odds : Num ~= {4.5: 1, 9: 1}
 def two_homicides : Num := two_sids / odds
 
--- The question for the jury was not "how rare are two cot deaths?" but "given that two
--- babies died, how likely is each explanation?"
+-- The rarity of two cot deaths was never the right question. Two babies had died, so
+-- what the jury needed to know was how likely each explanation was given that fact.
+-- The model below conditions on the deaths and compares the two explanations.
 input explanation : Explanation ~
   if flip(two_sids + two_homicides)
   then (if flip(two_sids / (two_sids + two_homicides)) then DoubleSIDS else DoubleHomicide)

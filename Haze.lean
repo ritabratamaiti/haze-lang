@@ -16,5 +16,7 @@ import Haze.Theory
 /-!
 # Haze
 
-This module imports the whole Haze library.
+This module imports the whole Haze library. A source file is parsed by `Haze.Syntax`,
+elaborated by `Haze.Elab`, and checked and evaluated by the kernel in `Haze.Kernel`.
+`Haze.Frontend` drives these steps one declaration at a time and reports the results.
 -/

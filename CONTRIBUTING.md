@@ -1,56 +1,42 @@
-External Contribution Guidelines
-============
+# Contributing to Haze
 
-Thank you for your interest in Haze. These guidelines describe how to propose changes.
+Thanks for your interest in Haze. This page explains how to propose a change and what a good
+pull request looks like. Before you start, it's worth reading the
+[language reference](docs/Language-Reference.md) and the [design document](docs/Design.md), so
+that your change fits how the rest of Haze works.
 
-Helpful links
--------
+## Before you open a pull request
 
-* [Language Reference](docs/Language-Reference.md)
-* [Design and Semantics](docs/Design.md)
-* [Testing](tests/README.md)
+Please open an issue first and describe the problem you want to solve or the feature you'd
+like to add. If you're proposing a new feature, prefix the title with `RFC:` (request for
+comments). For a language feature, include a small model that shows why it's needed and what
+its output should be; that usually makes the discussion much shorter.
 
-Before You Submit a Pull Request (PR):
--------
+Changes to the kernel need extra care. The files in `Haze/Kernel` are the part of Haze that has
+to be trusted, so a change there needs a clear reason, a precise description of how it changes
+the meaning of programs, and tests whose expected results can be checked by hand. If a change
+to the elaborator or the front end is enough, prefer that.
 
-**Start with an Issue**: Before submitting a PR, open an issue that describes the problem you
-want to solve or the feature you want to add. Use the prefix `RFC:` (request for comments)
-when you propose a new feature. For a language feature, include a small model that shows why
-the feature is needed and what its output should be.
+## What a pull request should include
 
-**Keep the Kernel Small**: The files in `Haze/Kernel` are the trusted part of Haze. Changes to
-them need a clear reason, a precise description of the change in meaning, and tests whose
-expected results can be checked by hand. Prefer changes to the elaborator or the front end
-when they are enough.
+Every change in behavior should come with a golden test in `tests` or `examples`, and
+`lake test` should pass. Only regenerate expected output with `lake exe hazetest --update`, and
+look through the differences in the `.expected` files before you commit them. The
+[test suite README](tests/README.md) has the details.
 
-**Understand the Project**: Read the language reference and the design document, and look at
-existing issues and recent commits, so that your contribution fits the direction of the
-project.
+`lake build` also checks the theorems in `Haze/Theory.lean`. If you change a definition that one
+of them is about, update the proof rather than adding `sorry`.
 
-Writing the Pull Request
--------
-
-**Tests**: Add or update golden tests in `tests` or `examples` for every change in behavior,
-and run `lake test`. Regenerate expected output only with `lake exe hazetest --update`, and
-review the differences before committing them.
-
-**Theorems**: `lake build` checks the theorems in `Haze/Theory.lean`. If you change a
-definition that a theorem is about, update the proof. Don't add `sorry`.
-
-**Documentation**: Update the language reference for changes to the language, and add an
-entry to [`RELEASES.md`](RELEASES.md). Documentation follows the
+If you change the language, update the language reference and add an entry to
+[`RELEASES.md`](RELEASES.md). Documentation follows the
 [Lean documentation style guide](https://github.com/leanprover/lean4/blob/master/doc/style.md):
-US English, active voice and docstrings that make sense on their own in a hover.
+US English, the active voice, and docstrings that make sense on their own when shown in an
+editor hover. Each Lean file starts with a copyright header and a module docstring
+(`/-! … -/`) describing what it contains, and public definitions have docstrings.
 
-**Source files**: Each Lean file starts with a copyright header and a module docstring
-(`/-! … -/`) that describes the file and its main definitions. Public definitions have
-docstrings.
+Commit messages should start with a short summary line, followed by what changed and why.
 
-**Commit messages**: Write a short summary line, followed by a description of what changed
-and why.
-
-License
--------
+## License
 
 Haze is available under the [PolyForm Noncommercial License 1.0.0](LICENSE.md). By
 contributing, you agree that your contribution is available under the same license.

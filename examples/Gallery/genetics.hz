@@ -1,34 +1,40 @@
--- Genetics: genetic drift, Hardy–Weinberg proportions and a Mendelian cross.
+-- Population genetics examples: Wright–Fisher drift, Hardy–Weinberg proportions
+-- when the allele frequency is only roughly known, and a Mendelian cross of two
+-- carriers.
 
 enum Allele = Dom | Rec
 
 -- 1. Wright–Fisher genetic drift ----------------------------------------------
--- A population carries 6 copies of a gene, 2 of which are a new neutral allele.
--- Each generation draws 6 copies from the previous generation's frequencies.
--- The allele is eventually fixed with probability equal to its initial
--- frequency, 2/6, and its expected number of copies never changes.
+-- A small population carries 6 copies of a gene, 2 of them a new neutral allele.
+-- Each generation is formed by drawing 6 copies at random according to the
+-- allele's frequency in the previous one. Because selection plays no part, the
+-- expected number of copies never changes, and the probability that the new
+-- allele eventually takes over (becomes fixed) equals its starting frequency, 2/6.
 system Drift {
   var copies : Num := 2
   step { copies := binomial(6, copies / 6) }
 }
 theorem copies_in_range : Drift |= always[60] (copies >= 0 and copies <= 6)
-#eval Drift |= after[1] copies                 -- binomial(6, 1/3)
-#expect Drift |= after[10] copies              -- 2
-claim fixed : Drift |= eventually[60] copies == 6    -- → 1/3
-claim lost : Drift |= eventually[60] copies == 0     -- → 2/3
+#eval Drift |= after[1] copies                 -- binomial(6, 1/3) after one generation
+#expect Drift |= after[10] copies              -- still 2
+claim fixed : Drift |= eventually[60] copies == 6    -- close to 1/3
+claim lost : Drift |= eventually[60] copies == 0     -- close to 2/3
 
 -- 2. Hardy–Weinberg proportions with a vaguely known allele frequency ----------
--- The recessive allele frequency q is "about 0.2". Under random mating a child
--- is heterozygous with probability 2q(1 - q) and affected with probability q².
+-- Here the frequency q of a recessive allele is only known as "about 0.2", so it
+-- is a fuzzy parameter: a few candidate values, each with a degree of possibility.
+-- Under random mating a child is heterozygous (one copy of each allele) with
+-- probability 2q(1 - q) and affected (two recessive copies) with probability q².
 param q : Num ~= {0.1: 0.6, 0.2: 1, 0.3: 0.5}
 input maternal : Allele ~ if flip(q) then Rec else Dom
 input paternal : Allele ~ if flip(q) then Rec else Dom
-claim heterozygous : maternal != paternal          -- 0.18, 0.32, 0.42
-claim affected : maternal == Rec and paternal == Rec  -- 0.01, 0.04, 0.09
+claim heterozygous : maternal != paternal          -- 0.18, 0.32 or 0.42 depending on q
+claim affected : maternal == Rec and paternal == Rec  -- 0.01, 0.04 or 0.09 depending on q
 
 -- 3. A Mendelian cross of two carriers ----------------------------------------
--- Each parent passes Dom or Rec with probability 1/2. A quarter of children are
--- affected. Among unaffected children, two thirds are carriers.
+-- Both parents carry one copy of each allele and pass either one on with
+-- probability 1/2, so a quarter of their children are affected. Once you observe
+-- that a child is unaffected, the probability that it is a carrier is 2/3.
 input from_mother : Allele ~ {Dom: 0.5, Rec: 0.5}
 input from_father : Allele ~ {Dom: 0.5, Rec: 0.5}
 #prob from_mother == Rec and from_father == Rec    -- 1/4

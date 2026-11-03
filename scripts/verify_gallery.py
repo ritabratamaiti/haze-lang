@@ -1,9 +1,10 @@
 """
-Checks the results of the models in examples/Gallery against independent calculations.
+Checks the numbers printed by the models in examples/Gallery against independent calculations.
 
-Each model is recomputed here with exact fractions, from closed-form answers or by propagating
-the distribution of the Markov chain step by step, without using Haze. Run it from the
-repository root after `lake build`:
+The script runs the haze binary on each gallery file and then recomputes every result here with
+exact fractions, without using Haze: either from a closed-form answer, or by pushing the
+probability distribution of the Markov chain forward one step at a time. Build Haze with
+`lake build` first, then run it from any directory:
 
     python scripts/verify_gallery.py
 """
@@ -41,7 +42,7 @@ def check_line(bl, key, value_label, prob, name):
     results.append((ok, name, f"{value_label} ↦ {float(prob):.6f}"))
 
 def integrate(rows):
-    """rows: (possibility, lo, hi) -> (belief, plausibility); same formula as the design doc."""
+    """Turn rows of (possibility, lo, hi) into (belief, plausibility), using the formula from the design doc."""
     lv = sorted({r[0] for r in rows}, reverse=True) + [F(0)]
     top = lv[0]
     bel = sum((lv[i] - lv[i+1]) * min(r[1] for r in rows if r[0] >= lv[i]) for i in range(len(lv) - 1))
@@ -65,6 +66,8 @@ def evolve(init, step, k):
 def after(init, step, k, f):
     return sum(p * f(s) for s, p in evolve(init, step, k).items())
 
+# eventually and always pair each state with a flag that records whether f has held at
+# some step (or at every step) so far.
 def eventually(init, step, k, f):
     st = lambda sh: [((s2, sh[1] or bool(f(s2))), q) for s2, q in step(sh[0])]
     return after((init, bool(f(init))), st, k, lambda sh: sh[1])

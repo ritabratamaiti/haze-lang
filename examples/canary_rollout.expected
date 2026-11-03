@@ -1,4 +1,4 @@
-examples/canary_rollout.hz:37:1: info: claim bad_build_contained
+examples/canary_rollout.hz:41:1: info: claim bad_build_contained
   belief ≈0.622817 · plausibility 1 — graded
   grade prob+fuzzy · 4 parameter assignment(s) · ≤3 states/step
   by fuzzy parameter (π = possibility):
@@ -6,7 +6,7 @@ examples/canary_rollout.hz:37:1: info: claim bad_build_contained
     defect = 0.005  π 0.8     ≈0.528521
     defect = 0.02   π 0.5     ≈0.951704
     defect = 0.1    π 0.2     ≈1
-examples/canary_rollout.hz:38:1: info: claim reaches_full
+examples/canary_rollout.hz:42:1: info: claim reaches_full
   belief ≈0.355932 · plausibility 1 — graded
   grade prob+fuzzy · 4 parameter assignment(s) · ≤3 states/step
   by fuzzy parameter (π = possibility):
@@ -14,14 +14,14 @@ examples/canary_rollout.hz:38:1: info: claim reaches_full
     defect = 0.005  π 0.8     ≈0.471479
     defect = 0.02   π 0.5     ≈0.048296
     defect = 0.1    π 0.2     ≈1.36891e-7
-examples/canary_rollout.hz:39:1: info: #expect Rollout |= after[4] exposure
+examples/canary_rollout.hz:43:1: info: #expect Rollout |= after[4] exposure
   lower expectation ≈27.51387 · upper expectation 61
   by fuzzy parameter (π = possibility):
     defect = 0      π 1       E 61
     defect = 0.005  π 0.8     E ≈39.071647
     defect = 0.02   π 0.5     E ≈11.272675
     defect = 0.1    π 0.2     E ≈1.052866
-examples/canary_rollout.hz:40:1: info: #outcomes Rollout |= after[4] stage
+examples/canary_rollout.hz:44:1: info: #outcomes Rollout |= after[4] stage
   when defect = 0 (π 1):
     (all worlds)  P 1         ⇒ Full
   when defect = 0.005 (π 0.8):
@@ -30,7 +30,7 @@ examples/canary_rollout.hz:40:1: info: #outcomes Rollout |= after[4] stage
     (all worlds)  P 1         ⇒ RolledBack ≈0.951704 | Full ≈0.048296
   when defect = 0.1 (π 0.2):
     (all worlds)  P 1         ⇒ RolledBack ≈1 | Full ≈1.36891e-7
-examples/canary_rollout.hz:44:1: info: theorem ships_when_clean
+examples/canary_rollout.hz:48:1: info: theorem ships_when_clean
   probability 1 — holds with certainty
   grade prob+fuzzy · 4 parameter assignment(s) · ≤4 states/step
   theorem accepted

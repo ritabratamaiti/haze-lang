@@ -8,9 +8,9 @@ import Haze.Frontend
 /-!
 # Command-Line Interface
 
-`haze [--fuel N] [--json] FILE.hz...` checks Haze source files and prints their messages. With
-`--json`, it prints one JSON record per message instead. It exits with status 1 if any declaration
-was rejected.
+`haze [--fuel N] [--json] FILE.hz...` checks Haze source files and prints their messages, or one
+JSON record per message with `--json`. The exit status is 1 if any declaration was rejected and 2
+if the arguments are invalid.
 -/
 
 /-- The help text of the command-line interface. -/

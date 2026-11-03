@@ -8,24 +8,24 @@ import Std.Data.HashMap
 /-!
 # Core Language
 
-This file defines the core language of Haze: kernel terms, types, values, grades,
-declarations and the environment. These play the roles of `Lean.Expr`,
-`Lean.Declaration` and `Lean.Environment` in Lean.
+This file defines the data that the elaborator produces and the kernel checks: kernel terms,
+types, values, grades, declarations and the environment. They play the roles that `Lean.Expr`,
+`Lean.Declaration` and `Lean.Environment` play in Lean.
 
-The core language differs from Lean's in three ways:
+Compared with Lean's core language, there are a few differences:
 
 * The typing judgement is graded. In `Γ ⊢ e : T @ g`, the grade `g` records which kinds of
   uncertainty `e` can carry: randomness, fuzziness and possible non-termination.
 * Stochastic conditionals (`Expr.choose`), random primitives (`Expr.rand`, `Expr.cat`) and the
   state of a transition system (`Expr.svar`, `Expr.crashed`) are part of the term language.
-* Theorems are graded. A `ClaimInfo` stores the belief–plausibility interval that the kernel
-  computed for its property.
+* Theorems are graded too. Instead of a proof, a `ClaimInfo` stores the belief–plausibility
+  interval that the kernel computed for its property.
 
 ## Main Definitions
 
 * `Haze.Grade`: uncertainty grades and their order.
 * `Haze.Expr`, `Haze.Stmt`: kernel terms and statements.
-* `Haze.Decl`: elaborated declarations, which are the input of the kernel.
+* `Haze.Decl`: elaborated declarations, which the kernel takes as input.
 * `Haze.Env`: the environment of checked declarations.
 
 ## Tags
@@ -37,7 +37,7 @@ namespace Haze
 
 /--
 The kinds of uncertainty that a term can carry: randomness, fuzziness and possible
-non-termination. Grades are ordered pointwise.
+non-termination. Each kind is a flag, and grades are ordered flag by flag.
 -/
 structure Grade where
   prob : Bool := false
@@ -56,8 +56,8 @@ def fuzzyG : Grade := { fuzzy := true }
 def divergeG : Grade := { diverge := true }
 
 /--
-The least upper bound of two grades. A term that combines terms of grades `a` and `b` can carry the
-uncertainty of both.
+The least upper bound of two grades. A term built from subterms of grades `a` and `b` can carry
+the uncertainty of both, so its grade is at least `a.join b`.
 -/
 def join (a b : Grade) : Grade :=
   { prob := a.prob || b.prob, fuzzy := a.fuzzy || b.fuzzy, diverge := a.diverge || b.diverge }
@@ -69,7 +69,7 @@ The grade order. `a.le b` is `true` when every kind of uncertainty allowed by `a
 def le (a b : Grade) : Bool :=
   (!a.prob || b.prob) && (!a.fuzzy || b.fuzzy) && (!a.diverge || b.diverge)
 
-/-- The least upper bound of a list of grades, which is `crisp` for the empty list. -/
+/-- The least upper bound of a list of grades. The empty list gives `crisp`. -/
 def joinAll (gs : List Grade) : Grade := gs.foldl join crisp
 
 protected def toString (g : Grade) : String :=
@@ -83,8 +83,8 @@ end Grade
 /--
 The types of Haze terms.
 
-`Num` values are exact rational numbers and `Deg` values are fuzzy truth degrees between 0 and 1.
-Enumeration types are referred to by name.
+`Num` values are exact rational numbers, and `Deg` values are fuzzy truth degrees between 0 and 1.
+An enumeration type is referred to by its name.
 -/
 inductive Ty where
   | bool
@@ -109,15 +109,16 @@ inductive Value where
   deriving DecidableEq, Hashable, Repr, Inhabited
 
 /--
-The result of an evaluation: a value, or `stuck` if evaluation ran out of fuel. A stuck outcome
-is unknown, so it widens the belief–plausibility interval of a property.
+The result of an evaluation: a value, or `stuck` if evaluation ran out of fuel. Since nothing is
+known about a stuck outcome, it widens the belief–plausibility interval of any property that
+depends on it.
 -/
 inductive Res (α : Type) where
   | ok (a : α)
   | stuck
   deriving DecidableEq, Hashable, Repr, Inhabited
 
-/-- Fuzzy logics, which determine the meaning of `and` and `or` on degrees. -/
+/-- The fuzzy logics. The active logic determines what `and` and `or` mean on degrees. -/
 inductive Logic where
   | godel | product | lukasiewicz
   deriving DecidableEq, Hashable, Repr, Inhabited
@@ -129,8 +130,9 @@ instance : ToString Logic := ⟨fun
 Deterministic primitive operations.
 
 Arithmetic, comparisons and the Boolean connectives are crisp. `tand` and `tor` are the fuzzy
-conjunction and disjunction of a `Logic`, `tnot` is the fuzzy negation `1 - x` and `very` squares a
-degree. `tri`, `trap`, `rampUp` and `rampDown` are membership functions.
+conjunction and disjunction of a `Logic`, `tnot` is the fuzzy negation `1 - x`, and `very` squares
+a degree. `degOfBool`, `numOfDeg` and `degOfNum` are the coercions that the elaborator inserts,
+and `tri`, `trap`, `rampUp` and `rampDown` are membership functions.
 -/
 inductive Prim where
   | add | sub | mul | div | neg | abs | min | max | floor
@@ -142,8 +144,8 @@ inductive Prim where
   deriving DecidableEq, Repr, Inhabited
 
 /--
-Random primitives: `bernoulli p` (written `flip(p)`), `uniform a b` over the integers from `a` to
-`b`, and `binomial n p`.
+Random primitives: `bernoulli p` (written `flip(p)` in source), `uniform a b`, which picks an
+integer from `a` to `b`, and `binomial n p`.
 -/
 inductive RandPrim where
   | bernoulli | uniform | binomial
@@ -162,7 +164,7 @@ inductive Expr where
   | prim (op : Prim) (args : List Expr)
   | call (f : String) (args : List Expr)
   | ite (c t e : Expr)
-  /-- A stochastic conditional, which evaluates `t` with probability `p` and `e` otherwise. -/
+  /-- A stochastic conditional: evaluates `t` with probability `p`, and `e` otherwise. -/
   | choose (p t e : Expr)
   | rand (r : RandPrim) (args : List Expr)
   /-- A categorical choice with exact weights. The kernel checks that the weights sum to 1. -/
@@ -171,16 +173,17 @@ inductive Expr where
   /--
   A bounded quantifier over the integers from `lo` to `hi`, which binds `bvar 0` in `body`.
 
-  `binder` is the name of the bound variable and is used only in messages. `isDeg` records whether
-  the body is a `Deg`, which is aggregated by minimum or maximum, rather than a `Bool`.
+  `binder` is the name of the bound variable and is used only in messages. `isDeg` is `true` when
+  the body is a `Deg` rather than a `Bool`. Degrees are then combined by minimum for `forall` and
+  by maximum for `exists`.
   -/
   | quant (all isDeg : Bool) (binder : String) (lo hi body : Expr)
   | matchE (s : Expr) (arms : List (Nat × Expr)) (dflt : Option Expr)
   deriving Repr, Inhabited
 
 /--
-Statements in the step of a transition system. State variables are referred to by index. Local
-variables introduced by `letS` use de Bruijn indices.
+Statements in the step of a transition system. State variables are referred to by index, and
+local variables introduced by `letS` by de Bruijn index.
 -/
 inductive Stmt where
   | skip
@@ -195,8 +198,8 @@ inductive Stmt where
   deriving Repr, Inhabited
 
 /--
-Bounded temporal modalities. `after k` considers step `k` only, `always k` considers every step from
-0 to `k`, and `eventually k` considers some step from 0 to `k`.
+Bounded temporal modalities. `after k` looks at step `k` only, `always k` requires the property at
+every step from 0 to `k`, and `eventually k` requires it at some step from 0 to `k`.
 -/
 inductive Temporal where
   | after (k : Nat)
@@ -228,8 +231,8 @@ inductive Bound where
   deriving DecidableEq, Repr, Inhabited
 
 /--
-A belief–plausibility interval. `bel` is the degree to which the evidence guarantees a property and
-`pl` is the degree to which it allows the property, so `bel ≤ pl`.
+A belief–plausibility interval. `bel` is the degree to which the evidence guarantees a property,
+and `pl` is the degree to which the evidence allows it, so `bel ≤ pl`.
 -/
 structure Interval where
   bel : Rat
@@ -238,9 +241,14 @@ structure Interval where
 
 /-- How a global variable gets its value. -/
 inductive GlobalKind where
-  /-- A fuzzy parameter, with a normal membership function over a finite support. -/
+  /--
+  A fuzzy parameter, given by the membership degree of each value in its finite support. The
+  membership function is normal, meaning that at least one value has membership 1.
+  -/
   | param (support : List (Value × Rat))
-  /-- A random node, which has one value in each world. -/
+  /--
+  A random node, which has one value in each world. `isInput` marks nodes declared with `input`.
+  -/
   | node (val : Expr) (isInput : Bool)
   deriving Repr, Inhabited
 
@@ -266,8 +274,8 @@ structure FunInfo where
   deriving Repr, Inhabited
 
 /--
-A transition system: named state variables with initial values, and the statement that is executed
-at each step. The kernel computes `grade`.
+A transition system: named state variables with initial values, and the statement that runs at
+each step. `grade` is computed by the kernel.
 -/
 structure SysInfo where
   name : String
@@ -278,9 +286,9 @@ structure SysInfo where
   deriving Repr, Inhabited
 
 /--
-A checked claim or theorem. Instead of a proof term, it stores the exact belief–plausibility
-interval that the kernel's model checker computed for its property. A theorem is accepted only
-if its belief is 1.
+A checked claim or theorem. Where Lean would store a proof term, it stores the exact
+belief–plausibility interval that the kernel's model checker computed for the property. A theorem
+is accepted only if its belief is 1.
 -/
 structure ClaimInfo where
   name : String
@@ -296,7 +304,7 @@ inductive QueryKind where
   | check | eval | prob | expect | outcomes
   deriving DecidableEq, Repr, Inhabited
 
-/-- Elaborated declarations, which are the input of the kernel. -/
+/-- Elaborated declarations, which the kernel takes as input. -/
 inductive Decl where
   | logic (l : Logic)
   | enumD (name : String) (ctors : Array String)
@@ -336,18 +344,23 @@ def contains (env : Env) (n : String) : Bool :=
 def global? (env : Env) (n : String) : Option GlobalInfo :=
   env.globalIx[n]? >>= (env.globals[·]?)
 
-/-- Adds a global variable. Its index in `globals` is the position of its value in every world. -/
+/--
+Adds a global variable. Its index in `globals` is also the position of its value in every world.
+-/
 def addGlobal (env : Env) (g : GlobalInfo) : Env :=
   { env with globals := env.globals.push g, globalIx := env.globalIx.insert g.name env.globals.size }
 
-/-- The name of constructor `i` of the enumeration type `ty`. -/
+/--
+The name of constructor `i` of the enumeration type `ty`, or `ty#i` if the environment doesn't
+define it.
+-/
 def ctorName (env : Env) (ty : String) (i : Nat) : String :=
   match env.enums[ty]? >>= (·[i]?) with
   | some n => n
   | none => s!"{ty}#{i}"
 end Env
 
-/-! Exact rational helpers and formatting -/
+/-! Helpers for exact rational numbers and their formatting -/
 
 /-- The minimum of two rational numbers. -/
 def qmin (a b : Rat) : Rat := if a ≤ b then a else b
@@ -357,7 +370,9 @@ def qmax (a b : Rat) : Rat := if a ≤ b then b else a
 /-- Checks whether a rational number is an integer. -/
 def isInt (q : Rat) : Bool := q.den == 1
 
-/-- Renders a rational number in decimal notation, rounded to `digits` places. -/
+/--
+Renders a rational number in decimal notation, rounded to `digits` places, without trailing zeros.
+-/
 def fmtDec (q : Rat) (digits : Nat := 6) : String := Id.run do
   let neg := q < 0
   let a := if neg then -q else q
@@ -371,7 +386,7 @@ def fmtDec (q : Rat) (digits : Nat := 6) : String := Id.run do
   return sign ++ toString ip ++ (if fp.isEmpty then "" else "." ++ fp)
 
 /--
-Renders a positive rational number in scientific notation with six significant digits, such as
+Renders a nonzero rational number in scientific notation with six significant digits, such as
 `1.37019e-8`.
 -/
 def fmtSci (q : Rat) : String := Id.run do
@@ -392,9 +407,10 @@ def fmtSci (q : Rat) : String := Id.run do
   return (if q < 0 then "-" else "") ++ m ++ "e" ++ toString e
 
 /--
-Renders a rational number exactly if it has a short decimal expansion. Otherwise it is rounded,
-in decimal notation or, below 0.001, in scientific notation, and followed by the exact fraction
-when the fraction is short.
+Renders a rational number for messages. Integers and numbers with at most six decimal places are
+shown exactly. Other numbers are rounded, in scientific notation if their absolute value is below
+0.001 and in decimal notation otherwise, and are followed by the exact fraction when its
+denominator is small enough.
 -/
 def fmtQ (q : Rat) : String :=
   if q.den == 1 then toString q.num

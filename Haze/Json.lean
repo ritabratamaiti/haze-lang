@@ -8,14 +8,14 @@ import Haze.Core
 /-!
 # JSON Output
 
-This file defines a minimal JSON representation, which `haze --json` uses to report results in a
-form that other programs can read. Rational numbers are written as strings such as `"2/3"`, so
-that they stay exact.
+This file defines a minimal JSON representation. `haze --json` uses it to report results in a form
+that other programs can read. Rational numbers are written as strings such as `"2/3"`, so they stay
+exact.
 -/
 
 namespace Haze
 
-/-- JSON values. Numbers are kept as their textual representation. -/
+/-- JSON values. A number is stored as its textual representation, which is rendered unchanged. -/
 inductive Json where
   | null
   | bool (b : Bool)
@@ -50,21 +50,23 @@ partial def render : Json → String
   | .arr xs => "[" ++ ",".intercalate (xs.map render) ++ "]"
   | .obj fs => "{" ++ ",".intercalate (fs.map fun (k, v) => "\"" ++ escape k ++ "\":" ++ render v) ++ "}"
 
-/-- An exact rational number, written as a string such as `"2/3"` or `"5"`. -/
+/-- Encodes an exact rational number as a JSON string such as `"2/3"` or `"5"`. -/
 def rat (q : Rat) : Json :=
   .str (if q.den == 1 then toString q.num else s!"{q.num}/{q.den}")
 
-/-- A natural number. -/
+/-- Encodes a natural number as a JSON number. -/
 def nat (n : Nat) : Json := .num (toString n)
 
-/-- A Haze value: Booleans as JSON Booleans, numbers and degrees as exact rationals, and
-enumeration values as the names of their constructors. -/
+/--
+Encodes a Haze value. Booleans become JSON Booleans, numbers and degrees become exact rationals,
+and an enumeration value becomes the name of its constructor.
+-/
 def value (env : Env) : Value → Json
   | .bool b => .bool b
   | .num q | .deg q => rat q
   | .tag ty i => .str (env.ctorName ty i)
 
-/-- An assignment of values to names, as a JSON object. -/
+/-- Encodes an assignment of values to names as a JSON object. -/
 def assignment (env : Env) (a : List (String × Value)) : Json :=
   .obj (a.map fun (n, v) => (n, value env v))
 

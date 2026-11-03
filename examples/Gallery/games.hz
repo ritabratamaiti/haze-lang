@@ -1,11 +1,13 @@
--- Games: craps, a game of tennis, and Penney's game.
+-- Games of chance with known closed-form answers: craps, a single game of tennis
+-- and Penney's coin game.
 
 enum Phase = ComeOut | OnPoint | Won | Lost
 
 -- 1. Craps ---------------------------------------------------------------------------
--- On the come-out roll, 7 or 11 wins and 2, 3 or 12 loses. Any other total becomes
--- the point, and the shooter rolls until the point (win) or a 7 (loss).
--- The probability of winning is 244/495 ≈ 0.492929.
+-- The shooter rolls two dice. On the first (come-out) roll, a total of 7 or 11 wins
+-- and 2, 3 or 12 loses. Any other total becomes the point, and the shooter keeps
+-- rolling until the point comes up again (a win) or a 7 does (a loss). The
+-- probability of winning is 244/495 ≈ 0.492929.
 system Craps {
   var phase : Phase := ComeOut
   var point : Num := 0
@@ -25,18 +27,20 @@ system Craps {
   }
 }
 claim shooter_wins : Craps |= eventually[100] phase == Won
-claim decided_on_come_out : Craps |= after[1] (phase == Won or phase == Lost)   -- 12/36
+claim decided_on_come_out : Craps |= after[1] (phase == Won or phase == Lost)   -- 12/36: 8 winning rolls, 4 losing
 
 -- 2. A game of tennis ------------------------------------------------------------------
--- The server wins each point with probability 0.6. A game is won with at least four
--- points and a lead of two. At deuce the probability of winning is p² / (1 - 2pq).
+-- The server wins each point with probability p = 0.6 and loses it with q = 0.4.
+-- Winning the game takes at least four points and a lead of two. From deuce, the
+-- server goes on to win with probability p² / (1 - 2pq).
 system Tennis {
   var server : Num := 0
   var receiver : Num := 0
   step {
     if not ((server >= 4 or receiver >= 4) and abs(server - receiver) >= 2) {
       if flip(0.6) { server := server + 1 } else { receiver := receiver + 1 }
-      -- deuce is the same state however long it lasts
+      -- every tie from 3-3 on is the same deuce state, so fold it back to 3-3 and
+      -- keep the number of states small
       if server >= 3 and receiver >= 3 and server == receiver { server := 3; receiver := 3 }
     }
   }
@@ -44,8 +48,10 @@ system Tennis {
 claim server_holds : Tennis |= eventually[200] (server >= 4 and server - receiver >= 2)
 
 -- 3. Penney's game -----------------------------------------------------------------------
--- A fair coin is flipped until HHT or HTT appears. HHT comes first with probability 2/3.
--- (0 = nothing yet, 1 = heads, 2 = tails)
+-- A fair coin is flipped until either HHT or HTT appears, and HHT comes first with
+-- probability 2/3. The variables before and last hold the previous two flips,
+-- coded as 0 = nothing yet, 1 = heads and 2 = tails; winner becomes 1 for HHT and
+-- 2 for HTT.
 system Penney {
   var before : Num := 0
   var last : Num := 0

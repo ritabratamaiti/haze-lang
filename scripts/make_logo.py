@@ -1,7 +1,10 @@
 """
-Generates the Haze logo: the letters H and A are solid, Z dissolves halfway into a LiDAR-style
-point cloud, and E is a point cloud entirely. Letters are built from straight-line geometry, so
-no font is involved.
+Draws the Haze logo, in which the word dissolves from left to right into a LiDAR-style point
+cloud. The H is solid, the A begins to melt into scan lines, the Z is mostly points and the E is
+entirely point cloud. Right at a letter's melt line the points are large enough to merge into
+the solid shape and share its color; further right they shrink, separate into scan rows and
+take on a depth color ramp. The letters are built from straight-line geometry, so no font is
+involved.
 
     python scripts/make_logo.py
 
@@ -29,13 +32,10 @@ def letter_A(x, w=88):
     xc = x + w / 2
     left = [(x, H), (x + sw, H), (xc + sw / 2, 0), (xc - sw / 2, 0)]
     right = [(x + w - sw, H), (x + w, H), (xc + sw / 2, 0), (xc - sw / 2, 0)]
-    # crossbar between the centre lines of the legs
-    yb0, yb1 = 60, 60 + S * 0.85
+    yb0, yb1 = 60, 60 + S * 0.85       # crossbar between the center lines of the legs
     def centre(y, side):
         t = y / H
-        if side < 0:
-            return (xc) * (1 - t) + (x + sw / 2) * t
-        return (xc) * (1 - t) + (x + w - sw / 2) * t
+        return xc * (1 - t) + ((x + sw / 2) if side < 0 else (x + w - sw / 2)) * t
     bar = [(centre(yb0, -1), yb0), (centre(yb0, 1), yb0), (centre(yb1, 1), yb1), (centre(yb1, -1), yb1)]
     return [left, right, bar], w
 
@@ -71,93 +71,112 @@ for name, make in (("H", letter_H), ("A", letter_A), ("Z", letter_Z), ("E", lett
     parts, w = make(x)
     glyphs[name] = (parts, x, x + w)
     x += w + GAP
-WIDTH = x - GAP + PAD + 34            # extra room on the right for drifting points
+WIDTH = x - GAP + PAD + 30            # room on the right for drifting points
 HEIGHT = H + 2 * PAD
 
-z_parts, z0, z1 = glyphs["Z"]
-Z_SPLIT = (z0 + z1) / 2               # Z is solid to the left of this line
-e_parts, e0, e1 = glyphs["E"]
+# The fraction of each letter's width that stays solid. The rest melts into points.
+SOLID = {"H": 1.0, "A": 0.62, "Z": 0.28, "E": 0.0}
+MELT = {n: glyphs[n][1] + f * (glyphs[n][2] - glyphs[n][1]) for n, f in SOLID.items() if f < 1}
 
-ROW_GAP, COL_GAP = 4.1, 2.45
-ROWS = [1.4 + k * ROW_GAP for k in range(int((H - 1.4) / ROW_GAP) + 1)]
-_edge_rng = random.Random(3)
-# where the solid part of Z ends on each scan row: a ragged edge around the middle of the letter
-EDGES = [Z_SPLIT + _edge_rng.uniform(-7, 4) for _ in ROWS]
+ROW_GAP, COL_GAP = 4.0, 2.3
+ROWS = [ROW_GAP / 2 + k * ROW_GAP for k in range(int(H / ROW_GAP))]
+R_MERGED = ROW_GAP * 0.63             # radius at which neighboring points overlap into a solid
+HAZE_START = min(MELT.values())
+HAZE_END = glyphs["E"][2]
+
+def smoothstep(u):
+    u = min(max(u, 0.0), 1.0)
+    return u * u * (3 - 2 * u)
 
 # ---- point cloud ------------------------------------------------------------------------------
-def point_cloud(seed=7):
+def point_cloud(seed=11):
+    """Returns a list of (x, y, radius, melt, drifting) tuples. melt is 0 where a point merges into
+    the solid letter and 1 where it is a fully separate, fully colored point; drifting marks the
+    stray points that float off to the right."""
     rng = random.Random(seed)
     pts = []
-    row_gap, col_gap = ROW_GAP, COL_GAP
-    for row, y in enumerate(ROWS):
-        xx = EDGES[row] + 0.8
-        while xx < e1 + 1:
-            px = xx + rng.uniform(-0.35, 0.35)
-            # scan rows bend slightly, like rings of a rotating LiDAR
-            py = y + 0.55 * math.sin(px / 23 + row * 0.7) + rng.uniform(-0.18, 0.18)
-            if px < z1 + 1 and in_shape(z_parts, px, py):
-                # density falls slowly to the right
-                t = max((px - Z_SPLIT) / (z1 - Z_SPLIT), 0)
-                keep = 0.97 - 0.12 * t
-                region = "Z"
-            elif in_shape(e_parts, px, py):
-                t = (px - e0) / (e1 - e0)
-                keep = 0.86 - 0.3 * t
-                region = "E"
-            else:
-                xx += col_gap; continue
-            if rng.random() < keep:
-                r = rng.uniform(0.82, 1.12)
-                # some points drift away to the right, more of them further right
-                drift = (0.03 if region == "Z" else 0.05 + 0.2 * t)
-                if rng.random() < drift:
-                    # a drifting copy leaves the glyph; the original point stays
-                    dx = rng.expovariate(1 / (7 if region == "Z" else 13))
-                    pts.append((px + dx, py + rng.gauss(0, 1.6) + PAD, r * 0.7))
-                pts.append((px, py + PAD - 0, r))
-            xx += col_gap
+    for name, edge in MELT.items():
+        parts, x0, x1 = glyphs[name]
+        for row, y in enumerate(ROWS):
+            melting = SOLID[name] > 0
+            melt_len = rng.uniform(14, 22)
+            xx = edge if melting else edge + COL_GAP / 2
+            while xx < x1 + 2:
+                d = xx - edge                                   # distance from the melt line
+                u = smoothstep(d / melt_len) if melting else 1.0
+                px = xx + rng.uniform(-0.3, 0.3) * u
+                py = y + (0.5 * math.sin(px / 21 + row * 0.6) + rng.uniform(-0.15, 0.15)) * u
+                xx += COL_GAP
+                if not in_shape(parts, px, py):
+                    continue
+                t = (px - HAZE_START) / (HAZE_END - HAZE_START)   # progress across the haze
+                r_far = 1.25 - 0.55 * t
+                r = R_MERGED * (1 - u) + r_far * rng.uniform(0.85, 1.1) * u
+                if u > 0.5 and rng.random() > 1 - 0.32 * t ** 1.4:
+                    continue                                    # thin the points out toward the right
+                pts.append((px, py + PAD, r, u, False))
+                if name == "E" and u > 0.9 and rng.random() < 0.01 + 0.14 * t ** 2:
+                    pts.append((px + rng.expovariate(1 / (4 + 10 * t)), py + PAD + rng.gauss(0, 1.4),
+                                r * 0.6, 1.0, True))
     return pts
 
 POINTS = point_cloud()
 
-# depth colouring along x, like a LiDAR intensity ramp
-RAMP = [(0.0, (20, 184, 166)), (0.5, (34, 211, 238)), (1.0, (99, 102, 241))]
+# depth coloring along x, like a LiDAR intensity ramp
+RAMP = [(0.0, (16, 185, 129)), (0.45, (34, 211, 238)), (1.0, (99, 102, 241))]
 def ramp(t):
     t = min(max(t, 0), 1)
     for (t0, c0), (t1, c1) in zip(RAMP, RAMP[1:]):
         if t <= t1:
-            u = (t - t0) / (t1 - t0)
-            return tuple(round(a + (b - a) * u) for a, b in zip(c0, c1))
+            v = (t - t0) / (t1 - t0)
+            return tuple(a + (b - a) * v for a, b in zip(c0, c1))
     return RAMP[-1][1]
 
-X_MIN, X_MAX = Z_SPLIT - 8, WIDTH - PAD
-def colour(px):
-    return ramp((px - X_MIN) / (X_MAX - X_MIN))
+def point_colour(px, melt, solid_rgb):
+    c = ramp((px - HAZE_START) / (WIDTH - PAD - HAZE_START))
+    m = smoothstep(melt)
+    return tuple(round(s * (1 - m) + v * m) for s, v in zip(solid_rgb, c))
 
 def opacity(px):
-    return 1.0 if px <= e1 else max(0.35, 1 - (px - e1) / 30)
+    return 1.0 if px <= HAZE_END else max(0.25, 1 - (px - HAZE_END) / 26)
+
+def hex_rgb(h):
+    return tuple(int(h[i:i + 2], 16) for i in (1, 3, 5))
 
 # ---- SVG ------------------------------------------------------------------------------------------
 def svg(solid_fill):
     f = lambda v: f"{v:.2f}".rstrip("0").rstrip(".")
-    def path(parts, dy):
-        return "".join("M" + "L".join(f"{f(px)},{f(py + dy)}" for px, py in p) + "Z" for p in parts)
+    solid_rgb = hex_rgb(solid_fill)
+    def path(parts):
+        return "".join("M" + "L".join(f"{f(px)},{f(py + PAD)}" for px, py in p) + "Z" for p in parts)
     out = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {f(WIDTH)} {f(HEIGHT)}" '
            f'width="{f(WIDTH * 4)}" height="{f(HEIGHT * 4)}" role="img" aria-label="Haze">',
-           '<title>Haze</title>',
-           '<defs><clipPath id="zsolid">' + ''.join(
-               f'<rect x="0" y="{f(PAD + y - ROW_GAP / 2)}" width="{f(e)}" height="{f(ROW_GAP + 0.02)}"/>'
-               for y, e in zip(ROWS, EDGES)) + '</clipPath></defs>',
-           f'<g fill="{solid_fill}">',
-           f'<path d="{path(glyphs["H"][0], PAD)}{path(glyphs["A"][0], PAD)}"/>',
-           f'<path clip-path="url(#zsolid)" d="{path(z_parts, PAD)}"/>',
-           '</g><g>']
-    for px, py, r in POINTS:
-        c = colour(px)
+           '<title>Haze</title><defs>']
+    for n in MELT:
+        if SOLID[n] > 0:
+            out.append(f'<clipPath id="solid{n}"><rect x="0" y="0" width="{f(MELT[n])}" height="{f(HEIGHT)}"/></clipPath>')
+        out.append(f'<clipPath id="shape{n}"><path d="{path(glyphs[n][0])}"/></clipPath>')
+    out.append(f'</defs><g fill="{solid_fill}">')
+    for n, frac in SOLID.items():
+        if frac == 1:
+            out.append(f'<path d="{path(glyphs[n][0])}"/>')
+        elif frac > 0:
+            out.append(f'<path clip-path="url(#solid{n})" d="{path(glyphs[n][0])}"/>')
+    out.append('</g>')
+    def circle(px, py, r, melt):
+        c = point_colour(px, melt, solid_rgb)
         o = opacity(px)
         op = "" if o >= 0.999 else f' fill-opacity="{f(o)}"'
-        out.append(f'<circle cx="{f(px)}" cy="{f(py)}" r="{f(r)}" fill="#{c[0]:02x}{c[1]:02x}{c[2]:02x}"{op}/>')
-    out.append("</g></svg>")
+        return f'<circle cx="{f(px)}" cy="{f(py)}" r="{f(r)}" fill="#{c[0]:02x}{c[1]:02x}{c[2]:02x}"{op}/>'
+    for n in MELT:
+        x0, x1 = glyphs[n][1], glyphs[n][2]
+        out.append(f'<g clip-path="url(#shape{n})">')
+        out += [circle(px, py, r, m) for px, py, r, m, dr in POINTS if not dr and x0 - 3 <= px <= x1 + 3
+                and in_shape(glyphs[n][0], px, py - PAD)]
+        out.append('</g>')
+    out.append('<g>')
+    out += [circle(px, py, r, m) for px, py, r, m, dr in POINTS if dr]
+    out.append('</g></svg>')
     return "\n".join(out) + "\n"
 
 # ---- PNG preview (PIL, supersampled) -------------------------------------------------------------
@@ -165,30 +184,41 @@ def png(path, solid_fill, background, scale=4):
     from PIL import Image, ImageDraw
     k = scale * 4                                    # supersampling factor
     W, Hh = int(WIDTH * k), int(HEIGHT * k)
+    solid_rgb = hex_rgb(solid_fill)
     img = Image.new("RGBA", (W, Hh), background)
-    rgb = tuple(int(solid_fill[i:i + 2], 16) for i in (1, 3, 5))
-    d = ImageDraw.Draw(img)
-    for name in ("H", "A"):
-        for p in glyphs[name][0]:
-            d.polygon([(px * k, (py + PAD) * k) for px, py in p], fill=rgb)
-    layer = Image.new("RGBA", (W, Hh), (0, 0, 0, 0))
-    dl = ImageDraw.Draw(layer)
-    for p in z_parts:
-        dl.polygon([(px * k, (py + PAD) * k) for px, py in p], fill=rgb)
-    mask = Image.new("L", (W, Hh), 0)
-    dm = ImageDraw.Draw(mask)
-    for y, e in zip(ROWS, EDGES):
-        dm.rectangle([0, (PAD + y - ROW_GAP / 2) * k, e * k, (PAD + y + ROW_GAP / 2) * k], fill=255)
-    clipped = Image.new("RGBA", (W, Hh), (0, 0, 0, 0))
-    clipped.paste(layer, (0, 0), mask)
-    img.alpha_composite(clipped)
-    dots = Image.new("RGBA", (W, Hh), (0, 0, 0, 0))
-    dd = ImageDraw.Draw(dots)
-    for px, py, r in POINTS:
-        c = colour(px)
-        dd.ellipse([(px - r) * k, (py - r) * k, (px + r) * k, (py + r) * k],
-                   fill=c + (round(255 * opacity(px)),))
-    img.alpha_composite(dots)
+    def poly(draw, parts, fill):
+        for p in parts:
+            draw.polygon([(px * k, (py + PAD) * k) for px, py in p], fill=fill)
+    for n, frac in SOLID.items():
+        if frac == 0:
+            continue
+        layer = Image.new("RGBA", (W, Hh), (0, 0, 0, 0))
+        poly(ImageDraw.Draw(layer), glyphs[n][0], solid_rgb)
+        if frac < 1:
+            layer = layer.crop((0, 0, int(MELT[n] * k), Hh))
+        img.alpha_composite(layer, (0, 0))
+    for n in MELT:
+        x0, x1 = glyphs[n][1], glyphs[n][2]
+        dots = Image.new("RGBA", (W, Hh), (0, 0, 0, 0))
+        dd = ImageDraw.Draw(dots)
+        for px, py, r, m, dr in POINTS:
+            if dr or not (x0 - 3 <= px <= x1 + 3 and in_shape(glyphs[n][0], px, py - PAD)):
+                continue
+            c = point_colour(px, m, solid_rgb)
+            dd.ellipse([(px - r) * k, (py - r) * k, (px + r) * k, (py + r) * k], fill=c + (255,))
+        mask = Image.new("L", (W, Hh), 0)
+        poly(ImageDraw.Draw(mask), glyphs[n][0], 255)
+        clipped = Image.new("RGBA", (W, Hh), (0, 0, 0, 0))
+        clipped.paste(dots, (0, 0), mask)
+        img.alpha_composite(clipped)
+    drift = Image.new("RGBA", (W, Hh), (0, 0, 0, 0))
+    dd = ImageDraw.Draw(drift)
+    for px, py, r, m, dr in POINTS:
+        if dr:
+            c = point_colour(px, m, solid_rgb)
+            dd.ellipse([(px - r) * k, (py - r) * k, (px + r) * k, (py + r) * k],
+                       fill=c + (round(255 * opacity(px)),))
+    img.alpha_composite(drift)
     img = img.resize((int(WIDTH * scale), int(HEIGHT * scale)), Image.LANCZOS)
     img.save(path)
 

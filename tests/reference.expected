@@ -1,26 +1,26 @@
-tests/reference.hz:10:1: info: work_ms ≤ 100 → work_ms ≠ 40 : Bool @prob
-tests/reference.hz:11:1: info: work_ms <= 100 -> work_ms != 40 : Bool @prob
-tests/reference.hz:16:1: info: #prob stored() and stored()
+tests/reference.hz:11:1: info: work_ms ≤ 100 → work_ms ≠ 40 : Bool @prob
+tests/reference.hz:12:1: info: work_ms <= 100 -> work_ms != 40 : Bool @prob
+tests/reference.hz:18:1: info: #prob stored() and stored()
   belief 0.87807 · plausibility 0.9801
   by fuzzy parameter (π = possibility):
     drop = 0.01  π 1       0.9801
     drop = 0.2   π 0.3     0.64
-tests/reference.hz:17:1: info: #prob once and once
+tests/reference.hz:19:1: info: #prob once and once
   belief 0.933 · plausibility 0.99
   by fuzzy parameter (π = possibility):
     drop = 0.01  π 1       0.99
     drop = 0.2   π 0.3     0.8
-tests/reference.hz:20:1: info: #eval let x := 3 in x * x
+tests/reference.hz:22:1: info: #eval let x := 3 in x * x
   9
-tests/reference.hz:21:1: info: #eval exists x in 1..5, x * x == 16
+tests/reference.hz:23:1: info: #eval exists x in 1..5, x * x == 16
   true
-tests/reference.hz:23:1: info: #eval 30 is not very hot
+tests/reference.hz:25:1: info: #eval 30 is not very hot
   deg 0.75
-tests/reference.hz:24:1: info: #eval not (30 is very hot)
+tests/reference.hz:26:1: info: #eval not (30 is very hot)
   deg 0.75
-tests/reference.hz:39:1: info: #eval L |= after[3] light
+tests/reference.hz:42:1: info: #eval L |= after[3] light
   Off
-tests/reference.hz:40:1: info: L ⊨ always[2] not crashed : Bool @prob
-tests/reference.hz:41:1: info: system L { light : Light, ticks : Num } @prob
-tests/reference.hz:42:1: info: def hot(x : Num) : Deg  latent grade @crisp
-tests/reference.hz:43:1: info: def once : Bool @prob+fuzzy
+tests/reference.hz:43:1: info: L ⊨ always[2] not crashed : Bool @prob
+tests/reference.hz:44:1: info: system L { light : Light, ticks : Num } @prob
+tests/reference.hz:45:1: info: def hot(x : Num) : Deg  latent grade @crisp
+tests/reference.hz:46:1: info: def once : Bool @prob+fuzzy

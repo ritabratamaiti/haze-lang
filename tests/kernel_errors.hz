@@ -1,5 +1,7 @@
--- Declarations the elaborator or kernel must reject. Every error is reported and
--- checking continues with the next declaration.
+-- Declarations that the elaborator or the kernel must reject, mixed with a few
+-- valid ones that the bad declarations refer to. Every error should be reported,
+-- and checking should carry on with the next declaration; the valid declaration
+-- at the end confirms that it does.
 
 param not_normal : Num ~= {1: 0.5, 2: 0.7}
 def weights : Num := {1: 0.5, 2: 0.6}
@@ -15,7 +17,8 @@ def runtime_degree : Deg := deg(five)
 def div0 : Num := 1 / (five - 5)
 def empty : Num := uniform(3, 1)
 
--- a failed node is not added, so later references are rejected cleanly
+-- A declaration that failed is never added, so a later reference to it gets a
+-- clean "unknown identifier" error.
 #eval runtime_degree
 
 system S {

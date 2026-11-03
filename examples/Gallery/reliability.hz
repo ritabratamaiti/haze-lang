@@ -1,9 +1,11 @@
--- Reliability engineering: redundancy, voting and repairable systems.
+-- Reliability engineering: how redundancy, majority voting and repair affect the
+-- chance that a system keeps working.
 
 -- 1. Triple modular redundancy ---------------------------------------------------
--- Three identical modules compute the same value (1). A working module outputs 1;
--- a failed module outputs an arbitrary value from 0 to 3. A voter outputs the
--- majority value. The module reliability is only known vaguely: "about 95%".
+-- Three identical modules compute the same value, which should come out as 1, and
+-- a voter outputs the majority value. A working module outputs 1, while a failed
+-- one outputs a random value from 0 to 3. The reliability r of a single module
+-- is only known roughly ("about 95%").
 param r : Num ~= {0.9: 0.5, 0.95: 1, 0.99: 0.7}
 
 input ok1 : Bool ~ flip(r)
@@ -15,23 +17,26 @@ def out3 : Num := if ok3 then 1 else uniform(0, 3)
 def voted : Num := if out1 == out2 then out1 else if out1 == out3 then out1 else out2
 def working : Num := (if ok1 then 1 else 0) + (if ok2 then 1 else 0) + (if ok3 then 1 else 0)
 
--- The voter masks any single failure.
+-- With at least two working modules the vote is always 1, so the voter masks any
+-- single failure.
 theorem masks_one_failure : working >= 2 implies voted == 1
 claim single_module : ok1                  -- r
 claim two_of_three : working >= 2          -- 3r² - 2r³
-claim voter_correct : voted == 1           -- slightly higher: failed modules may agree on 1
+claim voter_correct : voted == 1           -- slightly higher, since failed modules can still agree on 1
 
 -- 2. A series–parallel system ------------------------------------------------------
--- Two pumps in parallel (each works with probability 0.8), in series with a
--- valve (0.95): R = (1 - 0.2²) · 0.95 = 0.912.
+-- Flow gets through when at least one of two parallel pumps works (each with
+-- probability 0.8) and the valve in series with them also works (0.95), so the
+-- reliability is R = (1 - 0.2²) · 0.95 = 0.912.
 input pump_a : Bool ~ flip(0.8)
 input pump_b : Bool ~ flip(0.8)
 input valve : Bool ~ flip(0.95)
 claim flow : (pump_a or pump_b) and valve
 
 -- 3. A repairable server -------------------------------------------------------------
--- Each step a working server fails with probability 0.1, and a failed server is
--- repaired with probability 0.5. Its long-run availability is 0.5 / 0.6 = 5/6.
+-- In each step a working server fails with probability 0.1, and a failed server is
+-- repaired with probability 0.5. Its long-run availability is 0.5 / 0.6 = 5/6, and
+-- the downtime variable counts the steps it spends down.
 system Server {
   var up : Bool := true
   var downtime : Num := 0
@@ -45,5 +50,5 @@ system Server {
   }
 }
 claim available_at_50 : Server |= after[50] up        -- 5/6 + (1/6) · 0.4^50
-claim no_outage_in_24 : Server |= always[24] up       -- 0.9^24
+claim no_outage_in_24 : Server |= always[24] up       -- 0.9^24, no failure in 24 steps
 #expect Server |= after[24] downtime

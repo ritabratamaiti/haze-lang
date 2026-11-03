@@ -8,9 +8,9 @@ import Haze.Frontend
 /-!
 # Golden Tests
 
-Every `.hz` file in `tests/` and `examples/` is checked, and its output is compared with the
-`.expected` file next to it. Run the tests with `lake test`. After an intended change in
-output, regenerate the expected files with `lake exe hazetest --update`.
+Every `.hz` file under `tests/` and `examples/` is checked, and its output is compared with the
+`.expected` file next to it. Run the tests with `lake test`. When you change the output on
+purpose, regenerate the expected files with `lake exe hazetest --update`.
 -/
 
 def normalize (s : String) : String :=

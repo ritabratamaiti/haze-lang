@@ -1,8 +1,8 @@
-examples/Gallery/epidemic.hz:25:1: info: theorem people_conserved
+examples/Gallery/epidemic.hz:27:1: info: theorem people_conserved
   probability 1 — holds with certainty
   grade prob+fuzzy+partial · 3 parameter assignment(s) · ≤11 states/step
   theorem accepted
-examples/Gallery/epidemic.hz:26:1: info: #eval Household |= after[5] total
+examples/Gallery/epidemic.hz:28:1: info: #eval Household |= after[5] total
   when p = 0.2 (π 0.5):
     1  ↦ 0.4096
     2  ↦ 0.209715 (=16384/78125)
@@ -21,33 +21,33 @@ examples/Gallery/epidemic.hz:26:1: info: #eval Household |= after[5] total
     1  ↦ 0.0625
     3  ↦ 0.046875
     2  ↦ 0.03125
-examples/Gallery/epidemic.hz:27:1: info: #expect Household |= after[5] total
+examples/Gallery/epidemic.hz:29:1: info: #expect Household |= after[5] total
   lower expectation ≈2.685634 · upper expectation ≈3.626303
   by fuzzy parameter (π = possibility):
     p = 0.2  π 0.5     E ≈2.270137
     p = 0.3  π 1       E ≈3.10113
     p = 0.5  π 0.4     E 4.414063 (=565/128)
-examples/Gallery/epidemic.hz:28:1: info: claim large_outbreak
+examples/Gallery/epidemic.hz:30:1: info: claim large_outbreak
   belief 0.499703 · plausibility ≈0.733733 — graded
   grade prob+fuzzy+partial · 3 parameter assignment(s) · ≤11 states/step
   by fuzzy parameter (π = possibility):
     p = 0.2  π 0.5     0.380685 (=29741/78125)
     p = 0.3  π 1       ≈0.618721
     p = 0.5  π 0.4     0.90625
-examples/Gallery/epidemic.hz:29:1: info: claim over_in_two_generations
+examples/Gallery/epidemic.hz:31:1: info: claim over_in_two_generations
   belief ≈0.371679 · plausibility ≈0.587889 — graded
   grade prob+fuzzy+partial · 3 parameter assignment(s) · ≤6 states/step
   by fuzzy parameter (π = possibility):
     p = 0.2  π 0.5     ≈0.696937
     p = 0.3  π 1       ≈0.47884
     p = 0.5  π 0.4     0.210938 (=27/128)
-examples/Gallery/epidemic.hz:43:1: info: #expect Vaccinated |= after[5] total
+examples/Gallery/epidemic.hz:46:1: info: #expect Vaccinated |= after[5] total
   lower expectation 1.595 · upper expectation 1.9356
   by fuzzy parameter (π = possibility):
     p = 0.2  π 0.5     E 1.464
     p = 0.3  π 1       E 1.726
     p = 0.5  π 0.4     E 2.25
-examples/Gallery/epidemic.hz:44:1: info: claim vaccinated_large_outbreak
+examples/Gallery/epidemic.hz:47:1: info: claim vaccinated_large_outbreak
   belief 0.16 · plausibility 0.3296 — graded
   grade prob+fuzzy+partial · 3 parameter assignment(s) · ≤4 states/step
   by fuzzy parameter (π = possibility):

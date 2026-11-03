@@ -1,11 +1,13 @@
 # Haze Language Reference
 
-A Haze file describes a model of a software system and the questions to ask about it. Haze
-processes the file from top to bottom, one declaration at a time. Each declaration is
-elaborated, checked by the kernel and then executed. A declaration that is rejected produces
-an error message and is skipped, and processing continues with the next declaration.
+A Haze file holds a model and the questions you want to ask about it. Haze reads the file
+from top to bottom, one declaration at a time, checking each one with its kernel and then
+running it. If a declaration is rejected, Haze reports the error, skips it and carries on with
+the next one, so one mistake doesn't hide the results of the rest of the file.
 
-A typical file has the following parts, in this order:
+## The Parts of a File
+
+Because a declaration can only refer to the ones before it, most files follow the same order:
 
 1. Settings, such as the fuzzy logic in use
 2. Enumeration types
@@ -17,14 +19,13 @@ A typical file has the following parts, in this order:
 8. Claims and theorems
 9. Queries
 
-Later declarations can refer only to earlier ones. Each part is described below, followed by
-the expression and statement languages, the types and grades, and the meaning of the
-results.
+The sections below go through these parts in order. After them come the expression language,
+types and grades, and how to read Haze's output.
 
 ### 1. Settings
 
-`logic` selects the fuzzy logic used by `and`, `or` and `implies` when a degree is involved.
-It applies to the declarations that follow it:
+When `and`, `or` and `implies` combine degrees of truth, there is more than one reasonable way
+to do it. `logic` picks one, and the choice applies to the declarations that follow it:
 
 ```haze
 logic godel        -- min and max (the default; `zadeh` is a synonym)
@@ -34,8 +35,8 @@ logic lukasiewicz  -- max(0, a + b - 1) and min(1, a + b)
 
 ### 2. Enumeration Types
 
-An enumeration type has a fixed list of constructors. Constructor names must be unique in
-the file:
+An enumeration type lists its possible values. The names of the values must be unique in the
+file:
 
 ```haze
 enum Phase = Sending | Waiting | Done | GaveUp
@@ -43,37 +44,34 @@ enum Phase = Sending | Waiting | Done | GaveUp
 
 ### 3. Fuzzy Parameters
 
-A fuzzy parameter is a quantity whose value isn't known precisely and isn't random. It lists
-the values it could have, each with a degree of possibility between 0 and 1:
+Use a fuzzy parameter for a quantity you can't pin down but that isn't random either, such as
+a loss rate you only know roughly. You list the values it could plausibly have, each with a
+degree of possibility between 0 and 1:
 
 ```haze
 param loss : Num ~= {0.01: 0.6, 0.02: 1, 0.05: 0.5, 0.1: 0.2}
 ```
 
-The kernel requires that
-
-* at least one value has possibility 1, so that the parameter is _normal_,
-* every possibility lies between 0 and 1, and
-* no value is listed twice.
-
-Values must be literals of the declared type. A fuzzy parameter has the grade `fuzzy`.
+The values must be literals of the declared type, none may be listed twice, and at least one
+must have possibility 1 (the parameter must be _normal_, meaning that at least one value is
+fully plausible). Anything that depends on a fuzzy parameter has the grade `fuzzy`.
 
 ### 4. Random Inputs and Derived Values
 
-`input` declares a random value. `def` without parameters declares a value derived from
-earlier ones, which may also make its own random choices:
+`input` declares a random value with a given distribution. `def` without parameters declares a
+value computed from earlier ones, and it may make random choices of its own:
 
 ```haze
 input size : Size ~ {Small: 0.6, Medium: 0.3, Large: 0.1}
 def work_ms : Num := match size { Small => 40, Medium => 200, Large => 900 }
 ```
 
-Both have exactly one value in each _world_: every later reference to `size` sees the same
-value. The difference is in messages: the values of inputs are shown in `#outcomes` and in
-counterexamples, and the values of other definitions are not.
+Either way, the value is drawn once per _world_, so every later reference to `size` sees the
+same value. The only difference between the two is in Haze's messages: `#outcomes` and
+counterexamples show the values of inputs but not of other definitions.
 
-A definition may declare a grade after its type. The kernel rejects it if the inferred
-grade is not below the declared one:
+You can write the grade you expect after the type, and the kernel rejects the definition if
+its actual grade is higher:
 
 ```haze
 def noisy : Num @crisp := uniform(1, 3)   -- rejected: the term has grade prob
@@ -82,7 +80,8 @@ def noisy : Num @crisp := uniform(1, 3)   -- rejected: the term has grade prob
 ### 5. Functions and Fuzzy Sets
 
 A `def` with a parameter list declares a function. Unlike a value, a function makes fresh
-random choices each time it's called:
+random choices every time it's called, which is what you want for something like a network
+request:
 
 ```haze
 def call_succeeds(timeout : Num) : Bool :=
@@ -91,12 +90,12 @@ def call_succeeds(timeout : Num) : Bool :=
 def stored() : Bool := not flip(drop)    -- a new coin flip on every call
 ```
 
-Functions may be recursive. Each call uses one unit of _fuel_ (1000 by default, or the
-value of `--fuel`). A call that runs out of fuel has an _unknown_ outcome, which widens the
-result interval instead of being guessed. Recursive functions have the grade `partial`.
+Functions may be recursive. Each nested call uses one unit of _fuel_ (1000 by default, or the
+value of `--fuel`). When the fuel runs out, the outcome is treated as unknown rather than
+guessed, and it widens the result interval. Recursive functions have the grade `partial`.
 
-A function with one parameter that returns `Deg` is a _fuzzy set_, and it can be used with
-`is`:
+A function that takes one argument and returns a `Deg` describes a _fuzzy set_, such as "hot"
+or "slow", and you can test membership in it with `is`:
 
 ```haze
 def hot(x : Num) : Deg := ramp_up(x, 25, 35)
@@ -106,22 +105,21 @@ claim very_warm_day : temp is very hot
 
 ### 6. Observations
 
-`observe` conditions every world on a Boolean term that was observed to be true. The
-probabilities of the remaining worlds are rescaled by Bayes' rule:
+`observe` tells Haze that something was seen to be true. Worlds where it's false are discarded,
+and the probabilities of the rest are rescaled by Bayes' rule:
 
 ```haze
 observe timeouts
 observe not cache_misses
 ```
 
-The message reports the probability of the evidence. An observation that is impossible under
-every parameter value is rejected. An observation whose outcome is unknown because it ran
-out of fuel is also rejected.
+Haze reports how likely the evidence was. An observation is rejected if it's impossible under
+every parameter value, or if Haze can't decide it because it ran out of fuel.
 
 ### 7. Transition Systems
 
-A system has state variables with initial values and a `step` block that runs once per time
-step:
+A system has state variables, each with an initial value, and a `step` block that runs once
+per time step:
 
 ```haze
 system Worker {
@@ -141,7 +139,7 @@ system Worker {
 }
 ```
 
-The statements are
+The statements you can use in a step are:
 
 * `x := e`, which assigns to a state variable,
 * `let x := e`, which binds a local variable for the rest of the block,
@@ -151,13 +149,15 @@ The statements are
 * `assert e`, and
 * `skip`.
 
-Semicolons between statements are optional. If an `assert` fails, the system is _crashed_:
-the rest of the step is skipped and its state never changes again. Properties can refer to
-this with `crashed`.
+Semicolons between statements are optional. If an `assert` fails, the system _crashes_: the
+rest of the step is skipped and the state never changes again. Properties can check for this
+with `crashed`.
 
 ### 8. Claims and Theorems
 
-A claim computes how strongly a property holds:
+Claims and theorems are the questions you ask about a model. A claim asks how strongly a
+property holds, optionally with a bound it has to meet; a theorem asks Haze to show that the
+property always holds:
 
 ```haze
 claim double_charge_risk : Naive |= eventually[6] charges >= 2
@@ -166,12 +166,11 @@ claim stay_wins : pick == car with prob <= 0.34
 theorem single_charge : Idempotent |= always[6] charges <= 1
 ```
 
-* A claim without a bound is always accepted, and its interval is reported.
-* A claim `with prob >= q` is accepted if the belief is at least `q`.
-* A claim `with prob <= q` is accepted if the plausibility is at most `q`.
-* A theorem is accepted if the belief is 1. This means that the property holds on every path
-  of positive probability, for every parameter value of positive possibility, without any
-  unknown outcomes.
+A claim without a bound is always accepted, and Haze reports how strongly the property holds.
+A claim `with prob >= q` is accepted if the belief is at least `q`, and one `with prob <= q` if
+the plausibility is at most `q`. A theorem is accepted only if the belief is 1: the property
+holds on every path that can happen, for every plausible parameter value, with no unknown
+outcomes.
 
 A property is a term of type `Bool` or `Deg`, optionally about a system:
 
@@ -183,15 +182,16 @@ A property is a term of type `Bool` or `Deg`, optionally about a system:
 | `S \|= always[k] φ` | `φ` at every step from 0 to `k` |
 | `S \|= eventually[k] φ` | `φ` at some step from 0 to `k` |
 
-Within a property about `S`, the state variables of `S` and `crashed` are in scope. For a
-`Deg` property, `always` takes the minimum of the degrees along each path and `eventually`
-takes the maximum. A rejected theorem or bound is reported with a counterexample: the
-parameter values, inputs and state at the first step where the property fails, and the
-values of any leading `forall` variables that falsify it.
+In a property about `S`, you can use the state variables of `S` and `crashed`. For a `Deg`
+property, `always` takes the lowest degree along each path and `eventually` the highest.
+
+When a theorem or bound is rejected, Haze shows a counterexample: the parameter values, inputs
+and state at the first step where the property fails, and values for any leading `forall`
+variables that make it false.
 
 ### 9. Queries
 
-Queries print information without changing anything:
+Queries print information about the model without changing it:
 
 | Command | Prints |
 |---|---|
@@ -204,7 +204,7 @@ Queries print information without changing anything:
 
 ## Expressions
 
-From the loosest to the tightest binding, expressions are:
+The table lists the forms of expression from the loosest-binding to the tightest:
 
 | Syntax | Meaning |
 |---|---|
@@ -220,12 +220,13 @@ From the loosest to the tightest binding, expressions are:
 | `+`, `-` and then `*`, `/` | Arithmetic on exact rational numbers. |
 | `-x` | Negation of a number. |
 
-The connectives are Boolean when both sides are `Bool`. If either side is a `Deg`, they use
-the active fuzzy logic, with `true` as 1 and `false` as 0, and `not` is `1 - x`. The hedge
-`very` squares a degree.
+When both sides are `Bool`, the connectives are ordinary Boolean logic. If either side is a
+`Deg`, they use the active fuzzy logic instead, treating `true` as 1 and `false` as 0, and `not`
+becomes `1 - x`. The hedge `very` squares a degree, which makes a fuzzy set stricter.
 
-The atoms are numbers such as `3` and `0.25`, `true` and `false`, names, function calls,
-parenthesized expressions, `match e { C => a, _ => b }`, and categorical distributions:
+The simplest expressions are numbers such as `3` and `0.25`, `true` and `false`, names,
+function calls, expressions in parentheses, `match e { C => a, _ => b }`, and categorical
+distributions, which list values with their probabilities:
 
 ```haze
 {Small: 0.6, Medium: 0.3, Large: 0.1}
@@ -249,10 +250,11 @@ sum to 1.
 
 ## Types and Grades
 
-The types are `Bool`, `Num` (exact rational numbers), `Deg` (degrees between 0 and 1) and the
-declared enumeration types. A `Bool` can be used as a `Deg`, and a `Deg` can be used as a
-`Num`. A number can be used as a `Deg` if it lies between 0 and 1. The branches of a
-conditional are given their least common type.
+There are four kinds of type: `Bool`, `Num` (exact rational numbers), `Deg` (degrees of truth
+between 0 and 1) and the enumeration types you declare. A `Bool` can be used where a `Deg` is
+expected, and a `Deg` where a `Num` is expected; a number can be used as a `Deg` if it lies
+between 0 and 1. When the branches of a conditional have different types, the result takes the
+more general one.
 
 Every term also has a _grade_, which records the kinds of uncertainty it can carry:
 
@@ -263,8 +265,8 @@ Every term also has a _grade_, which records the kinds of uncertainty it can car
 | `fuzzy` | Depends on fuzzy parameters. |
 | `partial` | Calls a recursive function, so its outcome can be unknown. |
 
-Grades combine, as in `prob+fuzzy`. `#check` and `#print` show them, and `@` annotations
-on definitions limit them.
+Grades combine, as in `prob+fuzzy`. `#check` and `#print` show them, and an `@` annotation on a
+definition sets an upper limit.
 
 ## Lexical Structure
 
@@ -280,35 +282,31 @@ on definitions limit them.
 ## Results and Messages
 
 Every message has the form `file:line:column: severity: text`, where the severity is `info`
-or `error`. The result of a claim or `#prob` is
+or `error`.
 
-* a single probability when there are no fuzzy parameters and no unknown outcomes, or
-* a pair of belief and plausibility, where belief is the degree to which the model
-  guarantees the property and plausibility is the degree to which it allows it.
+When there are no fuzzy parameters and no unknown outcomes, the result of a claim or `#prob`
+is a single probability. Otherwise it's a pair: the _belief_, how strongly the model
+guarantees the property, and the _plausibility_, how strongly it allows it. If the result
+depends on the values of fuzzy parameters, a table shows the result for each value together
+with its possibility `π`. [`Design.md`](Design.md) gives the precise definitions.
 
-Numbers are exact. A number with a long decimal expansion is rounded and marked with `≈`, and
-the exact fraction follows when it is short, as in `0.666667 (=2/3)`. Numbers below 0.001 are
+All numbers are exact. A number with a long decimal expansion is rounded and marked with `≈`,
+followed by the exact fraction when it's short, as in `0.666667 (=2/3)`. Numbers below 0.001 are
 shown in scientific notation, as in `≈1.37018e-8 (=1/72982849)`.
-
-When the results differ between parameter values, a table shows the result for each value
-and its possibility `π`. The precise definitions are in [`Design.md`](Design.md).
 
 ## Command-Line Interface
 
-`haze [--fuel N] [--json] FILE.hz...` checks each file and prints its messages.
-
-* `--fuel N` sets the number of nested function calls after which an outcome becomes unknown.
-  The default is 1000.
-* `--json` prints one JSON record per message instead of text, as described below.
-
-The exit status is 0 if every declaration was accepted and 1 otherwise, so `haze` can be used
-in continuous integration.
+`haze [--fuel N] [--json] FILE.hz...` checks each file and prints its messages. `--fuel N` sets
+how deeply function calls can nest before an outcome counts as unknown (the default is 1000),
+and `--json` prints one JSON record per message instead of text, as described below. The exit
+status is 0 if every declaration was accepted and 1 otherwise, which makes `haze` easy to run in
+continuous integration.
 
 ### JSON Output
 
 With `--json`, each message is printed as a JSON object on its own line. Every record has the
-fields `file`, `line`, `column`, `severity` and `message`, which is the text that `haze` would
-otherwise print. Records for results also have a `kind` and further fields:
+fields `file`, `line`, `column`, `severity` and `message` (the text `haze` would otherwise
+print). Records that carry a result also have a `kind` and the fields below:
 
 | `kind` | Fields |
 |---|---|
@@ -323,16 +321,15 @@ otherwise print. Records for results also have a `kind` and further fields:
 and `possibility`; for properties it has the `lower` and `upper` bounds. A `counterexample` has
 the `step`, `parameters`, `inputs` and `state` at which a property fails, or is `null`.
 
-Numbers are exact: probabilities and numeric values are strings such as `"2/3"`, which
-libraries for exact fractions read directly. Booleans are JSON Booleans, enumeration values are
-the names of their constructors, and an unknown outcome has the value `null`.
+Numbers stay exact: probabilities and numeric values are strings such as `"2/3"`, which
+exact-fraction libraries (Python's `fractions.Fraction`, for example) read directly. Booleans
+are JSON Booleans, enumeration values are their names, and an unknown outcome is `null`.
 
 ## Limits
 
-Haze computes exact results by enumerating states, so models must be finite and bounded:
-
-* Horizons of temporal properties are at most 100000 steps.
-* `uniform` ranges and quantifier ranges have at most 100000 values, and `binomial` allows
-  at most 10000 trials.
-* At most 2000000 distinct configurations are kept per step. Configurations that are equal
-  are merged, and worlds are reduced to the variables that a property can read.
+Haze gets exact answers by enumerating every state, so models have to be finite and not too
+large. Temporal properties can look at most 100,000 steps ahead, `uniform` ranges and quantifier
+ranges can have at most 100,000 values, and `binomial` allows at most 10,000 trials. At most
+2,000,000 distinct configurations are kept per step, after merging equal configurations and
+dropping variables the property can't read. For scale, the models in this repository have up to
+about a thousand states per step, and each file checks in well under a minute.

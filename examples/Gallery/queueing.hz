@@ -1,9 +1,10 @@
--- Queueing: a network buffer with room for 4 packets.
+-- A queueing model of a network buffer that holds at most 4 packets.
 --
--- Each step the server sends the packet at the head of the queue with probability
--- 0.5, and then a new packet arrives with probability `arrival`. A packet that
--- arrives at a full buffer is dropped. The arrival rate during the busy hour is
--- only known vaguely: "usually 0.3, sometimes higher".
+-- In each step the server first sends the packet at the head of the queue with
+-- probability 0.5, and then a new packet arrives with probability `arrival`. A
+-- packet that arrives when the buffer is full is dropped. The arrival rate during
+-- the busy hour is only known roughly ("usually 0.3, sometimes higher"), so it is
+-- a fuzzy parameter and the results below are [belief, plausibility] intervals.
 
 param arrival : Num ~= {0.3: 1, 0.4: 0.6, 0.5: 0.3}
 

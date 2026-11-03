@@ -3,16 +3,19 @@ def warm(x : Num) : Deg := tri(x, 15, 22, 29)
 def a : Deg := 0.7
 def b : Deg := 0.4
 
--- Gödel (Zadeh) logic is the default: min / max / 1 - x
+-- The default logic uses the Gödel t-norm, so and and or are min and max. Like every
+-- logic in Haze it negates with 1 - x, which makes these Zadeh's original operators.
 #eval a and b
 #eval a or b
 #eval not a
 #eval a implies b
 
+-- Product logic: and multiplies, or is a + b - ab.
 logic product
 #eval a and b
 #eval a or b
 
+-- Łukasiewicz logic: and is max(0, a + b - 1), or is min(1, a + b).
 logic lukasiewicz
 #eval a and b
 #eval a or b
@@ -20,7 +23,7 @@ logic lukasiewicz
 #eval true and a
 
 logic godel
--- membership functions and hedges
+-- Back in Gödel logic: membership functions and hedges ("very" squares a degree).
 #eval 25 is warm
 #eval 25 is very warm
 #eval 25 is not very warm
@@ -28,7 +31,8 @@ logic godel
 #eval ramp_up(3, 0, 4)
 #eval ramp_down(3, 0, 4)
 
--- quantifiers over degrees use inf / sup
+-- Quantifiers over degrees take the infimum (forall) or the supremum (exists), so
+-- forall over the empty range 5..4 gives 1.
 #eval forall t in 18..22, t is warm
 #eval exists t in 18..22, t is warm
 #eval forall t in 5..4, t is warm

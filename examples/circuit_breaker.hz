@@ -1,10 +1,16 @@
--- Circuit breaker in front of a flaky upstream.
--- Closed: forward requests; 3 consecutive failures trip it to Open.
--- Open: reject requests for a 2-step cool-down, then HalfOpen.
--- HalfOpen: one trial request; success closes, failure re-opens.
+-- A circuit breaker in front of a flaky upstream service.
 --
--- The upstream failure rate is described linguistically ("flaky"), so it is a fuzzy
--- parameter; the incident itself is probabilistic.
+-- The breaker has three states:
+--   * Closed: requests go through to the upstream. Three failures in a row trip the
+--     breaker to Open.
+--   * Open: requests are rejected during a cool-down of two steps, after which the
+--     breaker moves to HalfOpen.
+--   * HalfOpen: one trial request goes through. If it succeeds the breaker closes,
+--     and if it fails the breaker opens again.
+--
+-- All we know about the upstream's failure rate is a word, "flaky". That makes the
+-- failure rate a fuzzy parameter, while each individual failure is still a random
+-- event.
 
 enum Breaker = Closed | Open | HalfOpen
 
@@ -14,7 +20,7 @@ system CB {
   var state : Breaker := Closed
   var consecutive : Num := 0
   var cooldown : Num := 0
-  var sent : Num := 0            -- requests that reached the upstream
+  var sent : Num := 0            -- requests that reached the upstream service
   var rejected : Num := 0
   step {
     match state {
@@ -42,18 +48,20 @@ system CB {
   }
 }
 
--- Safety invariants, proven for every path and every admissible failure rate.
+-- These safety properties are theorems: they hold on every path and for every
+-- admissible failure rate.
 theorem never_overloads : CB |= always[20] consecutive <= 3
 theorem no_crash : CB |= always[20] not crashed
 theorem open_has_cooldown : CB |= always[20] (state == Open implies cooldown >= 1)
 
--- How quickly does the breaker trip?
+-- How likely is the breaker to trip within the first six steps?
 claim trips_quickly : CB |= eventually[6] state == Open
--- Is it serving traffic after the incident window?
+-- Is it back to serving traffic after 20 steps?
 claim closed_at_20 : CB |= after[20] state == Closed
--- Load shedding: expected rejected requests over 20 steps.
+-- The expected number of requests rejected over 20 steps, which is the load shed.
 #expect CB |= after[20] rejected
 
--- A fuzzy service-level objective: "rejections are rare".
+-- An informal service-level objective, "rejections are rare", written as a fuzzy set:
+-- one rejection is fully rare, and eight or more are not rare at all.
 def rare(n : Num) : Deg := ramp_down(n, 1, 8)
 claim slo_rejections : CB |= after[20] rejected is rare

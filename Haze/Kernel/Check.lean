@@ -8,10 +8,11 @@ import Haze.Core
 /-!
 # Kernel Type Checker
 
-The kernel type checker re-checks every elaborated declaration, independently of the
-elaborator, before it enters the environment. It plays the role of Lean's C++ kernel
+The kernel type checker checks every elaborated declaration again, independently of the
+elaborator, before the declaration enters the environment. It plays the role of Lean's C++ kernel
 (reached through `Lean.Environment.addDecl`). Unlike Lean's kernel, it computes a graded
-judgement `Γ ⊢ e : T @ g` and enforces declared grades.
+judgement `Γ ⊢ e : T @ g`, and it rejects a declaration whose grade exceeds the grade written in
+its annotation, such as `@ prob`.
 
 ## Main Definitions
 
@@ -22,7 +23,10 @@ judgement `Γ ⊢ e : T @ g` and enforces declared grades.
 
 namespace Haze.Kernel
 
-/-- The checking monad of the kernel. Errors are rejection messages. -/
+/--
+The checking monad of the kernel. An error is the message explaining why a declaration was
+rejected.
+-/
 abbrev CheckM := Except String
 
 /--
@@ -34,12 +38,15 @@ structure TCtx where
   locals : List Ty := []
   sysVars : Array (String × Ty) := #[]
   inSystem : Bool := false
-  /-- The grade of state variables: `crisp` within a step, and the grade of the system in properties. -/
+  /--
+  The grade of the state variables: `crisp` inside the step of a system, and the grade of the
+  whole system in a property about it.
+  -/
   svarGrade : Grade := .crisp
 
 /--
-The type of a literal value. Degrees outside the interval from 0 to 1 and unknown constructors are
-rejected.
+Computes the type of a literal value. Rejects degrees outside the interval from 0 to 1 and
+constructors that the environment doesn't define.
 -/
 def typeOfValue (env : Env) : Value → CheckM Ty
   | .bool _ => pure .bool
@@ -50,8 +57,8 @@ def typeOfValue (env : Env) : Value → CheckM Ty
     | none => throw s!"kernel: unknown enum {ty}"
 
 /--
-The parameter types and result type of a primitive. Equality and inequality work at every type, so
-their signature is `none`.
+The parameter types and result type of a primitive. Equality and inequality accept two arguments
+of any one type, so they have no fixed signature and return `none`.
 -/
 def primSig : Prim → Option (List Ty × Ty)
   | .add | .sub | .mul | .div | .min | .max => some ([.num, .num], .num)
@@ -74,10 +81,11 @@ def expectTy (what : String) (expected actual : Ty) : CheckM Unit :=
     throw s!"kernel: type mismatch in {what}: expected {expected}, got {actual}"
 
 /--
-Infers the type and grade of a term, which is the graded judgement `Γ ⊢ e : T @ g`.
+Infers the type and grade of a term, that is, the graded judgement `Γ ⊢ e : T @ g`.
 
-Stochastic conditionals, random primitives and categorical choices add the grade `prob`, fuzzy
-parameters have the grade `fuzzy`, and calls add the latent grade of the function.
+The grade of a term joins the grades of its parts. Stochastic conditionals, random primitives and
+categorical choices add `prob`, a global variable contributes its own grade (`fuzzy` for a fuzzy
+parameter), and a call adds the latent grade of the function.
 -/
 partial def infer (c : TCtx) : Expr → CheckM (Ty × Grade)
   | .lit v => return (← typeOfValue c.env v, .crisp)
@@ -179,7 +187,7 @@ partial def infer (c : TCtx) : Expr → CheckM (Ty × Grade)
       g := g.join gb
     pure (t0, g)
 
-/-- Checks a statement and returns its grade. -/
+/-- Checks a statement of a system step and returns its grade. -/
 partial def checkStmt (c : TCtx) : Stmt → CheckM Grade
   | .skip => pure .crisp
   | .assign i e => do
@@ -214,19 +222,22 @@ partial def checkStmt (c : TCtx) : Stmt → CheckM Grade
     expectTy "assert" .bool tc
     pure g
 
-/-- Rejects a declaration whose inferred grade is not below its declared grade. -/
+/--
+Rejects a declaration that has a declared grade unless its inferred grade is less than or equal
+to the declared one.
+-/
 def checkDeclared (what : String) (declared : Option Grade) (actual : Grade) : CheckM Unit :=
   match declared with
   | some d => unless actual.le d do
       throw s!"kernel: grade mismatch for {what}: declared @{d} but the term is @{actual}"
   | none => pure ()
 
-/-- The largest horizon accepted in a temporal property. -/
+/-- The largest horizon `k` accepted in a temporal property. -/
 def maxHorizon : Nat := 100000
 
 /--
-Checks a property and returns its type and grade. If `allowNum` is `false`, the property must have
-type `Bool` or `Deg`.
+Checks a property and returns its type and grade. A property with a nonzero horizon must name a
+system. If `allowNum` is `false`, the property must have type `Bool` or `Deg`.
 -/
 def checkSpec (env : Env) (spec : PropSpec) (allowNum : Bool) : CheckM (Ty × Grade) := do
   let k := match spec.mode with | .after k | .always k | .eventually k => k
@@ -246,10 +257,11 @@ def checkSpec (env : Env) (spec : PropSpec) (allowNum : Bool) : CheckM (Ty × Gr
   pure (t, g)
 
 /--
-Checks a function and infers its latent grade.
+Checks a function and infers its latent grade, the grade that each call adds.
 
-For a recursive function, the latent grade is the least fixed point of grade inference. It exists
-and is reached after a few iterations because grades form a finite lattice.
+The body of a recursive function calls the function itself, so its grade depends on the latent
+grade being computed. The kernel therefore takes the least fixed point of grade inference, which
+exists and is reached after a few iterations because grades form a finite lattice.
 -/
 def checkFun (env : Env) (f : FunInfo) (declared : Option Grade) : CheckM FunInfo := do
   let base := if f.recursive then Grade.divergeG else .crisp
@@ -268,7 +280,8 @@ def checkFun (env : Env) (f : FunInfo) (declared : Option Grade) : CheckM FunInf
 
 /--
 Checks a declaration and adds it to the environment. This is the entry point of the kernel.
-Queries are checked but not added.
+Observations, claims and queries are checked but leave the environment unchanged; the front end
+adds a claim itself once the model checker has accepted it.
 -/
 def addDecl (env : Env) : Decl → CheckM Env
   | .logic l => pure { env with logic := l }

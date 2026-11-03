@@ -1,8 +1,8 @@
 """
 A payment client that retries charge requests over an unreliable network.
 
-This is the implementation under test. Its specification is payments.hz. The network is
-injected, so tests can control exactly which messages are lost.
+This is the implementation under test, and payments.hz is its specification. The network
+is passed in as an object, so a test can decide exactly which messages get lost.
 """
 from dataclasses import dataclass, field
 
@@ -40,7 +40,7 @@ class Result:
 
 
 def pay(network: Network, server: PaymentServer, key: str, amount: int) -> Result:
-    """Sends a charge request, retrying after a timeout up to MAX_ATTEMPTS times."""
+    """Sends a charge request and retries after each timeout, up to MAX_ATTEMPTS attempts in all."""
     latency = 0
     attempts = 0
     while attempts < MAX_ATTEMPTS:

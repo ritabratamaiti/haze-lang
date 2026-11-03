@@ -1,9 +1,12 @@
--- Progressive (canary) rollout of a release whose defect rate is uncertain.
--- Stages: 1% → 10% → 50% → 100% of traffic. At each stage monitoring samples
--- 50 requests; any failure triggers an automatic rollback.
+-- A progressive (canary) rollout of a release whose defect rate is uncertain.
 --
--- "The build is probably fine, but QA was rushed" is a fuzzy belief about the defect
--- rate, not a probability; Haze keeps that distinction and reports intervals.
+-- The release goes to 1% of traffic, then 10%, then 50%, and finally 100%. At each of
+-- the first three stages, monitoring samples 50 requests, and a single failure among
+-- them rolls the release back automatically.
+--
+-- "The build is probably fine, but QA was rushed" is a vague belief about the defect
+-- rate, not a probability, so the defect rate is a fuzzy parameter. Haze keeps the two
+-- kinds of uncertainty apart and reports intervals.
 
 enum Stage = Canary1 | Canary10 | Half | Full | RolledBack
 
@@ -13,7 +16,7 @@ def samples : Num := 50
 
 system Rollout {
   var stage : Stage := Canary1
-  var exposure : Num := 0          -- cumulative % of traffic exposed to the release
+  var exposure : Num := 0          -- sum of the traffic shares of the stages reached so far
   step {
     match stage {
       Canary1 => {
@@ -33,12 +36,13 @@ system Rollout {
   }
 }
 
--- If the build is bad it must not reach 100%. With a vague defect rate this is graded.
+-- A bad build must never reach 100% of traffic. Because the defect rate is vague,
+-- the answer is graded rather than a plain yes or no.
 claim bad_build_contained : Rollout |= always[4] (stage == Full implies defect == 0)
 claim reaches_full : Rollout |= eventually[4] stage == Full
 #expect Rollout |= after[4] exposure
 #outcomes Rollout |= after[4] stage
 
--- Statements conditional on the parameter can still be theorems:
--- a clean build always ships, whatever the admissible defect rate turns out to be.
+-- A statement that depends on the parameter can still be a theorem. Here, a clean
+-- build always ships, whatever the defect rate turns out to be.
 theorem ships_when_clean : Rollout |= after[4] (defect == 0 implies stage == Full)

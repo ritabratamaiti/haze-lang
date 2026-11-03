@@ -1,6 +1,8 @@
--- Incident triage: which component is at fault, given what monitoring observed?
--- Priors come from past incidents; alert behavior per root cause is probabilistic.
--- `observe` conditions every world on the evidence (exact Bayesian update).
+-- Incident triage: given what monitoring observed, which component is at fault?
+--
+-- The prior for each root cause comes from past incidents, and each cause makes each
+-- alert fire with some probability. `observe` then conditions every world on the
+-- alerts we actually saw, which is an exact Bayesian update.
 
 enum Cause = Database | Cache | Network | Deploy
 
@@ -16,8 +18,11 @@ input cache_misses : Bool ~ match cause {
   Database => flip(0.1), Cache => flip(0.95), Network => flip(0.2), Deploy => flip(0.1)
 }
 
+-- Before any evidence, the database is to blame 30% of the time.
 #prob cause == Database
 
+-- What monitoring saw: requests time out, the service returns 5xx errors, and the
+-- cache-miss alert stays quiet.
 observe timeouts
 observe error_5xx
 observe not cache_misses
@@ -25,5 +30,6 @@ observe not cache_misses
 #eval cause
 #outcomes cause == Database
 
--- Runbook policy: page the DB on-call only if the database is the likely cause.
+-- The runbook says to page the database on-call only if there is at least an even
+-- chance that the database is the cause.
 claim page_db_oncall : cause == Database with prob >= 0.5

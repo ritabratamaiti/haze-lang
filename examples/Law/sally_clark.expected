@@ -1,26 +1,26 @@
-examples/Law/sally_clark.hz:17:1: info: #eval one_sids * one_sids
+examples/Law/sally_clark.hz:18:1: info: #eval one_sids * one_sids
   ≈1.37018e-8 (=1/72982849)
-examples/Law/sally_clark.hz:18:1: info: #eval 1 / (700000 * one_sids * one_sids)
+examples/Law/sally_clark.hz:19:1: info: #eval 1 / (700000 * one_sids * one_sids)
   ≈104.261213
-examples/Law/sally_clark.hz:23:1: info: #eval 1 / (700000 * two_sids)
+examples/Law/sally_clark.hz:26:1: info: #eval 1 / (700000 * two_sids)
   when dependence = 5 (π 1):
     ≈20.852243
   when dependence = 10 (π 1):
     ≈10.426121
-examples/Law/sally_clark.hz:35:1: info: observe explanation != Neither
+examples/Law/sally_clark.hz:40:1: info: observe explanation != Neither
   evidence probability by fuzzy parameter:
     dependence = 5, odds = 4.5: ≈8.37335e-8 (=55/656845641)
     dependence = 5, odds = 9: ≈7.61214e-8 (=50/656845641)
     dependence = 10, odds = 4.5: ≈1.67467e-7 (=110/656845641)
     dependence = 10, odds = 9: ≈1.52243e-7 (=100/656845641)
-examples/Law/sally_clark.hz:36:1: info: #prob explanation == DoubleSIDS
+examples/Law/sally_clark.hz:41:1: info: #prob explanation == DoubleSIDS
   belief 0.818182 (=9/11) · plausibility 0.9
   by fuzzy parameter (π = possibility):
     dependence = 5, odds = 4.5   π 1       0.818182 (=9/11)
     dependence = 5, odds = 9     π 1       0.9
     dependence = 10, odds = 4.5  π 1       0.818182 (=9/11)
     dependence = 10, odds = 9    π 1       0.9
-examples/Law/sally_clark.hz:37:1: info: claim natural_more_likely
+examples/Law/sally_clark.hz:42:1: info: claim natural_more_likely
   belief 0.818182 (=9/11) · plausibility 0.9 — graded
   grade prob+fuzzy · 4 parameter assignment(s) · ≤2 states/step
   bound holds: belief ≥ 0.5

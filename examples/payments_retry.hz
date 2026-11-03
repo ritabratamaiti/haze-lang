@@ -1,8 +1,12 @@
--- Payments client with timeouts and retries over a lossy network.
+-- A payments client that times out and retries when the network loses a message.
 --
--- Question: with retries, can a customer be charged twice? How likely is delivery?
--- The network loss rate is only known vaguely ("around 2%, could be worse"),
--- so it is a fuzzy parameter; every answer is a [belief, plausibility] interval.
+-- Retries make delivery more likely, but they raise a worrying question: can a
+-- customer be charged twice? This file models two versions of the client and server
+-- to answer that, and to measure how often a payment gets through.
+--
+-- We only know the loss rate vaguely ("around 2%, could be worse"), so it is a fuzzy
+-- parameter rather than a probability, so answers that depend on it come out as
+-- [belief, plausibility] intervals.
 
 enum Phase = Sending | Waiting | Done | GaveUp
 
@@ -12,7 +16,8 @@ def max_attempts : Num := 3
 def timeout_ms : Num := 1000
 def rtt_ms : Num := 80
 
--- Server charges on every request it receives (no idempotency key).
+-- The naive version: the server charges the card for every request it receives,
+-- because requests carry no idempotency key it could use to spot a retry.
 system Naive {
   var phase : Phase := Sending
   var attempts : Num := 0
@@ -23,11 +28,11 @@ system Naive {
     match phase {
       Sending => {
         attempts := attempts + 1
-        if flip(loss) {                 -- request lost
+        if flip(loss) {                 -- the request is lost
           phase := Waiting
         } else {
-          charges := charges + 1        -- card is charged
-          if flip(loss) {               -- response lost
+          charges := charges + 1        -- the server charges the card
+          if flip(loss) {               -- the response is lost
             phase := Waiting
           } else {
             acked := true
@@ -36,7 +41,7 @@ system Naive {
           }
         }
       }
-      Waiting => {                      -- the timeout fires
+      Waiting => {                      -- no answer arrived, so the timeout fires
         latency := latency + timeout_ms
         if attempts < max_attempts { phase := Sending } else { phase := GaveUp }
       }
@@ -45,7 +50,8 @@ system Naive {
   }
 }
 
--- Same client, but the server deduplicates by idempotency key.
+-- The fixed version: the client is unchanged, but the server remembers each
+-- idempotency key and charges at most once per key.
 system Idempotent {
   var phase : Phase := Sending
   var attempts : Num := 0
@@ -59,7 +65,7 @@ system Idempotent {
         if flip(loss) {
           phase := Waiting
         } else {
-          if charges == 0 { charges := 1 }   -- replayed requests return the stored result
+          if charges == 0 { charges := 1 }   -- a retry gets the stored result, not a new charge
           if flip(loss) {
             phase := Waiting
           } else {
@@ -78,21 +84,26 @@ system Idempotent {
   }
 }
 
--- Fuzzy SLA: "fast" fades out between 200 ms and 2 s.
+-- The latency target is vague too, so it is a fuzzy set: a payment is fully "fast" up
+-- to 200 ms, and the degree falls to zero at 2 s.
 def fast(ms : Num) : Deg := ramp_down(ms, 200, 2000)
 
--- Delivery
+-- With three attempts, the payment should get through at least 99% of the time.
 claim delivered : Naive |= eventually[6] phase == Done with prob >= 0.99
 
--- The bug: a lost response plus a retry charges the card twice.
+-- Here is the bug. When the response is lost after the server has charged the card,
+-- the client retries and the card is charged again. Haze rejects this theorem and
+-- prints that path as a counterexample, and the claim after it says how likely it is.
 theorem naive_single_charge : Naive |= always[6] charges <= 1
 claim double_charge_risk : Naive |= eventually[6] charges >= 2
 
--- The fix is a theorem: it holds on every path, for every admissible loss rate.
+-- With idempotency keys the same property becomes a theorem: it holds on every path,
+-- whatever the loss rate turns out to be.
 theorem idempotent_single_charge : Idempotent |= always[6] charges <= 1
 theorem ack_implies_charged : Idempotent |= always[6] (acked implies charges == 1)
 
--- Fuzzy SLA over a stochastic system: expected degree of "fast" after the protocol settles.
+-- The latency target mixes both kinds of uncertainty: the latency is random and "fast"
+-- is fuzzy, so Haze reports the expected degree of "fast" once the protocol has settled.
 claim snappy : Idempotent |= after[6] latency is fast
 #expect Idempotent |= after[6] latency
 #eval Idempotent |= after[6] phase

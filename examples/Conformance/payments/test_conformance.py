@@ -1,17 +1,18 @@
 """
 Conformance test: checks payments_client.py against its Haze specification, payments.hz.
 
-The test follows the verification-guided development pattern (model, prove, then test the
-implementation against the model):
+The test follows the verification-guided development pattern, in which you model the
+system, prove properties of the model, and then test the implementation against it. It
+runs in four steps:
 
 1. Haze checks the specification. Every theorem and bound in payments.hz must be accepted.
-2. Every possible pattern of lost messages is run through the real implementation, with
-   the network injected. Each pattern has an exact probability, so the implementation's
-   outcome distributions are computed exactly, for every loss rate in the specification.
-3. These distributions must equal the ones that Haze computed from the model: exactly,
-   with no statistical tolerance. The safety theorems are also checked on every run.
-4. To show that the test can find bugs, it is run against mutants of the implementation,
-   and each mutant must be caught.
+2. The test runs the real implementation once for every possible pattern of lost messages,
+   with a scripted network. Each pattern has an exact probability, so this gives the exact
+   outcome distributions of the implementation for every loss rate in the specification.
+3. These distributions must equal the ones Haze computed from the model, exactly and with
+   no statistical tolerance. Every run is also checked against the safety theorems.
+4. To show that the test can find bugs, it is repeated against mutants of the
+   implementation, and each mutant must be caught.
 
 Run it from the repository root after `lake build`:
 
@@ -57,7 +58,7 @@ def model_distributions(records):
             loss = Fraction(b["parameters"]["loss"])
             model[(loss, observables[var])] = {
                 str(o["value"]): Fraction(o["probability"]) for o in b["distribution"]}
-        losses = sorted({loss for loss, _ in model})
+    losses = sorted({loss for loss, _ in model})
     expectations = {}
     for r in records:
         if r.get("kind") == "expect":
@@ -85,7 +86,12 @@ class ScriptedNetwork(impl.Network):
 
 
 def all_runs(make_server, loss):
-    """Yields (probability, result) for every pattern of lost messages."""
+    """Yields (probability, result) for every pattern of lost messages.
+
+    The search starts from an empty script. Whenever the implementation asks for a
+    decision that the script doesn't have, the script is extended both ways and each
+    extension is run again, so only patterns the implementation can reach are visited.
+    """
     stack = [()]
     while stack:
         script = stack.pop()
@@ -110,7 +116,7 @@ def implementation_distributions(make_server, loss):
         for obs in ("status", "charges", "attempts", "latency_ms"):
             dists[obs][str(getattr(res, obs))] += p
         expected_latency += p * res.latency_ms
-        # the theorems of the specification, checked on every run
+        # check the theorems of the specification on every single run
         if res.charges > 1: violations.append(f"single_charge violated: {res}")
         if res.acked and res.charges != 1: violations.append(f"ack_means_charged violated: {res}")
         if res.attempts > 3: violations.append(f"bounded_attempts violated: {res}")

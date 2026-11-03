@@ -8,14 +8,15 @@ import Haze.Core
 /-!
 # Concrete Syntax
 
-This file contains the lexer, the concrete syntax tree and the recursive-descent parser for
-Haze source files. It plays the role of `Lean.Parser` and `Lean.Syntax` in Lean, but the
+This file contains the lexer, the concrete syntax trees and the recursive-descent parser for Haze
+source files. Together they play the role of `Lean.Parser` and `Lean.Syntax`, except that the
 grammar is fixed rather than extensible.
 
 ## Main Definitions
 
 * `Haze.Syntax.lex`: splits a source file into tokens.
-* `Haze.Syntax.SExpr`, `Haze.Syntax.SStmt`, `Haze.Syntax.SDecl`: syntax trees.
+* `Haze.Syntax.SExpr`, `Haze.Syntax.SStmt`, `Haze.Syntax.SDecl`: the syntax trees of
+  expressions, statements and declarations.
 * `Haze.Syntax.program`: parses a complete source file.
 -/
 
@@ -29,7 +30,10 @@ structure Pos where
 
 instance : ToString Pos := ⟨fun p => s!"{p.line}:{p.col}"⟩
 
-/-- Tokens. Keywords are lexed as identifiers and recognized by the parser. -/
+/--
+The kinds of token. Keywords are lexed as identifiers and recognized by the parser, and commands
+such as `#eval` are lexed as symbols.
+-/
 inductive Tok where
   | ident (s : String)
   | num (q : Rat)
@@ -37,7 +41,7 @@ inductive Tok where
   | eof
   deriving Inhabited, Repr, BEq
 
-/-- A token, with its source position and the range of characters that it covers. -/
+/-- A token, with its source position and the range of character indices that it covers. -/
 structure Token where
   tok : Tok
   pos : Pos
@@ -52,12 +56,15 @@ def keywords : List String :=
    "and", "or", "not", "implies", "is", "very", "true", "false", "assert", "skip",
    "always", "eventually", "after"]
 
-/-- Symbols. Multi-character symbols come first so that the longest match wins. -/
+/--
+The symbols that the lexer recognizes. Multi-character symbols come first, so the lexer always
+takes the longest match.
+-/
 def symbols : List String :=
   [":=", "~=", "|=", "==", "!=", "<=", ">=", "=>", "->", "..",
    "(", ")", "{", "}", "[", "]", ",", ":", ";", "|", "@", "<", ">", "+", "-", "*", "/", "~", "_", "="]
 
-/-- Unicode spellings of ASCII symbols, such as `≤` for `<=` and `≈` for `~=`. -/
+/-- Maps a Unicode symbol to its ASCII spelling, such as `≤` to `<=` and `≈` to `~=`. -/
 def unicodeAlias : Char → Option String
   | '≈' => some "~=" | '≤' => some "<=" | '≥' => some ">=" | '≠' => some "!="
   | '⊨' => some "|=" | '→' => some "->" | '⇒' => some "=>" | _ => none
@@ -66,8 +73,8 @@ def isIdStart (c : Char) : Bool := c.isAlpha
 def isIdChar (c : Char) : Bool := c.isAlphanum || c == '_' || c == '\''
 
 /--
-Splits a source file into tokens. Line comments start with `--`, and block comments are written `/-
-… -/`.
+Splits a source file into tokens. Line comments start with `--`, and block comments are written
+`/- … -/`. On failure, returns the position and message of the first lexical error.
 -/
 def lex (src : String) : Except (Pos × String) (Array Token) := Id.run do
   let cs := src.toList.toArray
@@ -77,7 +84,8 @@ def lex (src : String) : Except (Pos × String) (Array Token) := Id.run do
   let mut col := 1
   let mut out : Array Token := #[]
   let charAt (j : Nat) : Char := cs.getD j '\x00'
-  -- fuel bound: each iteration consumes at least one character
+  -- `for` needs a bound. Every iteration consumes at least one character, so `n + 1`
+  -- iterations are enough.
   for _ in [0:n+1] do
     if i ≥ n then break
     let c := charAt i
@@ -85,7 +93,7 @@ def lex (src : String) : Except (Pos × String) (Array Token) := Id.run do
       i := i + 1; line := line + 1; col := 1; continue
     if c.isWhitespace then
       i := i + 1; col := col + 1; continue
-    -- comments
+    -- Skip comments.
     if c == '-' && charAt (i+1) == '-' then
       while i < n && charAt i != '\n' do i := i + 1
       continue
@@ -147,8 +155,8 @@ def lex (src : String) : Except (Pos × String) (Array Token) := Id.run do
 /-! ## Concrete syntax -/
 
 /--
-Expressions as written in the source, before names are resolved and types are checked. `atPos`
-records source positions for error messages.
+Expressions as written in the source, before names are resolved and types are checked. The
+parser wraps subexpressions in `atPos` to record their source positions for error messages.
 -/
 inductive SExpr where
   | num (q : Rat)
@@ -177,7 +185,10 @@ inductive SStmt where
   | atPos (p : Pos) (s : SStmt)
   deriving Inhabited, Repr
 
-/-- A property as written in the source: either a term or `S |= modality φ` for a system `S`. -/
+/--
+A property as written in the source: a term, optionally preceded by `S |=` and a temporal modality
+to evaluate it on the states of the system `S`.
+-/
 structure SProp where
   sys : Option String := none
   mode : Temporal := .after 0
@@ -199,7 +210,7 @@ inductive SDecl where
   | print (n : String)
   deriving Inhabited, Repr
 
-/-- A parsed declaration, with its position and source text. -/
+/-- A parsed declaration, with its position and its source text, which messages quote. -/
 structure DeclStx where
   decl : SDecl
   pos : Pos
@@ -212,7 +223,10 @@ structure PState where
   toks : Array Token
   i : Nat := 0
 
-/-- The parser monad. It tracks the current token and reports errors at a source position. -/
+/--
+The parser monad. It tracks the position in the token array and reports errors at a source
+position.
+-/
 abbrev P := StateT PState (Except (Pos × String))
 
 def peekTok : P Token := do let s ← get; pure (s.toks[s.i]?.getD s.toks.back!)
@@ -247,8 +261,8 @@ def number : P Rat := do
   | t => failAt s!"expected a number, found {describe t}"
 
 /--
-Parses items separated by `sep` until `close`, allowing a trailing separator. `close` is not
-consumed.
+Parses items separated by `sep` up to `close`, allowing a trailing separator. Doesn't consume
+`close`.
 -/
 def sepBy (p : P α) (sep : String) (close : String) : P (List α) := do
   let mut out := #[]
@@ -262,7 +276,9 @@ def sepBy (p : P α) (sep : String) (close : String) : P (List α) := do
       break
   return out.toList
 
-/-- Parses items until `close`, with optional `sep` separators between them. `close` is not consumed. -/
+/--
+Parses items up to `close`, with optional `sep` separators between them. Doesn't consume `close`.
+-/
 def itemsUntil (p : P α) (sep close : String) : P (List α) := do
   let mut out := #[]
   while !(← isSym close) do
@@ -279,7 +295,7 @@ mutual
 /--
 Parses an expression.
 
-From loosest to tightest, the levels of precedence are `if`, `let` and the quantifiers; `implies`;
+The precedence levels, from loosest to tightest, are `if`, `let` and the quantifiers; `implies`;
 `or`; `and`; `not`; comparisons and `is`; `+` and `-`; `*` and `/`; unary `-`; and atoms.
 -/
 partial def expr : P SExpr := withPos do
@@ -538,7 +554,7 @@ def decl : P SDecl := do
     else failAt s!"unknown command {c}"
   | tok => failAt s!"expected a declaration, found {describe tok}"
 
-/-- Parses a complete source file into its declarations. -/
+/-- Parses a complete source file into its declarations, each with its position and source text. -/
 def program (src : String) : Except (Pos × String) (Array DeclStx) := do
   let toks ← lex src
   let chars := src.toList.toArray
