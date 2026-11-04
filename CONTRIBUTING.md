@@ -38,5 +38,9 @@ Commit messages should start with a short summary line, followed by what changed
 
 ## License
 
-Haze is available under the [PolyForm Noncommercial License 1.0.0](LICENSE.md). By
-contributing, you agree that your contribution is available under the same license.
+Haze is available under the [Functional Source License 1.1](LICENSE.md) (FSL-1.1-ALv2). Before
+a pull request can be merged, its author needs to agree to the
+[contributor license agreement](CLA.md), by adding a comment to the pull request that says "I
+agree to the Haze contributor license agreement". The agreement lets Haze be offered under its
+current license, under the Apache License 2.0 when each release converts, and under commercial
+licenses, while you keep the copyright to your work.

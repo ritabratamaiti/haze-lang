@@ -7,7 +7,7 @@
 
 # Haze: Verifying Software with Uncertain Outcomes
 
-[![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-blue.svg)](LICENSE.md)
+[![License: FSL-1.1-ALv2](https://img.shields.io/badge/License-FSL--1.1--ALv2-blue.svg)](LICENSE.md)
 [![Lean 4](https://img.shields.io/badge/built%20with-Lean%204-blue.svg)](https://lean-lang.org)
 
 Haze is a small language for checking software that has to cope with things going wrong some
@@ -139,8 +139,13 @@ unknown (the default is 1000), and `--json` prints the results as JSON for other
 
 ## License
 
-Haze is available under the [PolyForm Noncommercial License 1.0.0](LICENSE.md), which allows
-personal, research, educational and other non-commercial use. For commercial use, please get
-in touch.
+Haze is available under the [Functional Source License 1.1](LICENSE.md) with Apache 2.0 as the
+future license (FSL-1.1-ALv2). You can use, modify and share Haze for any purpose, including
+inside a company and in commercial work, except offering it, or a product built on it with the
+same functionality, as a competing commercial product or service. Each release becomes
+available under the Apache License 2.0 two years after it is published. For a commercial
+license that covers other uses, please get in touch.
 
-Required Notice: Copyright (c) 2026 Ritabrata Maiti
+"Haze" and the Haze logo are trademarks of Ritabrata Maiti; see [TRADEMARKS.md](TRADEMARKS.md).
+
+Copyright 2026 Ritabrata Maiti

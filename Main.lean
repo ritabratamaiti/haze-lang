@@ -1,6 +1,6 @@
 /-
 Copyright (c) 2026 Ritabrata Maiti. All rights reserved.
-Released under the PolyForm Noncommercial License 1.0.0 as described in the file LICENSE.md.
+Released under the Functional Source License 1.1 (FSL-1.1-ALv2) as described in the file LICENSE.md.
 Authors: Ritabrata Maiti
 -/
 import Haze.Frontend
