@@ -1,44 +1,83 @@
-# Installs the latest release of Haze on Windows.
+# Installs Haze on Windows.
 #
 #   irm https://raw.githubusercontent.com/ritabratamaiti/haze-lang/main/install.ps1 | iex
 #
-# Set $env:HAZE_VERSION to install a particular release (for example v0.1.0),
-# $env:HAZE_INSTALL_DIR to choose where haze.exe goes (the default is
-# %LOCALAPPDATA%\Programs\haze), or $env:HAZE_ARCHIVE to install from an archive that is already
-# downloaded.
+# By default this downloads a prebuilt release and checks it against the release's checksums.
+# Set $env:HAZE_FROM_SOURCE = "1" to build Haze on your machine instead, the way Lean projects
+# are built: the script installs elan (Lean's toolchain manager) if needed, fetches the source
+# and runs `lake build`. A program you build yourself isn't treated as an untrusted download,
+# which helps on managed machines that block new unsigned programs.
+#
+# Other settings: $env:HAZE_VERSION picks a release (for example v0.1.0),
+# $env:HAZE_INSTALL_DIR picks where haze.exe goes (the default is
+# %LOCALAPPDATA%\Programs\haze), $env:HAZE_ARCHIVE installs from an archive that is already
+# downloaded, and $env:HAZE_SOURCE_DIR builds from a local checkout.
 $ErrorActionPreference = "Stop"
 $repo = "ritabratamaiti/haze-lang"
 $dir = if ($env:HAZE_INSTALL_DIR) { $env:HAZE_INSTALL_DIR } else { Join-Path $env:LOCALAPPDATA "Programs\haze" }
+$fromSource = [bool]$env:HAZE_FROM_SOURCE -or [bool]$env:HAZE_SOURCE_DIR
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ("haze-" + [Guid]::NewGuid())
 New-Item -ItemType Directory -Force $tmp | Out-Null
+
+function Get-LatestVersion {
+  try { (Invoke-RestMethod "https://api.github.com/repos/$repo/releases/latest").tag_name } catch { "" }
+}
+
 try {
-  $zip = Join-Path $tmp "haze.zip"
-  if ($env:HAZE_ARCHIVE) {
-    Copy-Item $env:HAZE_ARCHIVE $zip
+  if ($fromSource) {
+    if ($env:HAZE_SOURCE_DIR) {
+      $src = $env:HAZE_SOURCE_DIR
+    } else {
+      if (-not (Get-Command git -ErrorAction SilentlyContinue)) { throw "Building from source needs git." }
+      $version = if ($env:HAZE_VERSION) { $env:HAZE_VERSION } else { Get-LatestVersion }
+      if (-not $version) { $version = "main" }
+      Write-Host "Fetching the Haze source ($version)"
+      $src = Join-Path $tmp "src"
+      git -c advice.detachedHead=false clone --quiet --depth 1 --branch $version "https://github.com/$repo.git" $src
+      if ($LASTEXITCODE -ne 0) { throw "git clone failed." }
+    }
+    $elanBin = Join-Path $env:USERPROFILE ".elan\bin"
+    if (-not (Get-Command lake -ErrorAction SilentlyContinue)) {
+      if (-not (Test-Path (Join-Path $elanBin "lake.exe"))) {
+        Write-Host "Installing elan, the Lean toolchain manager"
+        $init = Join-Path $tmp "elan-init.ps1"
+        Invoke-WebRequest https://raw.githubusercontent.com/leanprover/elan/master/elan-init.ps1 -OutFile $init
+        & $init -NoPrompt 1 -DefaultToolchain none
+      }
+      $env:Path = "$elanBin;$env:Path"
+    }
+    Write-Host "Building Haze (the first build downloads the Lean toolchain and takes a few minutes)"
+    Push-Location $src
+    try { lake build haze; if ($LASTEXITCODE -ne 0) { throw "lake build failed." } } finally { Pop-Location }
+    $built = Join-Path $src ".lake\build\bin\haze.exe"
   } else {
-    $version = $env:HAZE_VERSION
-    if (-not $version) {
-      $version = (Invoke-RestMethod "https://api.github.com/repos/$repo/releases/latest").tag_name
+    $zip = Join-Path $tmp "haze.zip"
+    if ($env:HAZE_ARCHIVE) {
+      Copy-Item $env:HAZE_ARCHIVE $zip
+    } else {
+      $version = if ($env:HAZE_VERSION) { $env:HAZE_VERSION } else { Get-LatestVersion }
+      if (-not $version) { throw "Could not find the latest Haze release." }
+      $asset = "haze-$version-x86_64-windows.zip"
+      $base = "https://github.com/$repo/releases/download/$version"
+      Write-Host "Downloading Haze $version"
+      Invoke-WebRequest "$base/$asset" -OutFile $zip
+      # check the archive against the checksums published with the release
+      $sums = (Invoke-WebRequest "$base/SHA256SUMS" -UseBasicParsing).Content
+      if ($sums -is [byte[]]) { $sums = [Text.Encoding]::UTF8.GetString($sums) }
+      $line = $sums -split "`n" | Where-Object { $_ -match " $([regex]::Escape($asset))\s*$" } | Select-Object -First 1
+      $expected = if ($line) { ($line -split "\s+")[0] } else { "" }
+      $actual = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+      if (-not $expected -or $expected -ne $actual) {
+        throw "The download doesn't match the release checksum; not installing."
+      }
     }
-    $asset = "haze-$version-x86_64-windows.zip"
-    $base = "https://github.com/$repo/releases/download/$version"
-    Write-Host "Downloading Haze $version"
-    Invoke-WebRequest "$base/$asset" -OutFile $zip
-    # check the archive against the checksums published with the release
-    $sums = (Invoke-WebRequest "$base/SHA256SUMS" -UseBasicParsing).Content
-    if ($sums -is [byte[]]) { $sums = [Text.Encoding]::UTF8.GetString($sums) }
-    $line = $sums -split "`n" | Where-Object { $_ -match " $([regex]::Escape($asset))\s*$" } | Select-Object -First 1
-    $expected = if ($line) { ($line -split "\s+")[0] } else { "" }
-    $actual = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
-    if (-not $expected -or $expected -ne $actual) {
-      throw "The download doesn't match the release checksum; not installing."
-    }
+    Expand-Archive $zip -DestinationPath $tmp
+    $built = (Get-ChildItem -Path $tmp -Recurse -Filter haze.exe | Select-Object -First 1).FullName
   }
-  Expand-Archive $zip -DestinationPath $tmp
+
   New-Item -ItemType Directory -Force $dir | Out-Null
-  $exe = Get-ChildItem -Path $tmp -Recurse -Filter haze.exe | Select-Object -First 1
   $installed = Join-Path $dir "haze.exe"
-  Copy-Item $exe.FullName $installed -Force
+  Copy-Item $built $installed -Force
   Unblock-File $installed
   $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
   if (-not ($userPath -split ";" | Where-Object { $_ -eq $dir })) {
@@ -54,9 +93,9 @@ try {
     Write-Host "Installed $version to $dir"
   } else {
     Write-Host "Installed haze to $dir, but Windows didn't let it run yet."
-    Write-Host "Managed devices often block new unsigned programs; if haze keeps failing with"
-    Write-Host "'Access is denied', ask your IT department to allow it, or build Haze from source."
+    Write-Host "Managed devices often block new unsigned programs. Building from source usually"
+    Write-Host "avoids this: set `$env:HAZE_FROM_SOURCE = '1' and run the installer again."
   }
 } finally {
-  Remove-Item -Recurse -Force $tmp
+  Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
 }

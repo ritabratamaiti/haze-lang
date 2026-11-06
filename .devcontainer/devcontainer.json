@@ -1,0 +1,10 @@
+{
+  "name": "Haze",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "postCreateCommand": "sh install.sh || HAZE_SOURCE_DIR=\"$PWD\" sh install.sh",
+  "remoteEnv": { "PATH": "${containerEnv:HOME}/.local/bin:${containerEnv:PATH}" },
+  "customizations": {
+    "codespaces": { "openFiles": ["examples/Tutorial/JobWorker.hz", "README.md"] },
+    "vscode": { "settings": { "files.associations": { "*.hz": "plaintext" } } }
+  }
+}

@@ -107,6 +107,34 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$TAG" "$ASSET" --clobber
 
+  docker:
+    name: Docker image
+    needs: create
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.TAG }}
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Build and smoke-test the image
+        run: |
+          docker build -t haze:release .
+          docker run --rm haze:release --version
+      - name: Push ghcr.io/OWNER/haze:VERSION and :latest
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/haze"
+          for t in "${TAG#v}" latest; do
+            docker tag haze:release "$image:$t"
+            docker push "$image:$t"
+          done
+
   checksums:
     name: Publish checksums
     needs: build

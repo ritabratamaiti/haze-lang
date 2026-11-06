@@ -1,0 +1,70 @@
+name: Set up Haze
+description: Installs the haze command from a Haze release, and optionally checks Haze models.
+author: Ritabrata Maiti
+branding:
+  icon: check-circle
+  color: blue
+
+inputs:
+  version:
+    description: The release to install, such as v0.1.0, or "latest".
+    default: latest
+  files:
+    description: >
+      Haze files to check, separated by spaces; glob patterns such as models/*.hz work. When
+      empty, the action only installs haze. The step fails if any declaration is rejected.
+    default: ""
+  args:
+    description: Extra arguments for haze, such as --json or --states 5000.
+    default: ""
+  token:
+    description: The token used to download the release.
+    default: ${{ github.token }}
+
+outputs:
+  version:
+    description: The release that was installed.
+    value: ${{ steps.install.outputs.version }}
+
+runs:
+  using: composite
+  steps:
+    - id: install
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        HAZE_VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+        repo="ritabratamaiti/haze-lang"
+        case "$RUNNER_OS-$RUNNER_ARCH" in
+          Linux-X64) target=x86_64-linux; ext=tar.gz ;;
+          macOS-ARM64) target=aarch64-macos; ext=tar.gz ;;
+          Windows-X64) target=x86_64-windows; ext=zip ;;
+          *) echo "::error::There is no prebuilt Haze for $RUNNER_OS $RUNNER_ARCH"; exit 1 ;;
+        esac
+        version="$HAZE_VERSION"
+        if [ "$version" = latest ]; then
+          version="$(gh release view -R "$repo" --json tagName -q .tagName)"
+        fi
+        asset="haze-$version-$target.$ext"
+        dest="$RUNNER_TEMP/haze-$version"
+        mkdir -p "$dest"
+        gh release download "$version" -R "$repo" -p "$asset" -p SHA256SUMS -D "$dest" --clobber
+        cd "$dest"
+        # check the archive against the checksums published with the release
+        grep " $asset\$" SHA256SUMS > expected.sha256
+        if command -v sha256sum >/dev/null 2>&1; then sha256sum -c expected.sha256
+        else shasum -a 256 -c expected.sha256; fi
+        if [ "$ext" = zip ]; then unzip -q -o "$asset"; else tar xzf "$asset"; fi
+        echo "$dest/haze-$version-$target" >> "$GITHUB_PATH"
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+        echo "Installed Haze $version"
+
+    - if: inputs.files != ''
+      shell: bash
+      env:
+        HAZE_FILES: ${{ inputs.files }}
+        HAZE_ARGS: ${{ inputs.args }}
+      # the variables are left unquoted on purpose, so that globs and separate arguments expand
+      run: haze $HAZE_ARGS $HAZE_FILES
