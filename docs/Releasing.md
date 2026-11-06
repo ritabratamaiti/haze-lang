@@ -23,8 +23,9 @@ release with the same tag, so publish the release before announcing the tag. The
 [Distribution workflow](../.github/workflows/distribution.yml) tests the source install, the
 action and the Docker image whenever they change.
 
-Pushing the Docker image needs a repository secret named `GHCR_TOKEN`, because GitHub doesn't
-let a workflow's built-in token create a package in a personal account. Create a classic token
+The workflow pushes the Docker image with its built-in token. If GitHub refuses the push with
+`denied`, which can happen when a package is first created in a personal account, add a
+repository secret named `GHCR_TOKEN` and the workflow will use it instead. Create a classic token
 with only the `write:packages` scope at
 <https://github.com/settings/tokens/new?scopes=write:packages&description=haze-ghcr>, then:
 
