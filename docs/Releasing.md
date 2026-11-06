@@ -10,7 +10,7 @@
    silicon and Windows x86-64 archives, smoke-tests each binary, and attaches the archives and a
    `SHA256SUMS` file to a draft release. For a public repository, it also records build
    provenance for each archive. It also builds the Docker image and pushes it to
-   `ghcr.io/ritabratamaiti/haze` as `X.Y.Z` and `latest`.
+   `ghcr.io/ritabratamaiti/haze-lang` as `X.Y.Z` and `latest`.
 4. Check the draft on the releases page, then publish it:
    `gh release edit vX.Y.Z --draft=false`.
 

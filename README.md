@@ -143,7 +143,7 @@ There are three other ways to run Haze:
 
 - **In the browser.** The *Open in GitHub Codespaces* button above starts an editor with Haze
   installed and the tutorial open.
-- **With Docker.** `docker run --rm -v "$PWD:/work" ghcr.io/ritabratamaiti/haze model.hz`
+- **With Docker.** `docker run --rm -v "$PWD:/work" ghcr.io/ritabratamaiti/haze-lang model.hz`
   checks `model.hz` in the current directory.
 - **In GitHub Actions.** This step installs Haze and fails the build if any declaration is
   rejected:

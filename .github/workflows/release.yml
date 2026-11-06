@@ -127,9 +127,9 @@ jobs:
         run: |
           docker build -t haze:release .
           docker run --rm haze:release --version
-      - name: Push ghcr.io/OWNER/haze:VERSION and :latest
+      - name: Push ghcr.io/OWNER/haze-lang:VERSION and :latest
         run: |
-          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/haze"
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/haze-lang"
           for t in "${TAG#v}" latest; do
             docker tag haze:release "$image:$t"
             docker push "$image:$t"

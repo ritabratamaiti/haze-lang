@@ -1,7 +1,7 @@
 # A small image with the haze command. It builds Haze from source with the Lean toolchain,
 # then copies only the binary and the examples into the final image.
 #
-#   docker run --rm -v "$PWD:/work" ghcr.io/ritabratamaiti/haze model.hz
+#   docker run --rm -v "$PWD:/work" ghcr.io/ritabratamaiti/haze-lang model.hz
 
 FROM debian:bookworm-slim AS build
 RUN apt-get update \
