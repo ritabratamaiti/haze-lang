@@ -37,10 +37,16 @@ try {
   }
   # antivirus software may hold a new executable for a moment while it scans it
   $version = $null
-  for ($i = 0; $i -lt 10 -and -not $version; $i++) {
-    try { $version = & $installed --version } catch { Start-Sleep -Milliseconds 500 }
+  for ($i = 0; $i -lt 3 -and -not $version; $i++) {
+    try { $version = & $installed --version } catch { Start-Sleep -Seconds 1 }
   }
-  Write-Host ("Installed " + $(if ($version) { $version } else { "haze" }) + " to $dir")
+  if ($version) {
+    Write-Host "Installed $version to $dir"
+  } else {
+    Write-Host "Installed haze to $dir, but Windows didn't let it run yet."
+    Write-Host "Managed devices often block new unsigned programs; if haze keeps failing with"
+    Write-Host "'Access is denied', ask your IT department to allow it, or build Haze from source."
+  }
 } finally {
   Remove-Item -Recurse -Force $tmp
 }
