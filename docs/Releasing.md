@@ -23,6 +23,16 @@ release with the same tag, so publish the release before announcing the tag. The
 [Distribution workflow](../.github/workflows/distribution.yml) tests the source install, the
 action and the Docker image whenever they change.
 
+Pushing the Docker image needs a repository secret named `GHCR_TOKEN`, because GitHub doesn't
+let a workflow's built-in token create a package in a personal account. Create a classic token
+with only the `write:packages` scope at
+<https://github.com/settings/tokens/new?scopes=write:packages&description=haze-ghcr>, then:
+
+```sh
+gh secret set GHCR_TOKEN -R ritabratamaiti/haze-lang   # paste the token when asked
+gh workflow run release.yml -R ritabratamaiti/haze-lang -f tag=vX.Y.Z
+```
+
 A Docker image pushed from a private repository stays private when the repository is made public.
 Change its visibility once in the package settings on GitHub.
 
