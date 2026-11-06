@@ -152,6 +152,7 @@ explores (the default is 100,000), and `--json` prints the results as JSON for o
 
 - [Language reference](docs/Language-Reference.md)
 - [Design and semantics](docs/Design.md), including how Haze relates to Lean
+- [Releasing](docs/Releasing.md), for maintainers
 - [Test suite](tests/README.md)
 - [Release notes](RELEASES.md)
 - [Contributing](CONTRIBUTING.md)
