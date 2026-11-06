@@ -20,9 +20,19 @@ try {
     if (-not $version) {
       $version = (Invoke-RestMethod "https://api.github.com/repos/$repo/releases/latest").tag_name
     }
-    $url = "https://github.com/$repo/releases/download/$version/haze-$version-x86_64-windows.zip"
+    $asset = "haze-$version-x86_64-windows.zip"
+    $base = "https://github.com/$repo/releases/download/$version"
     Write-Host "Downloading Haze $version"
-    Invoke-WebRequest $url -OutFile $zip
+    Invoke-WebRequest "$base/$asset" -OutFile $zip
+    # check the archive against the checksums published with the release
+    $sums = (Invoke-WebRequest "$base/SHA256SUMS" -UseBasicParsing).Content
+    if ($sums -is [byte[]]) { $sums = [Text.Encoding]::UTF8.GetString($sums) }
+    $line = $sums -split "`n" | Where-Object { $_ -match " $([regex]::Escape($asset))\s*$" } | Select-Object -First 1
+    $expected = if ($line) { ($line -split "\s+")[0] } else { "" }
+    $actual = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+    if (-not $expected -or $expected -ne $actual) {
+      throw "The download doesn't match the release checksum; not installing."
+    }
   }
   Expand-Archive $zip -DestinationPath $tmp
   New-Item -ItemType Directory -Force $dir | Out-Null
