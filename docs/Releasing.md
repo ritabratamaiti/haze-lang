@@ -9,12 +9,28 @@
 3. The [release workflow](../.github/workflows/release.yml) builds Linux x86-64, macOS Apple
    silicon and Windows x86-64 archives, smoke-tests each binary, and attaches the archives and a
    `SHA256SUMS` file to a draft release. For a public repository, it also records build
-   provenance for each archive.
+   provenance for each archive. It also builds the Docker image and pushes it to
+   `ghcr.io/ritabratamaiti/haze` as `X.Y.Z` and `latest`.
 4. Check the draft on the releases page, then publish it:
    `gh release edit vX.Y.Z --draft=false`.
 
 To rebuild the archives for an existing tag, run the workflow by hand:
 `gh workflow run release.yml -f tag=vX.Y.Z`.
+
+The GitHub Action in [`action.yml`](../action.yml) is used as
+`ritabratamaiti/haze-lang@vX.Y.Z`, so each tag is also an action version. It downloads the
+release with the same tag, so publish the release before announcing the tag. The
+[Distribution workflow](../.github/workflows/distribution.yml) tests the source install, the
+action and the Docker image whenever they change.
+
+A Docker image pushed from a private repository stays private when the repository is made public.
+Change its visibility once in the package settings on GitHub.
+
+## A browser playground
+
+Haze can't run in the browser yet. Lean stopped publishing WebAssembly builds of its runtime after
+version 4.15, and Lean programs need threads, which a static page on GitHub Pages can't enable.
+Until that changes, GitHub Codespaces gives people a way to try Haze without installing it.
 
 ## How users can check a download
 

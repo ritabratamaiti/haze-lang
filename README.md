@@ -9,6 +9,7 @@
 
 [![License: FSL-1.1-ALv2](https://img.shields.io/badge/License-FSL--1.1--ALv2-blue.svg)](LICENSE.md)
 [![Lean 4](https://img.shields.io/badge/built%20with-Lean%204-blue.svg)](https://lean-lang.org)
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/ritabratamaiti/haze-lang)
 
 Haze is a small language for checking software that has to cope with things going wrong some
 of the time. You write a model of a system, such as a payment client that retries failed
@@ -129,7 +130,32 @@ irm https://raw.githubusercontent.com/ritabratamaiti/haze-lang/main/install.ps1 
 
 The [releases page](https://github.com/ritabratamaiti/haze-lang/releases) has the same builds as
 archives, each with the examples, so you can run `haze examples/payments_retry.hz` straight
-away. On other platforms, build Haze from source as described below.
+away. Both scripts check each download against the checksums published with the release.
+
+To build Haze on your own machine instead, the way Lean projects are built, set
+`HAZE_FROM_SOURCE=1` (in PowerShell, `$env:HAZE_FROM_SOURCE = "1"`) before running the script.
+It installs [elan](https://github.com/leanprover/elan) if you don't have it, fetches the source
+and runs `lake build`; the first build takes a few minutes. Platforms without a prebuilt release
+are built from source automatically. This also helps on managed Windows machines that block new
+unsigned programs, since a program you build yourself isn't treated as a download.
+
+There are three other ways to run Haze:
+
+- **In the browser.** The *Open in GitHub Codespaces* button above starts an editor with Haze
+  installed and the tutorial open.
+- **With Docker.** `docker run --rm -v "$PWD:/work" ghcr.io/ritabratamaiti/haze model.hz`
+  checks `model.hz` in the current directory.
+- **In GitHub Actions.** This step installs Haze and fails the build if any declaration is
+  rejected:
+
+  ```yaml
+  - uses: ritabratamaiti/haze-lang@v0.1.0
+    with:
+      files: models/*.hz
+  ```
+
+  Without `files`, the step only installs `haze` for later steps. `args` passes options such as
+  `--json`, and `version` picks a release.
 
 ## Build
 
