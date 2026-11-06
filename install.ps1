@@ -27,13 +27,20 @@ try {
   Expand-Archive $zip -DestinationPath $tmp
   New-Item -ItemType Directory -Force $dir | Out-Null
   $exe = Get-ChildItem -Path $tmp -Recurse -Filter haze.exe | Select-Object -First 1
-  Copy-Item $exe.FullName (Join-Path $dir "haze.exe") -Force
+  $installed = Join-Path $dir "haze.exe"
+  Copy-Item $exe.FullName $installed -Force
+  Unblock-File $installed
   $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
   if (-not ($userPath -split ";" | Where-Object { $_ -eq $dir })) {
     [Environment]::SetEnvironmentVariable("Path", "$userPath;$dir", "User")
     Write-Host "Added $dir to your PATH. Open a new terminal to use it."
   }
-  Write-Host ("Installed " + (& (Join-Path $dir "haze.exe") --version) + " to $dir")
+  # antivirus software may hold a new executable for a moment while it scans it
+  $version = $null
+  for ($i = 0; $i -lt 10 -and -not $version; $i++) {
+    try { $version = & $installed --version } catch { Start-Sleep -Milliseconds 500 }
+  }
+  Write-Host ("Installed " + $(if ($version) { $version } else { "haze" }) + " to $dir")
 } finally {
   Remove-Item -Recurse -Force $tmp
 }
