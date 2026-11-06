@@ -3,7 +3,7 @@
 Haze doesn't promise backwards compatibility between versions yet. When a release breaks
 existing models, its notes will say so.
 
-## v0.1.0 (unreleased)
+## v0.1.0 (6 November 2026)
 
 This is the first version of Haze.
 
@@ -53,7 +53,10 @@ property holds, taken from a parameter value that breaks the bound.
 
 ### Tools
 
-The `haze` command checks models and supports `--fuel`, `--states` and JSON output (`--json`).
+The `haze` command checks models and supports `--fuel`, `--states`, `--version` and JSON
+output (`--json`). Prebuilt binaries are available for Linux (x86-64), macOS (Apple silicon) and
+Windows (x86-64), with install scripts for each. Haze is released under the Functional Source
+License (FSL-1.1-ALv2).
 `python scripts/bench.py` times the models in `bench`. The test
 suite runs with `lake test`. When a result depends on more than six parameter assignments, the
 output summarizes them and ranks the parameters by how much each one moves the result.

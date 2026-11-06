@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use Haze in your research, please cite it as below."
+title: "Haze: a language for verifying software with uncertain outcomes"
+type: software
+authors:
+  - family-names: Maiti
+    given-names: Ritabrata
+version: 0.1.0
+date-released: 2026-11-06
+repository-code: "https://github.com/ritabratamaiti/haze-lang"
+license: FSL-1.1-ALv2
+keywords:
+  - probabilistic model checking
+  - fuzzy logic
+  - formal verification
+  - Lean 4
+  - programming language

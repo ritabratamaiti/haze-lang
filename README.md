@@ -113,6 +113,24 @@ Finally, [`examples/Conformance`](examples/Conformance) shows how to use a Haze 
 specification of real code. A test runs a Python payment client against every pattern of lost
 messages and checks that its outcomes match the model's probabilities exactly.
 
+## Install
+
+On Linux (x86-64) and macOS (Apple silicon):
+
+```sh
+curl -sSfL https://raw.githubusercontent.com/ritabratamaiti/haze-lang/main/install.sh | sh
+```
+
+On Windows, in PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/ritabratamaiti/haze-lang/main/install.ps1 | iex
+```
+
+The [releases page](https://github.com/ritabratamaiti/haze-lang/releases) has the same builds as
+archives, each with the examples, so you can run `haze examples/payments_retry.hz` straight
+away. On other platforms, build Haze from source as described below.
+
 ## Build
 
 You need [elan](https://github.com/leanprover/elan), the Lean toolchain manager. The Lean
@@ -125,9 +143,10 @@ lake exe haze FILE.hz            # check a model
 lake test                        # run the test suite
 ```
 
-`haze` exits with status 1 if any declaration is rejected, so it can run in CI. Two options are
-worth knowing: `--fuel N` limits how deeply function calls can nest before an outcome counts as
-unknown (the default is 1000), and `--json` prints the results as JSON for other programs.
+`haze` exits with status 1 if any declaration is rejected, so it can run in CI. A few options
+are worth knowing: `--fuel N` limits how deeply function calls can nest before an outcome counts
+as unknown (the default is 1000), `--states N` limits how many states an unbounded property
+explores (the default is 100,000), and `--json` prints the results as JSON for other programs.
 
 ## Documentation
 

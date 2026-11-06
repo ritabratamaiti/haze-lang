@@ -1,0 +1,97 @@
+name: Release
+
+# Pushing a tag such as v0.1.0 builds Haze on Linux, macOS and Windows and attaches the
+# archives to a draft GitHub release, which can be checked and then published by hand.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to build (it must already exist)"
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+jobs:
+  create:
+    name: Create the draft release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Create the draft with the release notes for this version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${TAG#v}"
+          # the notes are the section of RELEASES.md for this version
+          awk -v v="$version" '
+            /^## / { keep = (index($0, "## v" v) == 1); next }
+            keep' RELEASES.md > notes.md
+          gh release view "$TAG" >/dev/null 2>&1 ||
+            gh release create "$TAG" --draft --title "Haze $TAG" --notes-file notes.md
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: create
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-22.04, target: x86_64-linux, exe: haze, archive: tar.gz }
+          - { os: macos-14, target: aarch64-macos, exe: haze, archive: tar.gz }
+          - { os: windows-latest, target: x86_64-windows, exe: haze.exe, archive: zip }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Install elan
+        if: runner.os != 'Windows'
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh |
+            sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+      - name: Install elan (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Invoke-WebRequest https://raw.githubusercontent.com/leanprover/elan/master/elan-init.ps1 -OutFile elan-init.ps1
+          .\elan-init.ps1 -NoPrompt 1 -DefaultToolchain none
+          "$env:USERPROFILE\.elan\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+
+      - name: Build
+        run: lake build haze
+
+      - name: Smoke test
+        run: |
+          ./.lake/build/bin/${{ matrix.exe }} --version
+          ./.lake/build/bin/${{ matrix.exe }} examples/probability_classics.hz > /dev/null
+
+      - name: Package
+        run: |
+          name="haze-$TAG-${{ matrix.target }}"
+          mkdir "$name"
+          cp ".lake/build/bin/${{ matrix.exe }}" LICENSE.md README.md "$name/"
+          cp -r examples "$name/examples"
+          if [ "${{ matrix.archive }}" = zip ]; then
+            7z a -tzip "$name.zip" "$name" > /dev/null
+          else
+            tar czf "$name.tar.gz" "$name"
+          fi
+          echo "ASSET=$name.${{ matrix.archive }}" >> "$GITHUB_ENV"
+
+      - name: Upload
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" "$ASSET" --clobber

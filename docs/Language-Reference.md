@@ -372,7 +372,8 @@ shown in scientific notation, as in `≈1.37018e-8 (=1/72982849)`.
 
 `haze [--fuel N] [--states N] [--json] FILE.hz...` checks each file and prints its messages.
 `--fuel N` sets how deeply function calls can nest before an outcome counts as unknown (the
-default is 1000), `--states N` sets the default for `explore`, and `--json` prints one JSON record per message instead of text, as described below. The exit
+default is 1000), `--states N` sets the default for `explore`, `--version` prints the version, and
+`--json` prints one JSON record per message instead of text, as described below. The exit
 status is 0 if every declaration was accepted and 1 otherwise, which makes `haze` easy to run in
 continuous integration.
 

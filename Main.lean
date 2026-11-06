@@ -13,9 +13,13 @@ JSON record per message with `--json`. The exit status is 1 if any declaration w
 if the arguments are invalid.
 -/
 
+/-- The version of Haze, which `haze --version` prints. -/
+def version : String := "0.1.0"
+
 /-- The help text of the command-line interface. -/
 def usage : String :=
   "usage: haze [--fuel N] [--states N] [--json] FILE.hz...\n" ++
+  "       haze --version\n" ++
   "Checks Haze programs: graded types, exact probabilities, fuzzy [belief, plausibility].\n" ++
   "  --fuel N    bound on nested function calls (default 1000)\n" ++
   "  --states N  states explored for an unbounded property (default 100000)\n" ++
@@ -36,6 +40,7 @@ def main (args : List String) : IO UInt32 := do
       opts := { opts with states := k }; rest := tl
     | "--json" :: tl => json := true; rest := tl
     | ("-h" :: _) | ("--help" :: _) => IO.println usage; return 0
+    | ("-V" :: _) | ("--version" :: _) => IO.println s!"haze {version}"; return 0
     | f :: tl => files := files.push f; rest := tl
     | [] => pure ()
   if files.isEmpty then IO.eprintln usage; return 2
