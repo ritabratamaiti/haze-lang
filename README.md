@@ -145,8 +145,8 @@ There are three other ways to run Haze:
 
 - **In the browser.** The *Open in Colab* and *Launch Binder* buttons above open a notebook,
   [`notebooks/try_haze.ipynb`](notebooks/try_haze.ipynb), that installs Haze and walks through a
-  few models you can edit and rerun. Both are free and need no account for Binder (Colab needs a
-  Google account). *Open in GitHub Codespaces* starts a full editor with Haze installed and the
+  few models you can edit and rerun. Both are free; Colab needs a Google account, and Binder needs
+  none. *Open in GitHub Codespaces* starts a full editor with Haze installed and the
   tutorial open.
 - **With Docker.** `docker run --rm -v "$PWD:/work" ghcr.io/ritabratamaiti/haze-lang model.hz`
   checks `model.hz` in the current directory.
