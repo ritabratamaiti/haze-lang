@@ -1,0 +1,78 @@
+-- Security: guessing PINs, and why most intrusion alarms are false
+--
+-- Two questions that security teams answer with probabilities: how much a limit on wrong PIN
+-- guesses protects a stolen card or phone, and how much an intrusion-detection alarm should be
+-- trusted.
+
+-- 1. PIN guessing and lockout ---------------------------------------------------------
+-- A thief with a stolen card or phone tries the most popular PINs first. How likely the thief
+-- is to succeed depends on how people choose PINs and on how many guesses the system allows.
+--
+-- Nick Berry of DataGenetics analysed 3.4 million four-digit sequences from leaked password
+-- databases ("PIN number analysis", 2012). The 20 most common, which together make up 26.83%,
+-- are below. `pin` is the rank of the victim's PIN on that list, and 0 means it isn't on it.
+input pin : Num ~ {1: 0.10713, 2: 0.06016, 3: 0.01881, 4: 0.01197, 5: 0.00745,
+                   6: 0.00616, 7: 0.00613, 8: 0.00526, 9: 0.00516, 10: 0.00512,
+                   11: 0.00451, 12: 0.00419, 13: 0.00395, 14: 0.00391, 15: 0.00366,
+                   16: 0.00304, 17: 0.00303, 18: 0.00293, 19: 0.00290, 20: 0.00285,
+                   0: 0.73168}
+
+-- The thief guesses in order of popularity, and the device locks (a card) or erases itself (an
+-- iPhone with "Erase Data" turned on) after `limit` wrong guesses.
+system Thief(limit : Num) {
+  var guesses : Num := 0
+  var unlocked : Bool := false
+  var locked : Bool := false
+  step {
+    if not unlocked and not locked {
+      guesses := guesses + 1
+      if pin == guesses { unlocked := true }
+      else if guesses >= limit { locked := true }
+    }
+  }
+}
+
+-- The lockout holds however long the thief keeps trying.
+theorem card_lockout : Thief(3) |= always guesses <= 3
+theorem phone_lockout : Thief(10) |= always guesses <= 10
+
+-- Banks lock a card after 3 wrong guesses; an iPhone with "Erase Data" erases itself after 10
+-- (Apple Platform Security guide). With PINs chosen like these, both limits still let the thief
+-- in surprisingly often.
+claim card_three_guesses : Thief(3) |= eventually unlocked        -- 18.61%
+claim phone_ten_guesses : Thief(10) |= eventually unlocked        -- 23.335%
+
+-- Sequences from leaked passwords are only a stand-in for real PINs. Bonneau, Preibusch and
+-- Anderson ("A birthday present every eleven wallets?", Financial Cryptography 2012) surveyed
+-- how people actually choose banking PINs. They estimate that a thief with 6 guesses (3 at a
+-- cash machine and 3 at a shop terminal) succeeds 1.94% of the time, and only 0.24% if the bank
+-- refuses the most popular PINs. But a stolen wallet usually holds an ID with a birth date,
+-- and many PINs are built from it: with the birth date, 6 guesses succeed 8.23% of the time,
+-- and still 5.63% with the blocklist. Whether the bank uses a blocklist is a fuzzy parameter,
+-- and the question is what happens to a batch of 20 stolen wallets.
+param success_6 : Num ~= {0.0823: 1, 0.0563: 1}     -- without and with a blocklist
+input cracked : Num ~ binomial(20, success_6)
+#expect cracked
+#prob cracked >= 1
+
+-- 2. Intrusion-detection alarms -------------------------------------------------------
+-- Stefan Axelsson ("The base-rate fallacy and the difficulty of intrusion detection", ACM
+-- TISSEC 2000) works through a site that logs 1,000,000 audit records a day and sees 2
+-- intrusions a day, each spanning about 10 records. Grouped into events of 10 records, that is
+-- 2 intrusions among 100,000 events, a base rate of 2 in 100,000. His point is that even a very
+-- accurate detector produces mostly false alarms at that base rate.
+input intrusion : Bool ~ flip(2 / 100000)
+-- the detector catches 70% or 100% of intrusions, and raises a false alarm on 1 in 100,000 or
+-- 1 in 1,000 normal events; these are the cases Axelsson works through
+param detection : Num ~= {0.7: 1, 1: 1}
+param false_alarm : Num ~= {0.00001: 1, 0.001: 1}
+input alarm : Bool ~ if intrusion then flip(detection) else flip(false_alarm)
+
+-- How likely an alarm is to be a real intrusion: at best 2/3, with a perfect detector and one
+-- false alarm per 100,000 events, and only about 2% at one per 1,000.
+#prob intrusion given alarm
+-- How many alarms a day the analysts see.
+#expect (if alarm then 100000 else 0)
+-- Axelsson notes that operators start ignoring a detector whose alarms are mostly false. For
+-- at least half of all alarms to be real, the false alarm rate has to be the lower one.
+claim mostly_real : intrusion given alarm with prob >= 0.5

@@ -106,6 +106,8 @@ independent calculation (see [`scripts/verify_gallery.py`](scripts/verify_galler
 | [`games.hz`](examples/Gallery/games.hz) | Games | The odds in craps (244/495), winning a game of tennis from deuce, and Penney's coin game. |
 | [`queueing.hz`](examples/Gallery/queueing.hz) | Networking | How full a network buffer gets and how many packets it drops when the arrival rate is uncertain. |
 | [`game_physics.hz`](examples/Gallery/game_physics.hz) | Video games | Objects tunneling through walls, energy drift in physics integrators, and jumps that depend on the frame rate. |
+| [`chip_design.hz`](examples/Gallery/chip_design.hz) | Chip design | Why NVIDIA's H100 ships with 132 of its 144 cores enabled: the yield of an 814 mm² die at TSMC's reported defect density, with and without disabling defective cores. |
+| [`security.hz`](examples/Gallery/security.hz) | Security | How often a thief guesses a PIN before a card locks or a phone erases itself, using real PIN statistics, and why most intrusion-detection alarms are false (Axelsson's base-rate analysis). |
 
 [`examples/Law/sally_clark.hz`](examples/Law/sally_clark.hz) looks at a real court case. In R v
 Clark, a mother was convicted of murdering her two sons partly on the strength of a "1 in 73

@@ -1,0 +1,49 @@
+examples/Gallery/chip_design.hz:36:1: info: claim perfect_die
+  belief ≈0.422106 · plausibility ≈0.46546 — graded
+  grade prob+fuzzy · 6 parameter assignment(s) · ≤290 states/step
+  by fuzzy parameter (π = possibility):
+    d0 = 0.0009, sm_mm2 = 3  π 0.6     ≈0.480499
+    d0 = 0.0009, sm_mm2 = 4  π 0.6     ≈0.480499
+    d0 = 0.001, sm_mm2 = 3   π 1       ≈0.442902
+    d0 = 0.001, sm_mm2 = 4   π 1       ≈0.442902
+    d0 = 0.0011, sm_mm2 = 3  π 0.6     ≈0.408243
+    d0 = 0.0011, sm_mm2 = 4  π 0.6     ≈0.408243
+examples/Gallery/chip_design.hz:41:1: info: claim sellable_as_h100
+  belief ≈0.667004 · plausibility ≈0.799509 — graded
+  grade prob+fuzzy · 6 parameter assignment(s) · ≤290 states/step
+  by fuzzy parameter (π = possibility):
+    d0 = 0.0009, sm_mm2 = 3  π 0.6     ≈0.708961
+    d0 = 0.0009, sm_mm2 = 4  π 0.6     ≈0.807109
+    d0 = 0.001, sm_mm2 = 3   π 1       ≈0.682365
+    d0 = 0.001, sm_mm2 = 4   π 1       ≈0.788109
+    d0 = 0.0011, sm_mm2 = 3  π 0.6     ≈0.656764
+    d0 = 0.0011, sm_mm2 = 4  π 0.6     ≈0.769554
+examples/Gallery/chip_design.hz:46:1: info: #expect dead_sms
+  lower expectation ≈0.405697 · upper expectation ≈0.609588
+  by fuzzy parameter (π = possibility):
+    d0 = 0.0009, sm_mm2 = 3  π 0.6     E ≈0.38845
+    d0 = 0.0009, sm_mm2 = 4  π 0.6     E ≈0.517701
+    d0 = 0.001, sm_mm2 = 3   π 1       E ≈0.431568
+    d0 = 0.001, sm_mm2 = 4   π 1       E ≈0.575137
+    d0 = 0.0011, sm_mm2 = 3  π 0.6     E ≈0.474677
+    d0 = 0.0011, sm_mm2 = 4  π 0.6     E ≈0.632555
+examples/Gallery/chip_design.hz:47:1: info: claim few_dead
+  belief ≈0.999592 · plausibility ≈0.999937 — graded
+  grade prob+fuzzy · 6 parameter assignment(s) · ≤290 states/step
+  bound holds: belief ≥ 0.99
+  by fuzzy parameter (π = possibility):
+    d0 = 0.0009, sm_mm2 = 3  π 0.6     ≈0.99995
+    d0 = 0.0009, sm_mm2 = 4  π 0.6     ≈0.999809
+    d0 = 0.001, sm_mm2 = 3   π 1       ≈0.999918
+    d0 = 0.001, sm_mm2 = 4   π 1       ≈0.999691
+    d0 = 0.0011, sm_mm2 = 3  π 0.6     ≈0.999872
+    d0 = 0.0011, sm_mm2 = 4  π 0.6     ≈0.999526
+examples/Gallery/chip_design.hz:49:1: info: #prob dead_sms == 0 given dead_sms <= 12 and uncore_ok
+  belief ≈0.543088 · plausibility ≈0.666278
+  by fuzzy parameter (π = possibility):
+    d0 = 0.0009, sm_mm2 = 3  π 0.6     ≈0.677751
+    d0 = 0.0009, sm_mm2 = 4  π 0.6     ≈0.595334
+    d0 = 0.001, sm_mm2 = 3   π 1       ≈0.649069
+    d0 = 0.001, sm_mm2 = 4   π 1       ≈0.56198
+    d0 = 0.0011, sm_mm2 = 3  π 0.6     ≈0.621598
+    d0 = 0.0011, sm_mm2 = 4  π 0.6     ≈0.530493

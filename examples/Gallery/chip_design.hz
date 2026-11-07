@@ -1,0 +1,49 @@
+-- Chip design: why big GPUs ship with cores switched off
+--
+-- NVIDIA's GH100 die measures 814 mm² and has 144 streaming multiprocessors (SMs), but the
+-- H100 SXM5 sold with it has only 132 of them enabled. Disabling a few cores is common practice
+-- in large chips: a manufacturing defect that lands in one core then costs a core instead of the
+-- whole die. This file estimates how much that helps.
+--
+-- Sources:
+--   * Die size and SM counts: NVIDIA H100 Tensor Core GPU Architecture whitepaper (2022).
+--   * Defect density: TSMC reported about 0.10 defects per cm² for its N5 process in 2020
+--     (TSMC Technology Symposium 2020, as reported by AnandTech), with N7 at about 0.09 at a
+--     similar stage. GH100 is made on TSMC 4N, an N5-family process.
+-- Assumptions, labelled as such:
+--   * Defects are independent, as in the Poisson yield model. Each square millimetre has a
+--     defect with probability D0 × 1 mm², which is the Poisson model up to terms of order D0²
+--     (real defects cluster a little, which makes yields somewhat higher than this model).
+--   * A defect inside an SM disables that SM; a defect anywhere else on the die, such as in the
+--     memory controllers or the crossbar, makes the die unusable.
+--   * NVIDIA doesn't publish the area of one SM, so it is a fuzzy parameter: 3 mm² (the SMs
+--     cover about half the die) or 4 mm² (about 70%).
+
+-- defects per mm²: 0.10 per cm² is 0.001 per mm²; 0.09 and 0.11 bracket the reported values
+param d0 : Num ~= {0.0009: 0.6, 0.001: 1, 0.0011: 0.6}
+param sm_mm2 : Num ~= {3: 1, 4: 1}
+
+-- the probability that one SM has no defect, (1 - d0)^area
+def sm_clean : Num := if sm_mm2 == 3 then (1 - d0) * (1 - d0) * (1 - d0)
+  else (1 - d0) * (1 - d0) * (1 - d0) * (1 - d0)
+input dead_sms : Num ~ binomial(144, 1 - sm_clean)
+-- the rest of the die (memory controllers, crossbar and so on) has to be free of defects; only
+-- whether it is matters, which keeps the number of cases small
+input uncore_ok : Bool ~ binomial(814 - 144 * sm_mm2, d0) == 0
+
+-- If every SM had to work, only a perfect die could be sold. With D0 = 0.001 per mm² and
+-- 814 mm², that's close to the Poisson figure e^-0.814, about 44%.
+claim perfect_die : dead_sms == 0 and uncore_ok
+
+-- Selling the die with up to 12 SMs disabled, as the H100 SXM5 does, raises that to about
+-- 68-79% at the reported defect density. Now only the area outside the SMs has to be perfect,
+-- so the answer depends on how much of the die the SMs take up.
+claim sellable_as_h100 : dead_sms <= 12 and uncore_ok
+
+-- Defects alone rarely disable more than a few SMs, so 12 spares are far more than defects
+-- need. (NVIDIA doesn't say how it chose 12; other reasons to disable an SM, such as power or
+-- speed binning, aren't part of this model.)
+#expect dead_sms
+claim few_dead : dead_sms <= 4 given uncore_ok with prob >= 0.99
+-- Among the dies that can be sold, more than a third have at least one defective SM.
+#prob dead_sms == 0 given dead_sms <= 12 and uncore_ok

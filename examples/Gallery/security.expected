@@ -1,0 +1,50 @@
+examples/Gallery/security.hz:36:1: info: theorem card_lockout
+  probability 1 — holds with certainty
+  grade prob · 1 parameter assignment(s) · 81 reachable states
+  theorem accepted
+examples/Gallery/security.hz:37:1: info: theorem phone_lockout
+  probability 1 — holds with certainty
+  grade prob · 1 parameter assignment(s) · 186 reachable states
+  theorem accepted
+examples/Gallery/security.hz:42:1: info: claim card_three_guesses
+  probability 0.1861 — graded
+  grade prob · 1 parameter assignment(s) · 81 reachable states
+examples/Gallery/security.hz:43:1: info: claim phone_ten_guesses
+  probability 0.23335 — graded
+  grade prob · 1 parameter assignment(s) · 186 reachable states
+examples/Gallery/security.hz:55:1: info: #expect cracked
+  lower expectation 1.126 · upper expectation 1.646
+  by fuzzy parameter (π = possibility):
+    success_6 = 0.0823  π 1       E 1.646
+    success_6 = 0.0563  π 1       E 1.126
+examples/Gallery/security.hz:56:1: info: #prob cracked >= 1
+  belief ≈0.686181 · plausibility ≈0.820521
+  by fuzzy parameter (π = possibility):
+    success_6 = 0.0823  π 1       ≈0.820521
+    success_6 = 0.0563  π 1       ≈0.686181
+examples/Gallery/security.hz:73:1: info: #prob intrusion given alarm
+  belief 0.013807 (=700/50699) · plausibility ≈0.666671
+  by fuzzy parameter (π = possibility):
+    detection = 0.7, false_alarm = 0.00001  π 1       ≈0.583338
+    detection = 0.7, false_alarm = 0.001    π 1       0.013807 (=700/50699)
+    detection = 1, false_alarm = 0.00001    π 1       ≈0.666671
+    detection = 1, false_alarm = 0.001      π 1       0.019608 (=1000/50999)
+examples/Gallery/security.hz:75:1: info: #expect (if alarm then 100000 else 0)
+  lower expectation 2.39998 · upper expectation 101.998
+  by fuzzy parameter (π = possibility):
+    detection = 0.7, false_alarm = 0.00001  π 1       E 2.39998
+    detection = 0.7, false_alarm = 0.001    π 1       E 101.398
+    detection = 1, false_alarm = 0.00001    π 1       E 2.99998
+    detection = 1, false_alarm = 0.001      π 1       E 101.998
+examples/Gallery/security.hz:78:1: error: claim mostly_real
+  belief 0.013807 (=700/50699) · plausibility ≈0.666671 — graded
+  grade prob+fuzzy · 4 parameter assignment(s) · ≤4 states/step
+  bound fails: belief 0.013807 (=700/50699) < 0.5
+  by fuzzy parameter (π = possibility):
+    detection = 0.7, false_alarm = 0.00001  π 1       ≈0.583338
+    detection = 0.7, false_alarm = 0.001    π 1       0.013807 (=700/50699)
+    detection = 1, false_alarm = 0.00001    π 1       ≈0.666671
+    detection = 1, false_alarm = 0.001      π 1       0.019608 (=1000/50999)
+  counterexample (probability ≈9.9998e-4 (=49999/50000000), degree 0):
+    parameters: detection = 0.7, false_alarm = 0.001
+    inputs: intrusion = false, alarm = true

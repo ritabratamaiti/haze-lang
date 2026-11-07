@@ -252,8 +252,17 @@ def evalRand (r : RandPrim) (vs : List Value) : M Value := do
     let q ← asDeg p
     if n < 0 || n > 10000 then M.fail s!"runtime: binomial n={n} out of range" else
     let n := n.toNat
-    M.ofList ((List.range (n + 1)).map fun (k : Nat) =>
-      (.num (k : Rat), (choose n k : Rat) * q ^ k * (1 - q) ^ (n - k)))
+    if q == 0 || q == 1 then
+      return .num (if q == 0 then 0 else (n : Rat))
+    -- P(k + 1) = P(k) · (n - k) / (k + 1) · q / (1 - q), which avoids raising exact fractions to
+    -- large powers for every k
+    let r := q / (1 - q)
+    let mut p := (1 - q) ^ n
+    let mut out : Array (Value × Rat) := #[]
+    for k in [0:n + 1] do
+      out := out.push (.num (k : Rat), p)
+      p := p * ((n - k : Nat) : Rat) / ((k + 1 : Nat) : Rat) * r
+    M.ofList out.toList
   | _, _ => M.fail "runtime: bad random primitive application"
 
 mutual

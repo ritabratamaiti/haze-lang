@@ -304,6 +304,47 @@ def jet(s):
 check(b, "claim jetpack_reaches_platform", eventually((0, 0, 12), jet, 30, lambda s: s[0] >= 40))
 check(b, "#expect Jetpack |= after[30] y", after((0, 0, 12), jet, 30, lambda s: s[0]))
 
+# ---- chip design -------------------------------------------------------------
+b = blocks("examples/Gallery/chip_design.hz")
+chip = []
+for d0, pd in ((F(9, 10000), F(3, 5)), (F(1, 1000), F(1)), (F(11, 10000), F(3, 5))):
+    for area in (3, 4):
+        q = 1 - (1 - d0) ** area                      # an SM has at least one defect
+        dead = binom(144, q)
+        uncore_ok = (1 - d0) ** (814 - 144 * area)
+        le = lambda m: sum(w for k, w in dead if k <= m)
+        chip.append((min(pd, F(1)), {
+            "perfect": (1 - q) ** 144 * uncore_ok, "sellable": le(12) * uncore_ok,
+            "dead": 144 * q, "few": le(4), "perfect_given": (1 - q) ** 144 / le(12)}))
+check(b, "claim perfect_die", *interval([(pi, r["perfect"]) for pi, r in chip]))
+results.append((all(abs(float(r["perfect"]) - 2.718281828459045 ** (-814 * float(d))) < 5e-4
+                    for (pi, r), d in zip(chip, [0.0009] * 2 + [0.001] * 2 + [0.0011] * 2)),
+                "  ...perfect die close to the Poisson yield e^(-A D0)", "e^-0.814 = 0.443"))
+check(b, "claim sellable_as_h100", *interval([(pi, r["sellable"]) for pi, r in chip]))
+check(b, "#expect dead_sms", *interval([(pi, r["dead"]) for pi, r in chip]))
+check(b, "claim few_dead", *interval([(pi, r["few"]) for pi, r in chip]))
+check(b, "#prob dead_sms == 0 given dead_sms <= 12 and uncore_ok", *interval([(pi, r["perfect_given"]) for pi, r in chip]))
+
+# ---- security ----------------------------------------------------------------
+b = blocks("examples/Gallery/security.hz")
+pins = [F(x) / 100 for x in ("10.713 6.016 1.881 1.197 0.745 0.616 0.613 0.526 0.516 0.512 "
+                             "0.451 0.419 0.395 0.391 0.366 0.304 0.303 0.293 0.290 0.285").split()]
+check(b, "claim card_three_guesses", sum(pins[:3]), name="PIN: top 3 DataGenetics shares (18.61%)")
+check(b, "claim phone_ten_guesses", sum(pins[:10]), name="PIN: top 10 DataGenetics shares (23.335%)")
+results.append((sum(pins) == F(26832, 100000), "  ...top 20 shares sum to 26.832% (published: 26.83%)", "0.26832"))
+wallets = [(F(1), F(823, 10000)), (F(1), F(563, 10000))]
+check(b, "#expect cracked", *interval([(pi, 20 * l) for pi, l in wallets]))
+check(b, "#prob cracked >= 1", *interval([(pi, 1 - (1 - l) ** 20) for pi, l in wallets]))
+base = F(2, 100000)
+ids = [(F(1), dr, fa) for dr in (F(7, 10), F(1)) for fa in (F(1, 100000), F(1, 1000))]
+post = lambda dr, fa: base * dr / (base * dr + (1 - base) * fa)
+check(b, "#prob intrusion given alarm", *interval([(pi, post(dr, fa)) for pi, dr, fa in ids]))
+results.append((abs(float(post(F(1), F(1, 100000))) - 0.6667) < 1e-3 and abs(float(post(F(7, 10), F(1, 100000))) - 0.5833) < 1e-3
+                and abs(float(post(F(1), F(1, 1000))) - 0.0196) < 1e-3,
+                "  ...Axelsson's figures: 66%, 58% and about 2%", "0.667, 0.583, 0.020"))
+check(b, "#expect (if alarm then 100000 else 0)",
+      *interval([(pi, 100000 * (base * dr + (1 - base) * fa)) for pi, dr, fa in ids]))
+
 passed = sum(r[0] for r in results)
 for ok, name, exp in results:
     print("PASS" if ok else "FAIL", name, "|", exp)
