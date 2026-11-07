@@ -9,6 +9,8 @@
 
 [![License: FSL-1.1-ALv2](https://img.shields.io/badge/License-FSL--1.1--ALv2-blue.svg)](LICENSE.md)
 [![Lean 4](https://img.shields.io/badge/built%20with-Lean%204-blue.svg)](https://lean-lang.org)
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ritabratamaiti/haze-lang/blob/main/notebooks/try_haze.ipynb)
+[![Launch Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/ritabratamaiti/haze-lang/main?labpath=notebooks%2Ftry_haze.ipynb)
 [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/ritabratamaiti/haze-lang)
 
 Haze is a small language for checking software that has to cope with things going wrong some
@@ -141,8 +143,11 @@ unsigned programs, since a program you build yourself isn't treated as a downloa
 
 There are three other ways to run Haze:
 
-- **In the browser.** The *Open in GitHub Codespaces* button above starts an editor with Haze
-  installed and the tutorial open.
+- **In the browser.** The *Open in Colab* and *Launch Binder* buttons above open a notebook,
+  [`notebooks/try_haze.ipynb`](notebooks/try_haze.ipynb), that installs Haze and walks through a
+  few models you can edit and rerun. Both are free and need no account for Binder (Colab needs a
+  Google account). *Open in GitHub Codespaces* starts a full editor with Haze installed and the
+  tutorial open.
 - **With Docker.** `docker run --rm -v "$PWD:/work" ghcr.io/ritabratamaiti/haze-lang model.hz`
   checks `model.hz` in the current directory.
 - **In GitHub Actions.** This step installs Haze and fails the build if any declaration is

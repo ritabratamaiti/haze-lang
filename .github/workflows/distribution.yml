@@ -12,6 +12,8 @@ on:
       - action.yml
       - Dockerfile
       - .devcontainer/**
+      - binder/**
+      - notebooks/**
       - .github/workflows/distribution.yml
   workflow_dispatch:
 
@@ -55,6 +57,30 @@ jobs:
         run: |
           haze --version
           test "${{ steps.haze.outputs.version }}" = v0.1.0
+
+  notebook:
+    name: Notebook (as Binder sets it up)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Run binder/postBuild with the release archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download v0.1.0 -R "$GITHUB_REPOSITORY" -p "haze-v0.1.0-x86_64-linux.tar.gz" -D "$RUNNER_TEMP"
+          HAZE_ARCHIVE="$RUNNER_TEMP/haze-v0.1.0-x86_64-linux.tar.gz" sh binder/postBuild
+      - name: Execute the notebook
+        run: |
+          pip install --quiet nbclient nbformat ipykernel
+          python - <<'EOF'
+          import nbformat, nbclient
+          nb = nbformat.read("notebooks/try_haze.ipynb", as_version=4)
+          nbclient.NotebookClient(nb, timeout=600, kernel_name="python3").execute()
+          text = "".join(o.get("text", "") for c in nb.cells if c.cell_type == "code" for o in c.outputs)
+          for expected in ["is ready", "=1/6", "theorem rejected", "=244/495", "bound holds"]:
+              assert expected in text, f"missing from the notebook's output: {expected}"
+          print(text)
+          EOF
 
   docker:
     name: Docker image

@@ -1,0 +1,4 @@
+#!/bin/sh
+# Binder runs this once when it builds the image: install haze where the notebook looks for it.
+set -eu
+HAZE_INSTALL_DIR="$HOME/.local/bin" sh install.sh

@@ -37,6 +37,18 @@ gh workflow run release.yml -R ritabratamaiti/haze-lang -f tag=vX.Y.Z
 A Docker image pushed from a private repository stays private when the repository is made public.
 Change its visibility once in the package settings on GitHub.
 
+## Notebooks
+
+[`notebooks/try_haze.ipynb`](../notebooks/try_haze.ipynb) runs on Google Colab and on Binder.
+Its first cell installs the latest release with `install.sh`, and Binder installs it ahead of
+time with [`binder/postBuild`](../binder/postBuild). The Distribution workflow runs the
+notebook on Linux the way Binder sets it up. After changing it, save it with its outputs, so
+that GitHub's preview shows the results:
+`jupyter nbconvert --to notebook --execute --inplace notebooks/try_haze.ipynb`.
+
+Binder builds an image the first time someone opens a new commit, which takes a few minutes, so
+open the Binder link yourself after each push to `main` before sharing it.
+
 ## A browser playground
 
 Haze can't run in the browser yet. Lean stopped publishing WebAssembly builds of its runtime after
