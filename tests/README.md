@@ -26,6 +26,9 @@ right.
 - `kernel_errors.hz` contains declarations that the elaborator or the kernel must reject, and
   checks that processing carries on correctly after each error.
 - `parse_error.hz` checks how a syntax error is reported.
+- `weighted_tests.hz` covers `#tests`: runs in exact order of probability, early stopping for
+  `always` and `eventually`, failing runs, fuzzy parameters and the statistical test, and its
+  errors. `parse_error_tests.hz` checks the syntax error for `#tests[0]`.
 - `unbounded.hz` covers `always`, `eventually` and `steps until` without a bound: exact answers
   with known closed forms, an infinite expectation, degrees, counterexamples, and systems with
   infinitely many states, where exploration stops at `explore` states.

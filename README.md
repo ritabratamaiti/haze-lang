@@ -114,9 +114,16 @@ Clark, a mother was convicted of murdering her two sons partly on the strength o
 million" statistic. The model recomputes that figure from the numbers given in court, then
 asks the question the jury should have been asked, using the published analysis of the case.
 
+Haze can also generate tests. `#tests` lists the most likely runs of a model as test cases, with
+the random decisions behind each one, and reports how much of the probability they cover. For a
+property that fails by design some of the time, it sizes a statistical test with a known flake
+rate, so that a correct implementation fails it less than once in a million.
+
 Finally, [`examples/Conformance`](examples/Conformance) shows how to use a Haze model as the
-specification of real code. A test runs a Python payment client against every pattern of lost
-messages and checks that its outcomes match the model's probabilities exactly.
+specification of real code. One test runs a Python payment client against every pattern of
+lost messages and checks that its outcomes match the model's probabilities exactly. Another
+replays the runs that `#tests` generates and runs the statistical test Haze sized, and shows
+which deliberately broken clients each one catches.
 
 ## Install
 

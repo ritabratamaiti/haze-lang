@@ -620,6 +620,15 @@ def decl : P SDecl := do
   | .sym c =>
     if ["#check", "#eval", "#prob", "#expect", "#outcomes"].contains c then
       advance; pure (.query c (← prop))
+    else if c == "#tests" then
+      -- `#tests[n]` lists the n most likely runs; plain `#tests` lists 10
+      advance
+      let n ← if ← isSym "[" then do
+          advance; let k ← number; expectSym "]"
+          unless k.den == 1 && k.num > 0 do failAt "#tests[n] needs a positive whole number"
+          pure k.num.toNat
+        else pure 10
+      pure (.query s!"#tests {n}" (← prop))
     else failAt s!"unknown command {c}"
   | tok => failAt s!"expected a declaration, found {describe tok}"
 

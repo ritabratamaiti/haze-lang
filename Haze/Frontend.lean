@@ -226,6 +226,76 @@ def integrateExt (rows : List (Rat × Option Rat)) (lower : Bool) : Option Rat :
       | _, _ => none
   return acc.map (· / top)
 
+/-- Formats a float in scientific notation with seven significant digits, for JSON. -/
+def sciFloat (x : Float) : String :=
+  if x == 0 || !x.isFinite then "0" else
+  let e := (Float.log10 x.abs).floor
+  let m := x / Float.pow 10 e
+  -- rounding can carry the mantissa up to 10
+  let (m, e) := if (m.abs * 1e6).round ≥ 1e7 then (m / 10, e + 1) else (m, e)
+  let digits := (m.abs * 1e6).round.toUInt64.toNat
+  let s := toString digits
+  s!"{if x < 0 then "-" else ""}{s.take 1}.{s.drop 1}e{e.toInt64}"
+
+/-- `P(X > c)` for `X ~ binomial(n, q)`, in floating point. -/
+def binomTail (n : Nat) (q : Float) (c : Nat) : Float := Id.run do
+  if q ≤ 0 then return 0
+  if q ≥ 1 then return (if c < n then 1 else 0)
+  let lr := Float.log (q / (1 - q))
+  let mut lp := n.toFloat * Float.log (1 - q)
+  let mut cdf : Float := 0
+  for k in [0:min c n + 1] do
+    cdf := cdf + Float.exp lp
+    lp := lp + Float.log ((n - k).toFloat / (k + 1).toFloat) + lr
+  return max 0 (1 - cdf)
+
+/-- The smallest `c` with `P(X > c) ≤ α` for `X ~ binomial(n, q)`. -/
+def acceptLimit (n : Nat) (q α : Float) : Nat := Id.run do
+  if q ≤ 0 then return 0
+  if q ≥ 1 then return n
+  let lr := Float.log (q / (1 - q))
+  let mut lp := n.toFloat * Float.log (1 - q)
+  let mut cdf : Float := 0
+  for k in [0:n + 1] do
+    cdf := cdf + Float.exp lp
+    if 1 - cdf ≤ α then return k
+    lp := lp + Float.log ((n - k).toFloat / (k + 1).toFloat) + lr
+  return n
+
+/--
+A statistical test of real code: run it `runs` times and accept up to `allowed` failures. If each
+run fails independently with probability `q`, the test fails with probability `falseAlarm`; if it
+fails with probability `q2`, the test catches it with probability `power`.
+-/
+structure FlakePlan where
+  runs : Nat
+  allowed : Nat
+  falseAlarm : Float
+  power : Float
+
+/--
+The smallest statistical test that keeps false alarms below `α` (one in a million) and catches
+code that fails twice as often as `q` (or, for `q ≥ 1/2`, halfway to always failing) with
+probability at least 0.99. Returns `none` if that takes more than 10 million runs.
+-/
+def flakePlan (q : Float) (α : Float := 1e-6) (target : Float := 0.99) : Option FlakePlan := Id.run do
+  let q2 := if q < 0.5 then 2 * q else (1 + q) / 2
+  let eval := fun (n : Nat) =>
+    let c := acceptLimit n q α
+    (c, binomTail n q c, binomTail n q2 c)
+  let maxN := 10000000
+  -- double until the test is strong enough, then search between the last two sizes
+  let mut hi := 1
+  while (eval hi).2.2 < target do
+    if hi ≥ maxN then return none
+    hi := min maxN (2 * hi)
+  let mut lo := hi / 2 + 1
+  while lo < hi do
+    let mid := (lo + hi) / 2
+    if (eval mid).2.2 ≥ target then hi := mid else lo := mid + 1
+  let (c, fa, p) := eval hi
+  return some { runs := hi, allowed := c, falseAlarm := fa, power := p }
+
 /-- The largest number of parameter assignments shown as a full table. -/
 def maxTableRows : Nat := 6
 
@@ -568,6 +638,102 @@ def doQuery (d : DeclStx) (k : QueryKind) (spec : PropSpec) : FM Unit := do
           lines := lines.push s!"{pre}{padRight key wd}  P {padRight (fmtQ m) 8}  ⇒ {out}"
         if unk != 0 then lines := lines.push s!"diverged (out of fuel): {fmtQ unk}"
     emit d.pos "info" s!"{d.text}{indent lines.toList}"
+  | .tests n =>
+    let rows ← match runSpec env fuel branches spec s.opts.states with
+      | .ok (rows, _) => pure rows.toArray
+      | .error e => emit d.pos "error" e; return
+    let some si := spec.sys.bind (env.systems[·]?) | emit d.pos "error" "#tests needs a system"; return
+    -- tests are generated at the most plausible parameter values
+    let mut bi := 0
+    for i in [0:branches.size] do
+      if branches[i]!.poss > branches[bi]!.poss then bi := i
+    let some b := branches[bi]? | emit d.pos "error" "no parameter assignment is left"; return
+    let failProb := 1 - (rows[bi]?.map (·.lo)).getD 1
+    -- every state variable matters to a test, so nothing is sliced away
+    let ck : Checker := { checkerFor env fuel spec s.opts.states with
+      sys := some si, relevantVars := #[], relevant := relevantGlobals env (some si) spec.body spec.args,
+      trace := true, varNames := si.vars.map (·.1) }
+    let res ← match ck.weightedRuns spec.mode b n failProb with
+      | .ok r => pure r
+      | .error e => emit d.pos "error" e; return
+    let rel := ck.relevant
+    let fmtDeg : Option Rat → String := fun
+      | some 1 => "passes" | some 0 => "fails" | some q => s!"holds to degree {fmtQ q}"
+      | none => "unknown (ran out of fuel)"
+    let choicesOf (r : Checker.Run) : List String :=
+      let tr := r.configs.back!.st.trace.toList
+      let steps := (tr.map (·.step)).eraseDups
+      if steps.isEmpty then ["no random decisions"] else
+      steps.map fun t => s!"step {t}: " ++ ", ".intercalate
+        ((tr.filter (·.step == t)).map fun e => s!"{e.what} = {fmtValue env e.value}")
+    let mut lines : Array String := #[]
+    if !b.assign.isEmpty then
+      lines := lines.push s!"runs at {fmtAssign env b.assign}, the most plausible parameter values"
+    let suite := res.runs.filter (·.inSuite)
+    lines := lines.push (if res.complete && suite.size == res.runs.size then
+        (if suite.size == 1 then "this is the only run" else s!"these {suite.size} runs are all the runs there are")
+      else s!"the {suite.size} most likely runs make up {fmtQ res.covered} of the probability")
+    let listedFail := res.runs.foldl (fun acc r => if r.degree != some 1 then acc + r.prob else acc) 0
+    if failProb == 0 then
+      lines := lines.push "the property holds on every run"
+    else
+      let share := listedFail / failProb
+      lines := lines.push s!"the property fails with probability {fmtQ failProb}; {if share == 1 then "all the failing runs are listed" else s!"the failing runs listed make up {fmtQ share} of that"}"
+    if res.budgetHit then
+      lines := lines.push "the search stopped after expanding 200000 partial runs"
+    let mut cum : Rat := 0
+    let mut idx := 0
+    for r in res.runs do
+      idx := idx + 1
+      if r.inSuite then cum := cum + r.prob
+      let head := if r.inSuite then
+          s!"run {idx} · probability {fmtQ r.prob} · cumulative {fmtQ cum} · {fmtDeg r.degree}"
+        else s!"failing run · probability {fmtQ r.prob} · {fmtDeg r.degree}"
+      lines := lines.push head
+      for l in choicesOf r ++ fmtConfig env rel (some si) [] r.configs.back! do
+        lines := lines.push ("  " ++ l)
+    -- a statistical test of the real code, sized for the most failure-prone plausible values
+    -- size it for the plausible parameter values under which the property fails most often
+    let mut qi := 0
+    for i in [0:rows.size] do
+      if rows[i]!.poss > 0 && 1 - rows[i]!.lo > 1 - rows[qi]!.lo then qi := i
+    let qMax := (rows[qi]?.map (1 - ·.lo)).getD 0
+    let qAssign := (rows[qi]?.map (·.assign)).getD []
+    let plan := if qMax == 0 then none else flakePlan (Solve.ratToFloat qMax)
+    let fmtF : Float → String := fun x => fmtQ (Solve.floatToRat x)
+    let statLine := if qMax == 0 then
+        "statistical test: the property holds on every run, so one run of the real code is a deterministic test"
+      else match plan with
+      | some p =>
+        let atParams := if qAssign.isEmpty then "" else s!" at {fmtAssign env qAssign}"
+        s!"statistical test{atParams}: a run of code that matches the model fails this property with probability {fmtQ qMax}. Run the real code {p.runs} times and allow up to {p.allowed} failures: code that matches the model then fails the test with probability {fmtF p.falseAlarm}, and code that fails {if qMax < 1/2 then "twice as often" else "halfway to always"} is caught with probability {fmtF p.power}"
+      | none => "statistical test: telling correct code from code that fails twice as often would take more than 10 million runs; replaying the runs above is the practical test"
+    lines := lines.push statLine
+    let stateJson := fun (c : Config) => Json.obj
+      ((si.vars.toList.zip c.st.vars.toList).map fun ((n, _), v) => (n, Json.value env v))
+    let runJson := fun (r : Checker.Run) =>
+      let tr := r.configs.back!.st.trace.toList
+      Json.obj [("probability", Json.rat r.prob), ("suite", .bool r.inSuite),
+        ("degree", match r.degree with | some q => Json.rat q | none => .null),
+        ("passes", match r.degree with | some q => .bool (q == 1) | none => .null),
+        ("inputs", .obj ((inputsOf env rel r.configs[0]!.world).map fun (n, v) => (n, .str v))),
+        ("initial", stateJson r.configs[0]!),
+        ("steps", .arr (((List.range r.configs.size).drop 1).map fun t =>
+          .obj [("step", Json.nat t),
+                ("choices", .arr ((tr.filter (·.step == t)).map fun e =>
+                  .obj [("what", .str e.what), ("value", Json.value env e.value)])),
+                ("state", stateJson r.configs[t]!)]))]
+    let planJson : Json := match plan with
+      | some p => .obj [("parameters", Json.assignment env qAssign),
+          ("failure_rate", Json.rat qMax), ("runs", Json.nat p.runs),
+          ("allowed_failures", Json.nat p.allowed), ("false_alarm", .num (sciFloat p.falseAlarm)),
+          ("power", .num (sciFloat p.power))]
+      | none => .null
+    emit d.pos "info" s!"{d.text}{indent lines.toList}"
+      [("kind", .str "tests"), ("query", .str d.text), ("parameters", Json.assignment env b.assign),
+       ("covered", Json.rat res.covered), ("complete", .bool res.complete),
+       ("failure_probability", Json.rat failProb), ("runs", .arr (res.runs.toList.map runJson)),
+       ("statistical", planJson)]
 
 /-- Reports a one-line summary of the named declaration, for `#print`. -/
 def doPrint (d : DeclStx) (n : String) : FM Unit := do

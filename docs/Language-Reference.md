@@ -258,7 +258,44 @@ Queries print information about the model without changing it:
 | `#prob φ` | The belief and plausibility of a property. |
 | `#expect e` | The expectation of a number, or its lower and upper expectations when fuzzy parameters are involved. With `S \|= steps until φ`, the expected number of steps until `φ` holds. |
 | `#outcomes e` | The outcome of `e` for each combination of input values, with its probability. |
+| `#tests[n] S \|= φ` | The `n` most likely runs of `S` as test cases (10 without `[n]`), how much of the probability they cover, the most likely failing runs, and a statistical test for code that should match the model. See below. |
 | `#print x` | A summary of the declaration `x`, including its grade or result. |
+
+### Probability-weighted tests
+
+`#tests[n] S |= φ` turns a model into test cases for the code it describes. `φ` needs a bounded
+modality (`after[k]`, `always[k]` or `eventually[k]`), and `given` isn't allowed. Haze lists runs
+of `S` in order of decreasing probability, which is exact: a run is listed only after every more
+likely run. For each run it shows its probability, the running total, whether `φ` holds on it,
+the random decisions made at each step, and the final state:
+
+```
+run 2 · probability 0.019208 · cumulative 0.979608 · passes
+  step 1: request_lost = true
+  step 3: request_lost = false, response_lost = false
+  state: phase = Done, attempts = 2, charges = 1, acked = true, latency = 1080
+```
+
+A decision is labelled with the name it is assigned to (by `let` or to a state variable), or
+with the condition of an `if` or `match`. Naming random decisions with `let` makes runs easier
+to replay against real code. Runs that reach the same state by different decisions are listed
+separately, since a test has to make those decisions. A run ends at the horizon, when the system
+stops changing, or as soon as the result is settled: when an `always` property fails or an
+`eventually` property holds.
+
+The first `n` runs form the suite, and Haze reports the share of the probability they cover.
+If `φ` can fail, Haze also lists the most likely failing runs after the suite, up to three of
+them or until they account for all the failure probability.
+
+The last line is a statistical test, for checking code against a property that fails by design
+some of the time. If a run of code that matches the model fails `φ` with probability `q`, Haze
+gives the smallest number of runs, and the number of failures to allow, so that matching code
+fails the test with probability at most one in a million, while code that fails twice as often
+(for `q ≥ 1/2`, halfway to always) is caught with probability at least 0.99. If `φ` never fails,
+one run is a deterministic test.
+
+With fuzzy parameters, the runs use the most plausible parameter values, and the statistical
+test uses the plausible values under which `φ` fails most often.
 
 ## Expressions
 
@@ -391,6 +428,13 @@ print). Records that carry a result also have a `kind` and the fields below:
 | `eval` | `query`, `branches`, each with a `distribution` of `value` and `probability` pairs |
 | `check` | `query`, `type`, `grade` |
 | `observe` | `query`, `evidence`, the probability of the evidence for each parameter assignment |
+| `tests` | `query`, `parameters`, `covered`, `complete`, `failure_probability`, `runs`, `statistical` |
+
+For `tests`, each run has its `probability`, `suite` (whether it's one of the `n` most likely),
+`degree`, `passes`, `inputs`, `initial` state, and `steps`. Each step has its number, the
+`choices` made in it (each with `what` and `value`) and the `state` after it. `statistical` has
+the `parameters` it was sized for, `failure_rate`, `runs`, `allowed_failures`, `false_alarm` and
+`power`, or is `null` when the property never fails.
 
 `branches` lists the result for each assignment of the fuzzy parameters, with its `parameters`
 and `possibility`; for properties it has the `lower` and `upper` bounds. A `counterexample` has

@@ -225,7 +225,7 @@ partial def checkStmt (c : TCtx) : Stmt → CheckM Grade
     let mut g := gs.join (← checkStmt c dflt)
     for (_, b) in arms do g := g.join (← checkStmt c b)
     pure g
-  | .letS v body => do
+  | .letS v body _ => do
     let (tv, gv) ← infer c v
     return gv.join (← checkStmt { c with locals := tv :: c.locals } body)
   | .assert cnd => do
@@ -248,7 +248,7 @@ partial def assignedVars : Stmt → List Nat
   | .assign i _ => [i]
   | .seq a b | .ite _ a b | .choose _ a b => assignedVars a ++ assignedVars b
   | .matchS _ arms d => (arms.flatMap fun (_, b) => assignedVars b) ++ assignedVars d
-  | .letS _ b => assignedVars b
+  | .letS _ b _ => assignedVars b
   | .skip | .assert _ => []
 
 /-- The largest horizon `k` accepted in a temporal property. -/
@@ -389,7 +389,12 @@ def addDecl (env : Env) : Decl → CheckM Env
     | .none => pure ()
     pure env
   | .query k spec => do
-    let _ ← checkSpec env spec (k != .prob)
+    if let .tests _ := k then
+      if spec.sys.isNone then throw "kernel: #tests needs a system (`S |= ...`)"
+      if spec.mode.unbounded then throw "kernel: #tests needs a bounded property, such as always[k]"
+      if spec.given.isSome then throw "kernel: #tests doesn't support `given`"
+    let numOk := match k with | .prob | .tests _ => false | _ => true
+    let _ ← checkSpec env spec numOk
     pure env
   | .print _ => pure env
 

@@ -198,7 +198,7 @@ inductive Stmt where
   | choose (p : Expr) (t e : Stmt)
   | matchS (s : Expr) (arms : List (Nat × Stmt)) (dflt : Stmt)
   /-- Binds `bvar 0` in `body`. -/
-  | letS (v : Expr) (body : Stmt)
+  | letS (v : Expr) (body : Stmt) (name : String)
   | assert (c : Expr)
   deriving Repr, Inhabited
 
@@ -324,9 +324,13 @@ structure ClaimInfo where
   result : Interval
   deriving Repr, Inhabited
 
-/-- The query commands `#check`, `#eval`, `#prob`, `#expect` and `#outcomes`. -/
+/--
+The query commands `#check`, `#eval`, `#prob`, `#expect`, `#outcomes` and `#tests`, which lists
+the `n` most likely runs of a system as test cases.
+-/
 inductive QueryKind where
   | check | eval | prob | expect | outcomes
+  | tests (n : Nat)
   deriving DecidableEq, Repr, Inhabited
 
 /-- Elaborated declarations, which the kernel takes as input. -/

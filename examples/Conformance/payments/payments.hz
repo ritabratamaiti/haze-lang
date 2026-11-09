@@ -28,11 +28,14 @@ system Client {
     match phase {
       Sending => {
         attempts := attempts + 1
-        if flip(loss) {                         -- the request is lost
+        -- naming each random decision with `let` makes generated tests readable
+        let request_lost := flip(loss)
+        if request_lost {
           phase := Waiting
         } else {
           if charges == 0 { charges := 1 }      -- the server charges once per key
-          if flip(loss) {                       -- the response is lost
+          let response_lost := flip(loss)
+          if response_lost {
             phase := Waiting
           } else {
             acked := true
@@ -66,3 +69,10 @@ claim delivered : Client |= after[6] acked with prob >= 0.99
 #eval Client |= after[6] attempts
 #eval Client |= after[6] latency
 #expect Client |= after[6] latency
+
+-- Probability-weighted tests. The first lists the most likely runs, which test_weighted.py
+-- replays against the implementation, so the suite covers the behaviour that happens most often.
+-- The second adds a statistical test for a property that fails by design some of the time:
+-- a payment can give up after three lost messages.
+#tests[6] Client |= always[6] charges <= 1
+#tests[3] Client |= after[6] acked

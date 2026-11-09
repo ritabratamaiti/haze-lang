@@ -320,7 +320,7 @@ partial def elabBlock : List SStmt → ElabM Stmt
     match s with
     | .atPos p (.letS n v) => withPos p do
       let (vx, vt) ← elabExpr v
-      return .letS vx (← withLocal n vt (elabBlock rest))
+      return .letS vx (← withLocal n vt (elabBlock rest)) n
     | _ => return seqS (← elabStmt s) (← elabBlock rest)
 
 partial def elabStmt : SStmt → ElabM Stmt
@@ -472,9 +472,10 @@ def elabDecl : SDecl → ElabM Decl
     let (spec, _) ← elabProp p
     let k := match c with
       | "#check" => QueryKind.check | "#eval" => .eval | "#prob" => .prob
-      | "#expect" => .expect | _ => .outcomes
+      | "#expect" => .expect | "#outcomes" => .outcomes
+      | _ => .tests ((c.drop 7).toString.toNat?.getD 10)
     if spec.given.isSome && !(k == .prob || k == .check) then
-      err s!"{c} doesn't support `given`; use #prob or a claim"
+      err s!"{(c.splitOn " ").headD c} doesn't support `given`; use #prob or a claim"
     pure (.query k spec)
   | .print n => pure (.print n)
 

@@ -1,0 +1,115 @@
+tests/weighted_tests.hz:14:1: info: #tests[8] Coins |= after[3] heads <= 2
+  these 8 runs are all the runs there are
+  the property fails with probability 0.125; all the failing runs are listed
+  run 1 · probability 0.125 · cumulative 0.125 · fails
+    step 1: flip_heads = true
+    step 2: flip_heads = true
+    step 3: flip_heads = true
+    state: heads = 3
+  run 2 · probability 0.125 · cumulative 0.25 · passes
+    step 1: flip_heads = true
+    step 2: flip_heads = true
+    step 3: flip_heads = false
+    state: heads = 2
+  run 3 · probability 0.125 · cumulative 0.375 · passes
+    step 1: flip_heads = true
+    step 2: flip_heads = false
+    step 3: flip_heads = true
+    state: heads = 2
+  run 4 · probability 0.125 · cumulative 0.5 · passes
+    step 1: flip_heads = true
+    step 2: flip_heads = false
+    step 3: flip_heads = false
+    state: heads = 1
+  run 5 · probability 0.125 · cumulative 0.625 · passes
+    step 1: flip_heads = false
+    step 2: flip_heads = true
+    step 3: flip_heads = true
+    state: heads = 2
+  run 6 · probability 0.125 · cumulative 0.75 · passes
+    step 1: flip_heads = false
+    step 2: flip_heads = true
+    step 3: flip_heads = false
+    state: heads = 1
+  run 7 · probability 0.125 · cumulative 0.875 · passes
+    step 1: flip_heads = false
+    step 2: flip_heads = false
+    step 3: flip_heads = true
+    state: heads = 1
+  run 8 · probability 0.125 · cumulative 1 · passes
+    step 1: flip_heads = false
+    step 2: flip_heads = false
+    step 3: flip_heads = false
+    state: heads = 0
+  statistical test: a run of code that matches the model fails this property with probability 0.125. Run the real code 464 times and allow up to 94 failures: code that matches the model then fails the test with probability ≈9.01541e-7, and code that fails twice as often is caught with probability ≈0.990565
+tests/weighted_tests.hz:25:1: info: #tests[2] Biased |= always[3] heads == 0
+  the 2 most likely runs make up 0.829 of the probability
+  the property fails with probability 0.271; all the failing runs are listed
+  run 1 · probability 0.729 · cumulative 0.729 · passes
+    step 1: flip_heads = false
+    step 2: flip_heads = false
+    step 3: flip_heads = false
+    state: heads = 0
+  run 2 · probability 0.1 · cumulative 0.829 · fails
+    step 1: flip_heads = true
+    state: heads = 1
+  failing run · probability 0.09 · fails
+    step 1: flip_heads = false
+    step 2: flip_heads = true
+    state: heads = 1
+  failing run · probability 0.081 · fails
+    step 1: flip_heads = false
+    step 2: flip_heads = false
+    step 3: flip_heads = true
+    state: heads = 1
+  statistical test: a run of code that matches the model fails this property with probability 0.271. Run the real code 159 times and allow up to 71 failures: code that matches the model then fails the test with probability ≈6.87903e-7, and code that fails twice as often is caught with probability ≈0.990147
+tests/weighted_tests.hz:28:1: info: #tests[3] Biased |= eventually[3] heads >= 1
+  the 3 most likely runs make up 0.919 of the probability
+  the property fails with probability 0.729; all the failing runs are listed
+  run 1 · probability 0.729 · cumulative 0.729 · fails
+    step 1: flip_heads = false
+    step 2: flip_heads = false
+    step 3: flip_heads = false
+    state: heads = 0
+  run 2 · probability 0.1 · cumulative 0.829 · passes
+    step 1: flip_heads = true
+    state: heads = 1
+  run 3 · probability 0.09 · cumulative 0.919 · passes
+    step 1: flip_heads = false
+    step 2: flip_heads = true
+    state: heads = 1
+  statistical test: a run of code that matches the model fails this property with probability 0.729. Run the real code 444 times and allow up to 366 failures: code that matches the model then fails the test with probability ≈8.97731e-7, and code that fails halfway to always is caught with probability ≈0.990186
+tests/weighted_tests.hz:35:1: info: #tests Counter |= always[5] n <= 2
+  this is the only run
+  the property holds on every run
+  run 1 · probability 1 · cumulative 1 · passes
+    no random decisions
+    state: n = 2
+  statistical test: the property holds on every run, so one run of the real code is a deterministic test
+tests/weighted_tests.hz:44:1: info: #tests[2] Server |= after[1] not down
+  runs at p = 0.01, the most plausible parameter values
+  these 2 runs are all the runs there are
+  the property fails with probability 0.01; all the failing runs are listed
+  run 1 · probability 0.99 · cumulative 0.99 · passes
+    step 1: down = false
+    state: down = false
+  run 2 · probability 0.01 · cumulative 1 · fails
+    step 1: down = true
+    state: down = true
+  statistical test at p = 0.05: a run of code that matches the model fails this property with probability 0.05. Run the real code 1312 times and allow up to 106 failures: code that matches the model then fails the test with probability ≈8.37735e-7, and code that fails twice as often is caught with probability ≈0.990081
+tests/weighted_tests.hz:59:1: info: #tests[3] Pick |= after[1] k <= 1
+  these 3 runs are all the runs there are
+  the property holds on every run
+  run 1 · probability 0.375 · cumulative 0.375 · passes
+    step 1: c = Red, flip(0.5) = true
+    state: c = Red, k = 1
+  run 2 · probability 0.375 · cumulative 0.75 · passes
+    step 1: c = Red, flip(0.5) = false
+    state: c = Red, k = 0
+  run 3 · probability 0.25 · cumulative 1 · passes
+    step 1: c = Green
+    state: c = Green, k = 0
+  statistical test: the property holds on every run, so one run of the real code is a deterministic test
+tests/weighted_tests.hz:63:1: error: kernel: #tests needs a system (`S |= ...`)
+tests/weighted_tests.hz:64:1: error: kernel: #tests needs a bounded property, such as always[k]
+tests/weighted_tests.hz:65:1: error: #tests doesn't support `given`; use #prob or a claim

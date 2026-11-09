@@ -91,10 +91,81 @@ PASS
 ```
 
 Trying every pattern only works when each run makes a handful of random decisions, as it does
-here. For larger code, run the implementation many times with real randomness and compare the
-observed frequencies with the model's probabilities using a statistical test. Because the
-model's numbers are exact, the only uncertainty left is the sampling error on the
-implementation's side.
+here. Larger code needs a way to choose which patterns to test and to judge results that are
+random. The next section covers both.
+
+## Probability-weighted testing
+
+Coverage usually means how much of the code a test suite runs. A suite can run every line and
+still miss the failure that happens most often in production, because it never tried the right
+sequence of events. Probability-weighted testing measures a suite by how much of the system's
+*probable behavior* it covers instead, and it gives every random test an exact flake rate.
+
+`#tests` in the model asks Haze for test cases:
+
+```haze
+#tests[6] Client |= always[6] charges <= 1
+#tests[3] Client |= after[6] acked
+```
+
+Haze lists the runs of the model from the most likely to the least likely, which it can do
+exactly, with the random decisions behind each run and the state it ends in. The six most likely
+runs of this client cover 99.96% of the probability. When the property can fail, Haze adds the
+most likely failing runs as well, however rare they are. Naming each random decision with `let`
+(`let request_lost := flip(loss)`) makes the runs readable:
+
+```
+run 3 · probability ≈0.018824 · cumulative ≈0.998432 · passes
+  step 1: request_lost = false, response_lost = true
+  step 3: request_lost = false, response_lost = false
+  state: phase = Done, attempts = 2, charges = 1, acked = true, latency = 1080
+```
+
+[`test_weighted.py`](payments/test_weighted.py) reads these runs from `haze --json` and replays
+each one against the real client, with a network that loses exactly the messages the run says.
+The client must end in the state the model predicts.
+
+Some properties fail by design some of the time. A payment gives up when three messages in a row
+are lost, so a test that runs the real client against a random network can fail even when the
+client is correct. Instead of retrying such a test until it passes, Haze works out its flake
+rate and sizes it:
+
+```
+statistical test at loss = 0.1: a run of code that matches the model fails this property with
+probability 0.006859. Run the real code 10214 times and allow up to 113 failures: code that
+matches the model then fails the test with probability ≈8.10684e-7, and code that fails twice as
+often is caught with probability ≈0.990011
+```
+
+Haze picks the smallest number of runs that keeps false alarms below one in a million and still
+catches code that fails twice as often with probability 0.99, and the fewest failures to allow
+for that. It uses the plausible parameter values under which the property fails most often.
+
+The script runs both kinds of test against the client and four broken versions, and reports the
+probability of the behavior on which each broken version was caught:
+
+```
+1. Replaying the 9 runs that Haze generated
+  the most likely runs cover 0.999569 of the probability
+2. Statistical test of the delivery requirement
+  10214 payments at loss 1/10: 89 failed, 113 allowed -> pass
+3. Mutants
+  mutant caught  server without idempotency keys
+         by a replayed run of probability 0.0188 (charges 2 (model 1))
+  mutant caught  one retry too many (MAX_ATTEMPTS = 4)
+         by a replayed run of probability 8e-06 (the client asked the network more often than the model does)
+  ...
+PASS
+```
+
+The client that retries once too often behaves differently only after three lost messages, so
+none of the likely runs catch it. The failing runs that `#tests` adds do.
+
+Run it from the repository root after `lake build`:
+
+```sh
+python examples/Conformance/payments/test_weighted.py
+```
 
 ## Using this with your own code
 

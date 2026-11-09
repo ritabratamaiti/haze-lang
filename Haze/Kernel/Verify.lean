@@ -297,7 +297,7 @@ where
     | .seq a b => stmtExprs a ++ stmtExprs b
     | .ite c a b | .choose c a b => c :: stmtExprs a ++ stmtExprs b
     | .matchS s arms d => s :: (arms.flatMap fun (_, b) => stmtExprs b) ++ stmtExprs d
-    | .letS v b => v :: stmtExprs b
+    | .letS v b _ => v :: stmtExprs b
 
 /--
 The state variables that `e` reads, directly or through local variables. `locals` gives, for each
@@ -359,7 +359,7 @@ where
     | .matchS sc arms d =>
       let ctl := exprVars locals sc ++ ctl
       go d locals ctl (arms.foldl (fun acc (_, b) => go b locals ctl acc) acc)
-    | .letS v b =>
+    | .letS v b _ =>
       let acc := if hasCall v then (deps, exprVars locals v ++ ctl ++ roots) else acc
       go b (exprVars locals v :: locals) ctl acc
 
@@ -396,7 +396,7 @@ partial def sliceStep (relevant : Array Bool) : Stmt → Stmt
   | .choose c a b => .choose c (sliceStep relevant a) (sliceStep relevant b)
   | .matchS sc arms d =>
     .matchS sc (arms.map fun (k, b) => (k, sliceStep relevant b)) (sliceStep relevant d)
-  | .letS v b => .letS v (sliceStep relevant b)
+  | .letS v b n => .letS v (sliceStep relevant b) n
   | st => st
 
 /--
@@ -464,6 +464,10 @@ structure Checker where
   splitSteps : Bool := true
   /-- The number of states explored for an unbounded property. -/
   maxStates : Nat := 100000
+  /-- Whether steps record their random decisions, for `#tests`. -/
+  trace : Bool := false
+  /-- The names of the state variables, for labelling recorded decisions. -/
+  varNames : Array String := #[]
 
 namespace Checker
 
@@ -479,7 +483,8 @@ def forSpec (env : Env) (fuel : Nat) (sys : Option SysInfo) (body : Expr) (args 
 
 /-- The evaluation context for a configuration. -/
 def ctx (ck : Checker) (cfg : Config) : ECtx :=
-  { env := ck.env, world := cfg.world, vars := cfg.st.vars, crashed := cfg.st.crashed, fuel := ck.fuel }
+  { env := ck.env, world := cfg.world, vars := cfg.st.vars, crashed := cfg.st.crashed, fuel := ck.fuel,
+    trace := ck.trace, varNames := ck.varNames }
 
 /--
 Reads the value of a property as a degree. `true` is 1, `false` is 0, and degrees and numbers are
@@ -794,6 +799,174 @@ def expectedSteps (ck : Checker) (b : Branch) :
         | _, _ => none
   if sp.initUnk > 0 then hi := none
   return (lo, hi, n, sp.truncated, exact)
+
+/-! ## Probability-weighted test generation -/
+
+/--
+A run found by `Checker.weightedRuns`: its probability, the property's degree on it (`none` if an
+outcome on it ran out of fuel), and the configuration after each step, starting with the initial
+one. The trace of the last configuration lists the run's random decisions.
+-/
+structure Run where
+  prob : Rat
+  degree : Option Rat
+  configs : Array Config
+  /-- Whether the run is among the `n` most likely runs, rather than an extra failing run. -/
+  inSuite : Bool
+  deriving Inhabited
+
+/-- The result of `Checker.weightedRuns`. -/
+structure RunSearch where
+  runs : Array Run
+  /-- The total probability of the runs in the suite. -/
+  covered : Rat
+  /-- The total probability of the failing runs found. -/
+  failingFound : Rat
+  /-- Every run was found. -/
+  complete : Bool
+  /-- The search stopped at its budget before finding everything it looked for. -/
+  budgetHit : Bool
+
+/-- A partial run in the search, ordered by probability and then by when it was found. -/
+structure RunNode where
+  prob : Rat
+  seq : Nat
+  configs : Array Config
+  /-- The lowest (for `always`) or highest (for `eventually`) degree so far. -/
+  acc : Option Rat
+  /-- The degree, once the run is complete. -/
+  final : Option (Option Rat) := none
+  deriving Inhabited
+
+/-- Whether `a` comes before `b`: a more likely run first, and among equals the one found first. -/
+def RunNode.before (a b : RunNode) : Bool := a.prob > b.prob || (a.prob == b.prob && a.seq < b.seq)
+
+/-- Adds a node to a binary heap whose first element comes `before` all others. -/
+def heapPush (h : Array RunNode) (x : RunNode) : Array RunNode := Id.run do
+  let mut h := h.push x
+  let mut i := h.size - 1
+  while i > 0 do
+    let p := (i - 1) / 2
+    if h[i]!.before h[p]! then h := h.swapIfInBounds i p; i := p else break
+  return h
+
+/-- Removes the first node of a binary heap. -/
+def heapPop (h : Array RunNode) : Option (RunNode × Array RunNode) := Id.run do
+  let some top := h[0]? | return none
+  let last := h.back!
+  let mut h := h.pop
+  if h.isEmpty then return some (top, h)
+  h := h.set! 0 last
+  let mut i := 0
+  while true do
+    let l := 2 * i + 1
+    let r := l + 1
+    let mut m := i
+    if l < h.size && h[l]!.before h[m]! then m := l
+    if r < h.size && h[r]!.before h[m]! then m := r
+    if m == i then break
+    h := h.swapIfInBounds i m
+    i := m
+  return some (top, h)
+
+/--
+The expected degree of the property in a configuration, or `none` if it can run out of fuel.
+-/
+def expectedDegree (ck : Checker) (cfg : Config) : Except String (Option Rat) := do
+  let mut e : Rat := 0
+  for (r, q) in ← ck.degrees cfg do
+    match r with
+    | .ok d => e := e + q * d
+    | .stuck => return none
+  return some e
+
+/--
+Lists the runs of a system up to the property's horizon in order of decreasing probability, which
+is exact: a run is only reported once every more likely run has been. A run is a sequence of
+configurations together with the random decisions that produced it, so runs that reach the same
+states by different decisions are kept apart. A run ends early when the property's result is
+settled (an `always` property has failed, or an `eventually` property has held) or when the system
+stops changing.
+
+The first `maxRuns` runs form the suite. If the property can fail (`failProb > 0`), the search goes
+on until it has listed `maxFailing` failing runs or failing runs with the whole failure probability,
+or until it has expanded `budget` partial runs.
+-/
+def weightedRuns (ck : Checker) (mode : Temporal) (b : Branch) (maxRuns : Nat) (failProb : Rat)
+    (maxFailing : Nat := 3) (budget : Nat := 200000) : Except String RunSearch := do
+  let k := match mode with | .after k | .always k | .eventually k => k | _ => 0
+  let isAlways := mode matches .always _
+  let isEventually := mode matches .eventually _
+  let combine : Option Rat → Option Rat → Option Rat := fun a d => match a, d with
+    | some x, some y => some (if isAlways then qmin x y else if isEventually then qmax x y else y)
+    | _, _ => none
+  let (cfgs, _) ← ck.initial b
+  let mut heap : Array RunNode := #[]
+  let mut seq := 0
+  for (c, w) in cfgs do
+    heap := heapPush heap { prob := w, seq, configs := #[c], acc := ← ck.expectedDegree c }
+    seq := seq + 1
+  let mut runs : Array Run := #[]
+  let mut covered : Rat := 0
+  let mut failingFound : Rat := 0
+  let mut failingCount := 0
+  let mut expanded := 0
+  let mut budgetHit := false
+  let mut found := 0
+  while true do
+    let suiteDone := found ≥ maxRuns
+    let failDone := failProb == 0 || failingCount ≥ maxFailing || failingFound ≥ failProb
+    if suiteDone && failDone then break
+    if expanded ≥ budget then budgetHit := true; break
+    let some (node, rest) := heapPop heap | break
+    heap := rest
+    let cfg := node.configs.back!
+    let t := node.configs.size - 1
+    -- is the run complete?
+    let mut final := node.final
+    if final.isNone then
+      if (isAlways && node.acc == some 0) || (isEventually && node.acc == some 1) then
+        final := some node.acc
+      else if t == k then
+        let here ← ck.expectedDegree cfg
+        final := some (if isAlways || isEventually then node.acc else here)
+    if let some degree := final then
+      found := found + 1
+      let fails := degree != some 1
+      let inSuite := found ≤ maxRuns
+      if inSuite then covered := covered + node.prob
+      if fails then
+        failingFound := failingFound + node.prob
+        failingCount := failingCount + 1
+      if inSuite || (fails && failingCount ≤ maxFailing) then
+        runs := runs.push { prob := node.prob, degree, configs := node.configs, inSuite }
+      continue
+    expanded := expanded + 1
+    let succ ← ck.step cfg
+    -- a system that has stopped changing would repeat this configuration forever
+    if let [(.ok c', q)] := succ then
+      if q == 1 && c'.st.vars == cfg.st.vars && c'.st.crashed == cfg.st.crashed &&
+          c'.st.trace.size == cfg.st.trace.size then
+        let here ← ck.expectedDegree cfg
+        let degree := if isAlways || isEventually then node.acc else here
+        heap := heapPush heap { node with seq, final := some degree }
+        seq := seq + 1
+        continue
+    for (r, q) in succ do
+      if q == 0 then continue
+      match r with
+      | .stuck =>
+        heap := heapPush heap { node with prob := node.prob * q, seq, final := some none }
+      | .ok c' =>
+        -- stamp the decisions made in this step with its number
+        let n := cfg.st.trace.size
+        let tr := c'.st.trace.mapIdx fun i e => if i < n then e else { e with step := t + 1 }
+        let c' := { c' with st := { c'.st with trace := tr } }
+        let d ← ck.expectedDegree c'
+        heap := heapPush heap { prob := node.prob * q, seq, configs := node.configs.push c',
+                                acc := combine node.acc d }
+      seq := seq + 1
+  return { runs, covered, failingFound, complete := heap.isEmpty && !budgetHit, budgetHit }
 
 /--
 Checks a property on one branch. Returns the exact degree interval, together with the first

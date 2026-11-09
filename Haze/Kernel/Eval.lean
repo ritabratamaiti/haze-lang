@@ -117,6 +117,13 @@ structure ECtx where
   fuel : Nat
   /-- Whether a statement may split its work into parallel tasks. -/
   par : Bool := false
+  /--
+  Whether `exec` records the random decisions it makes, for `#tests`. Recording doesn't change
+  any probability; it only keeps runs that made different decisions apart.
+  -/
+  trace : Bool := false
+  /-- The names of the state variables, used only to label recorded decisions. -/
+  varNames : Array String := #[]
 
 /-- Reads a value as a number, failing on any other kind of value. -/
 def asNum : Value → M Rat
@@ -356,13 +363,92 @@ partial def eval (c : ECtx) : Expr → M Value
 end
 
 /--
+A random decision recorded while tracing: the step it was made in, what was decided (the name of
+a local or state variable, or the condition of an `if`), and the value it took.
+-/
+structure TraceEntry where
+  step : Nat
+  what : String
+  value : Value
+  deriving DecidableEq, Hashable, Repr, Inhabited
+
+/--
 The part of a system configuration that a step can change: the state variables, and whether an
-assertion has failed.
+assertion has failed. When tracing, `trace` also lists the random decisions made so far; it is
+always empty otherwise.
 -/
 structure SState where
   vars : Array Value
   crashed : Bool := false
+  trace : Array TraceEntry := #[]
   deriving DecidableEq, Hashable, Inhabited
+
+/-- Whether a term can make a random choice, directly or through a function it calls. -/
+partial def hasRand (env : Env) : Expr → Bool
+  | .rand _ _ | .choose _ _ _ | .cat _ | .catW _ => true
+  | .call f args => ((env.funs[f]?).map (·.latent.prob)).getD true || args.any (hasRand env)
+  | .prim _ args => args.any (hasRand env)
+  | .ite a b c => hasRand env a || hasRand env b || hasRand env c
+  | .letE v b => hasRand env v || hasRand env b
+  | .quant _ _ _ lo hi b => hasRand env lo || hasRand env hi || hasRand env b
+  | .matchE s arms d => hasRand env s || arms.any (hasRand env ·.2) || d.any (hasRand env)
+  | _ => false
+
+/--
+Renders a term in roughly the syntax it was written in, to label recorded decisions. Local
+variables are shown as `_`, since the core language doesn't keep their names.
+-/
+partial def showExpr (env : Env) (names : Array String) : Expr → String
+  | .lit (.deg q) | .lit (.num q) => fmtQ q
+  | .lit v => fmtValue env v
+  | .bvar _ => "_"
+  | .gvar n => n
+  | .svar i => names[i]?.getD s!"#{i}"
+  | .crashed => "crashed"
+  | .prim op args =>
+    let a := args.map arg
+    let bin (s : String) := match a with | [x, y] => s!"{x} {s} {y}" | _ => s
+    match op with
+    | .add => bin "+" | .sub => bin "-" | .mul => bin "*" | .div => bin "/"
+    | .eq => bin "==" | .ne => bin "!=" | .lt => bin "<" | .le => bin "<="
+    | .band | .tand _ => bin "and" | .bor | .tor _ => bin "or"
+    | .bnot | .tnot => s!"not {a.headD "_"}"
+    | .neg => s!"-{a.headD "_"}"
+    | .very => s!"very {a.headD "_"}"
+    | .degOfBool | .numOfDeg | .degOfNum => (args.head?.map (showExpr env names)).getD ""
+    | op => s!"{(reprStr op).drop 1 |>.toString |>.decapitalize}({", ".intercalate (args.map (showExpr env names))})"
+  | .call f args => s!"{f}({", ".intercalate (args.map (showExpr env names))})"
+  | .ite c t e | .choose c t e =>
+    s!"if {showExpr env names c} then {showExpr env names t} else {showExpr env names e}"
+  | .rand r args =>
+    let a := ", ".intercalate (args.map (showExpr env names))
+    match r with | .bernoulli => s!"flip({a})" | .uniform => s!"uniform({a})" | .binomial => s!"binomial({a})"
+  | .cat alts => "{" ++ ", ".intercalate (alts.map fun (e, w) => s!"{showExpr env names e}: {fmtQ w}") ++ "}"
+  | .catW alts =>
+    "{" ++ ", ".intercalate (alts.map fun (e, w) => s!"{showExpr env names e}: {showExpr env names w}") ++ "}"
+  | .letE v b => s!"let _ := {showExpr env names v} in {showExpr env names b}"
+  | .quant all _ x lo hi b =>
+    s!"{if all then "forall" else "exists"} {x} in {showExpr env names lo}..{showExpr env names hi}, {showExpr env names b}"
+  | .matchE s _ _ => s!"match {showExpr env names s}"
+where
+  /-- An argument of an operator, in parentheses if it is itself an operator application. -/
+  arg (e : Expr) : String :=
+    let s := showExpr env names e
+    match e with
+    | .prim op _ =>
+      if [Prim.neg, .abs, .min, .max, .floor, .degOfBool, .numOfDeg, .degOfNum, .very].contains op
+      then s else s!"({s})"
+    | .ite .. | .choose .. | .letE .. => s!"({s})"
+    | _ => s
+
+/--
+Records a random decision in a state, if tracing is on and the term can make one. The label is
+only computed when it is recorded, so tracing costs nothing when it is off.
+-/
+@[inline] def SState.record (s : SState) (c : ECtx) (e : Expr) (what : Unit → String) (v : Value) :
+    SState :=
+  if c.trace && hasRand c.env e then { s with trace := s.trace.push { step := 0, what := what (), value := v } }
+  else s
 
 /--
 Executes one statement of a system step. A failed `assert` crashes the system, which skips the rest
@@ -375,24 +461,36 @@ partial def exec (c : ECtx) (locals : List Value) (s : SState) (st : Stmt) : M S
   | .skip => pure s
   | .assign i e => do
     let v ← eval ce e
+    let s := s.record c e (fun _ => c.varNames[i]?.getD s!"#{i}") v
     pure { s with vars := s.vars.set! i v }
   | .seq a b =>
     M.bindSplit c.par (M.compact (exec c locals s a)) fun par s' => exec { c with par } locals s' b
   | .ite cnd t e => do
-    if ← asBool (← eval ce cnd) then exec c locals s t else exec c locals s e
+    let b ← asBool (← eval ce cnd)
+    let s := s.record c cnd (fun _ => showExpr c.env c.varNames cnd) (.bool b)
+    if b then exec c locals s t else exec c locals s e
   | .choose p t e => do
     let q ← asDeg (← eval ce p)
     let b ← M.ofList [(true, q), (false, 1 - q)]
+    -- a stochastic `if` always makes a random decision
+    let s := if c.trace then
+        { s with trace := s.trace.push { step := 0, what := s!"if {showExpr c.env c.varNames p}", value := .bool b } }
+      else s
     if b then exec c locals s t else exec c locals s e
   | .matchS scrut arms dflt => do
-    match ← eval ce scrut with
+    let v ← eval ce scrut
+    let s := s.record c scrut (fun _ => s!"match {showExpr c.env c.varNames scrut}") v
+    match v with
     | .tag _ i => match arms.find? (·.1 == i) with
       | some (_, b) => exec c locals s b
       | none => exec c locals s dflt
     | v => M.fail s!"runtime: match on non-enum value {repr v}"
-  | .letS v body =>
-    M.bindSplit c.par (eval ce v) fun par x => exec { c with par } (x :: locals) s body
+  | .letS v body name =>
+    M.bindSplit c.par (eval ce v) fun par x =>
+      exec { c with par } (x :: locals) (s.record c v (fun _ => name) x) body
   | .assert cnd => do
-    if ← asBool (← eval ce cnd) then pure s else pure { s with crashed := true }
+    let b ← asBool (← eval ce cnd)
+    let s := s.record c cnd (fun _ => s!"assert {showExpr c.env c.varNames cnd}") (.bool b)
+    if b then pure s else pure { s with crashed := true }
 
 end Haze.Kernel

@@ -1,0 +1,65 @@
+-- `#tests` lists the most likely runs of a system as test cases, measures how much of the
+-- probability they cover, and sizes a statistical test for properties that fail by design some of
+-- the time.
+
+-- A coin flipped three times. Every run of three flips has probability 1/8, so the runs are
+-- listed in the order they are found, and the eight runs are all there are.
+system Coins {
+  var heads : Num := 0
+  step {
+    let flip_heads := flip(0.5)
+    if flip_heads { heads := heads + 1 }
+  }
+}
+#tests[8] Coins |= after[3] heads <= 2
+
+-- A biased coin: runs come out from most to least likely, and a run stops as soon as an
+-- `always` property fails. The failing runs are added after the suite.
+system Biased {
+  var heads : Num := 0
+  step {
+    let flip_heads := flip(0.1)
+    if flip_heads { heads := heads + 1 }
+  }
+}
+#tests[2] Biased |= always[3] heads == 0
+
+-- `eventually`: a run stops as soon as the property holds.
+#tests[3] Biased |= eventually[3] heads >= 1
+
+-- A deterministic system has exactly one run, so one replay is a complete test.
+system Counter {
+  var n : Num := 0
+  step { if n < 2 { n := n + 1 } }
+}
+#tests Counter |= always[5] n <= 2
+
+-- With fuzzy parameters, tests use the most plausible values, and the statistical test is sized
+-- for the plausible value under which the property fails most often.
+param p : Num ~= {0.01: 1, 0.05: 0.5}
+system Server {
+  var down : Bool := false
+  step { down := flip(p) }
+}
+#tests[2] Server |= after[1] not down
+
+-- Random choices from distributions and `match`, and a decision that isn't named.
+enum Color = Red | Green
+system Pick {
+  var c : Color := Red
+  var k : Num := 0
+  step {
+    c := {Red: 0.75, Green: 0.25}
+    match c {
+      Red => { if flip(0.5) { k := k + 1 } }
+      Green => skip
+    }
+  }
+}
+#tests[3] Pick |= after[1] k <= 1
+
+-- Errors.
+input x : Num ~ uniform(1, 2)
+#tests x == 1
+#tests Counter |= always n <= 2
+#tests Counter |= after[1] n == 1 given n >= 0

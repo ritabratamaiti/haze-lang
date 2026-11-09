@@ -224,6 +224,28 @@ and exact rational arithmetic, and that kind of work suits CPU cores rather than
 GPU-friendly part, the floating-point solve, takes a small share of the time. Because its
 answer is certified afterwards, a GPU solver could be added later without trusting it.
 
+### Probability-weighted tests
+
+`#tests` needs the runs of a system, not just its distribution of configurations, so the kernel
+can record random decisions while it executes a step (`ECtx.trace`). Each assignment, `let`,
+`if`, `match` and `assert` whose term can make a random choice appends what it decided to the
+state. Recording is off for every other query, and when it is on it only keeps apart runs that
+made different decisions; the probability of each configuration is unchanged.
+
+`Haze.Kernel.Checker.weightedRuns` is a best-first search over partial runs, kept in a heap
+ordered by probability. Extending a run multiplies its probability by a factor of at most 1, so
+when a complete run is taken from the heap, no run still in the heap, and no extension of one,
+can be more likely. Complete runs therefore come out in exactly decreasing order of
+probability, and equally likely runs in the order they were found, which keeps the output
+deterministic. The search stops after the requested number of runs and enough failing runs, or
+after 200,000 expansions.
+
+The statistical test is a one-sided binomial test. For a failure rate `q`, Haze finds the
+smallest number of runs `n`, and for it the smallest allowance `c`, with
+`P(Bin(n, q) > c) ≤ 10⁻⁶` and `P(Bin(n, q₂) > c) ≥ 0.99`, where `q₂` is twice `q` (or halfway to
+1). These tail probabilities are computed in floating point; the test only sizes checks of
+other code, so it doesn't affect any result Haze proves.
+
 ### Keeping state spaces small
 
 Before checking a property, Haze works out which global variables the property can possibly

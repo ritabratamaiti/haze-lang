@@ -23,3 +23,6 @@ jobs:
 
       - name: Run the conformance sample
         run: python3 examples/Conformance/payments/test_conformance.py
+
+      - name: Run the probability-weighted tests
+        run: python3 examples/Conformance/payments/test_weighted.py

@@ -1,0 +1,4 @@
+-- #tests[n] needs a positive whole number of runs.
+system S { var n : Num := 0
+  step { n := n + 1 } }
+#tests[0] S |= after[1] n == 1

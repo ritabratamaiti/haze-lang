@@ -43,6 +43,12 @@ states are explored up to a limit set by `explore N` or `--states`, with the une
 counted as unknown. The samples that used long horizons to approximate such answers (craps,
 tennis, Penney's game, genetic drift and gambler's ruin) now state them exactly.
 
+`#tests` turns a model into tests for the code it describes. It lists the runs of a system from
+the most likely to the least, with the random decisions behind each one, reports how much of the
+probability they cover, and adds the most likely failing runs. For properties that fail by design
+some of the time, it sizes a statistical test with a known false-alarm rate. The conformance
+sample replays these runs against a real client.
+
 Checking runs on every core: parameter assignments, large frontiers and the random choices
 within a step are processed in parallel, with the same results as before.
 

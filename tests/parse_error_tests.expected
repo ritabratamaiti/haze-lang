@@ -1,0 +1,1 @@
+tests/parse_error_tests.hz:4:11: error: #tests[n] needs a positive whole number
