@@ -1,0 +1,23 @@
+-- Craps: the shooter keeps rolling until the point comes up again or a 7.
+-- That can take any number of rolls, and Haze still gets the exact answer.
+enum Phase = ComeOut | OnPoint | Won | Lost
+
+system Craps {
+  var phase : Phase := ComeOut
+  var point : Num := 0
+  step {
+    let roll := uniform(1, 6) + uniform(1, 6)
+    match phase {
+      ComeOut => {
+        if roll == 7 or roll == 11 { phase := Won }
+        else if roll == 2 or roll == 3 or roll == 12 { phase := Lost }
+        else { point := roll; phase := OnPoint }
+      }
+      OnPoint => { if roll == point { phase := Won } else if roll == 7 { phase := Lost } }
+      _ => skip
+    }
+  }
+}
+
+claim shooter_wins : Craps |= eventually phase == Won          -- 244/495
+#expect Craps |= steps until phase == Won or phase == Lost      -- rolls on average

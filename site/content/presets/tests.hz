@@ -1,0 +1,28 @@
+-- Tests ranked by probability: Haze lists the runs of the model from the
+-- most likely to the least, so a handful of tests covers almost everything
+-- that actually happens, plus the rare runs where the property fails.
+enum Phase = Sending | Waiting | Done | GaveUp
+def loss : Num := 0.1
+
+system Client {
+  var phase : Phase := Sending
+  var attempts : Num := 0
+  var acked : Bool := false
+  step {
+    match phase {
+      Sending => {
+        attempts := attempts + 1
+        let request_lost := flip(loss)
+        let reply_lost := flip(loss)
+        if request_lost or reply_lost { phase := Waiting }
+        else { acked := true; phase := Done }
+      }
+      Waiting => { if attempts < 3 { phase := Sending } else { phase := GaveUp } }
+      _ => skip
+    }
+  }
+}
+
+-- The 4 most likely runs, the rare failing runs, and a statistical test
+-- with a known flake rate for checking the real code.
+#tests[4] Client |= after[6] acked

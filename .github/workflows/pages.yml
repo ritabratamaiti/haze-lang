@@ -1,0 +1,80 @@
+name: Website
+
+# Builds Haze for WebAssembly, checks it against the native build, and builds the website
+# (site/). Pushes to main deploy the site to GitHub Pages; pull requests only build and test it.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build the WebAssembly engine and the site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: leanprover/lean-action@v1
+        with:
+          test: false
+
+      - uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 7.0.0
+          actions-cache-folder: emsdk-cache
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      # C for Lean's Init and Std libraries and the compiled runtime; only Haze's own files
+      # change between runs
+      - uses: actions/cache@v4
+        with:
+          path: wasm/.cache
+          key: wasm-${{ hashFiles('lean-toolchain', 'wasm/build.py', 'wasm/*.c') }}-${{ github.sha }}
+          restore-keys: wasm-${{ hashFiles('lean-toolchain', 'wasm/build.py', 'wasm/*.c') }}-
+
+      - name: Build the WebAssembly engine
+        run: python3 wasm/build.py --jobs 4
+
+      - name: Check it against the native build
+        run: node wasm/test_node.mjs --skip=chip_design
+
+      - name: Build the site
+        working-directory: site
+        run: |
+          npm ci
+          node build.mjs
+
+      # GitHub Pages needs a public repository; until then the site is only built and tested
+      - uses: actions/upload-pages-artifact@v4
+        if: github.event_name != 'pull_request' && !github.event.repository.private
+        with:
+          path: site/dist
+
+  deploy:
+    name: Deploy to GitHub Pages
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && !github.event.repository.private
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,15 @@
+-- You rarely know a failure rate exactly. Write what you do know:
+-- "loss is about 2%, could be 5%, possibly 10%".
+-- Each value comes with how plausible it is (1 = fully plausible).
+param loss : Num ~= {0.01: 0.6, 0.02: 1, 0.05: 0.5, 0.1: 0.2}
+
+-- A request is retried up to 3 times; it fails only if all 3 are lost.
+input lost1 : Bool ~ flip(loss)
+input lost2 : Bool ~ flip(loss)
+input lost3 : Bool ~ flip(loss)
+
+-- The answer is a range: how strongly what you know guarantees it
+-- (belief) and how strongly it allows it (plausibility). This bound holds
+-- at the likely rates but not at the pessimistic 10%, so it fails.
+claim delivered : not (lost1 and lost2 and lost3) with prob >= 0.9999
+#prob lost1 and lost2 and lost3

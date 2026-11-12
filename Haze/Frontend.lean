@@ -462,7 +462,9 @@ def doClaim (d : DeclStx) (name : String) (isThm : Bool) (spec : PropSpec) (boun
     let cex : Json := match wit with
       | some w =>
         let st : List (String × Json) := match sys with
-          | some si => (si.vars.toList.zip w.config.st.vars.toList).map fun ((n, _), v) => (n, Json.value env v)
+          -- variables outside the property's cone of influence aren't tracked, so they're left out
+          | some si => ((si.vars.toList.zip w.config.st.vars.toList).zipIdx.filter fun (_, i) =>
+              ck0.relevantVars[i]?.getD true).map fun (((n, _), v), _) => (n, Json.value env v)
           | none => []
         let ins : List (String × Json) := Id.run do
           let mut out := #[]

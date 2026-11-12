@@ -11,6 +11,7 @@ import Haze.Kernel.Eval
 import Haze.Kernel.Verify
 import Haze.Json
 import Haze.Frontend
+import Haze.Web
 import Haze.Theory
 
 /-!

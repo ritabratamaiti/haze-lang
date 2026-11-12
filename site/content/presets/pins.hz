@@ -1,0 +1,25 @@
+-- A thief tries the most popular PINs first. How often does a 3-guess
+-- lockout (a bank card) or a 10-guess erase (a phone) stop them?
+-- Frequencies of the top 20 PINs: DataGenetics, 3.4 million leaked PINs (2012).
+input pin : Num ~ {1: 0.10713, 2: 0.06016, 3: 0.01881, 4: 0.01197, 5: 0.00745,
+                   6: 0.00616, 7: 0.00613, 8: 0.00526, 9: 0.00516, 10: 0.00512,
+                   11: 0.00451, 12: 0.00419, 13: 0.00395, 14: 0.00391, 15: 0.00366,
+                   16: 0.00304, 17: 0.00303, 18: 0.00293, 19: 0.00290, 20: 0.00285,
+                   0: 0.73168}      -- 0: not in the top 20
+
+system Thief(limit : Num) {
+  var guesses : Num := 0
+  var unlocked : Bool := false
+  var locked : Bool := false
+  step {
+    if not unlocked and not locked {
+      guesses := guesses + 1
+      if pin == guesses { unlocked := true }
+      else if guesses >= limit { locked := true }
+    }
+  }
+}
+
+theorem lockout_holds : Thief(3) |= always guesses <= 3
+claim card : Thief(3) |= eventually unlocked
+claim phone : Thief(10) |= eventually unlocked

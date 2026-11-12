@@ -1,0 +1,16 @@
+-- An incident: which component is to blame? Start from how often each one
+-- causes incidents, then update on the alerts that fired (Bayes' rule).
+enum Cause = Database | Cache | Network | Deploy
+
+input cause : Cause ~ {Database: 0.3, Cache: 0.2, Network: 0.3, Deploy: 0.2}
+
+-- how likely each alert is to fire, depending on the cause
+input timeouts : Bool ~ match cause {
+  Database => flip(0.9), Cache => flip(0.3), Network => flip(0.8), Deploy => flip(0.5) }
+input errors_5xx : Bool ~ match cause {
+  Database => flip(0.7), Cache => flip(0.1), Network => flip(0.3), Deploy => flip(0.9) }
+
+observe timeouts
+observe errors_5xx
+#eval cause
+claim blame_database : cause == Database with prob >= 0.5

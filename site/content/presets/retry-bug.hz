@@ -1,0 +1,32 @@
+-- A payment client retries when a request or its reply is lost.
+-- The server charges the card every time a request reaches it.
+-- Is a customer ever charged twice?
+enum Phase = Sending | Waiting | Done | GaveUp
+
+def loss : Num := 0.05            -- each message is lost 5% of the time
+
+system Client {
+  var phase : Phase := Sending
+  var attempts : Num := 0
+  var charges : Num := 0
+  step {
+    match phase {
+      Sending => {
+        attempts := attempts + 1
+        let request_lost := flip(loss)
+        if request_lost { phase := Waiting }
+        else {
+          charges := charges + 1         -- the server charges the card
+          let reply_lost := flip(loss)
+          if reply_lost { phase := Waiting } else { phase := Done }
+        }
+      }
+      Waiting => { if attempts < 3 { phase := Sending } else { phase := GaveUp } }
+      _ => skip
+    }
+  }
+}
+
+claim delivered : Client |= eventually phase == Done with prob >= 0.99
+theorem never_charged_twice : Client |= always charges <= 1
+-- Fix: charge once per idempotency key, `if charges == 0 { charges := 1 }`

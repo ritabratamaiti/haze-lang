@@ -64,7 +64,8 @@ output (`--json`). Prebuilt binaries are available for Linux (x86-64), macOS (Ap
 Windows (x86-64), with install scripts for each that check downloads against published
 checksums and can also build Haze from source. Haze is also available as a Docker image
 (`ghcr.io/ritabratamaiti/haze-lang`), as a GitHub Action (`ritabratamaiti/haze-lang@v0.1.0`), and in
-GitHub Codespaces. Haze is released under the Functional Source
+GitHub Codespaces. A website with a playground, a tour and the gallery runs Haze in the
+browser, compiled to WebAssembly. Haze is released under the Functional Source
 License (FSL-1.1-ALv2).
 `python scripts/bench.py` times the models in `bench`. The test
 suite runs with `lake test`. When a result depends on more than six parameter assignments, the

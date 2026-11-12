@@ -49,11 +49,30 @@ that GitHub's preview shows the results:
 Binder builds an image the first time someone opens a new commit, which takes a few minutes, so
 open the Binder link yourself after each push to `main` before sharing it.
 
-## A browser playground
+## The website
 
-Haze can't run in the browser yet. Lean stopped publishing WebAssembly builds of its runtime after
-version 4.15, and Lean programs need threads, which a static page on GitHub Pages can't enable.
-Until that changes, GitHub Codespaces gives people a way to try Haze without installing it.
+The website in [`site/`](../site) is a static site: a landing page, a playground, a tour, the
+gallery and these docs. The Website workflow builds it on every push and pull request and
+deploys it to GitHub Pages from `main` once the repository is public. Under
+Settings > Pages, set the source to *GitHub Actions* the first time.
+
+The playground runs a WebAssembly build of Haze, made by [`wasm/build.py`](../wasm/README.md).
+The workflow checks that build against the native one with `node wasm/test_node.mjs`, which
+compares the output of every test and example.
+
+To work on the site locally, install [emsdk](https://emscripten.org/docs/getting_started/downloads.html)
+and activate it, then:
+
+```sh
+lake build
+python wasm/build.py             # writes site/public/engine/haze.{mjs,wasm}
+cd site && npm ci
+node build.mjs --serve           # builds site/dist and serves it on http://localhost:8080
+```
+
+The build runs every preset, tour chapter and gallery example ahead of time, so pages show results
+before the engine has loaded. Presets are in `site/content/presets`, the tour is
+`site/content/tour.md`, and the gallery list is in `site/build.mjs`.
 
 ## How users can check a download
 
