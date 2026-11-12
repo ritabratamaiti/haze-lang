@@ -9,7 +9,7 @@
 
 [![License: FSL-1.1-ALv2](https://img.shields.io/badge/License-FSL--1.1--ALv2-blue.svg)](LICENSE.md)
 [![Lean 4](https://img.shields.io/badge/built%20with-Lean%204-blue.svg)](https://lean-lang.org)
-[![Playground](https://img.shields.io/badge/try%20it-in%20your%20browser-0d9488.svg)](https://ritabratamaiti.github.io/haze-lang/play/)
+[![Playground](https://img.shields.io/badge/try%20it-in%20your%20browser-0d9488.svg)](https://haze-lang.pages.dev/play/)
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ritabratamaiti/haze-lang/blob/main/notebooks/try_haze.ipynb)
 [![Launch Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/ritabratamaiti/haze-lang/main?labpath=notebooks%2Ftry_haze.ipynb)
 [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/ritabratamaiti/haze-lang)
@@ -153,8 +153,8 @@ unsigned programs, since a program you build yourself isn't treated as a downloa
 
 There are four other ways to run Haze:
 
-- **On the website.** The [playground](https://ritabratamaiti.github.io/haze-lang/play/) and the
-  [tour](https://ritabratamaiti.github.io/haze-lang/tour/) run Haze in your browser, compiled to WebAssembly
+- **On the website.** The [playground](https://haze-lang.pages.dev/play/) and the
+  [tour](https://haze-lang.pages.dev/tour/) run Haze in your browser, compiled to WebAssembly
   from the same Lean code, with nothing to install and no server.
   [`wasm/`](wasm/README.md) explains how that build works.
 - **In a notebook.** The *Open in Colab* and *Launch Binder* buttons above open a notebook,
@@ -195,7 +195,7 @@ explores (the default is 100,000), and `--json` prints the results as JSON for o
 
 ## Documentation
 
-- [Website](https://ritabratamaiti.github.io/haze-lang/), with the playground, a tour and the gallery
+- [Website](https://haze-lang.pages.dev/), with the playground, a tour and the gallery
 - [Language reference](docs/Language-Reference.md)
 - [Design and semantics](docs/Design.md), including how Haze relates to Lean
 - [Releasing](docs/Releasing.md), for maintainers

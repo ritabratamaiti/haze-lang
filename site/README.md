@@ -17,4 +17,4 @@ node build.mjs --serve           # builds dist/ and serves it on http://localhos
   home page animation.
 
 The site uses relative links only, so it works at any path. The Website workflow deploys it to
-GitHub Pages; see [Releasing](../docs/Releasing.md#the-website).
+Cloudflare Pages at https://haze-lang.pages.dev/; see [Releasing](../docs/Releasing.md#the-website).

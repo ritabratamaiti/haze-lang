@@ -52,9 +52,12 @@ open the Binder link yourself after each push to `main` before sharing it.
 ## The website
 
 The website in [`site/`](../site) is a static site: a landing page, a playground, a tour, the
-gallery and these docs. The Website workflow builds it on every push and pull request and
-deploys it to GitHub Pages from `main` once the repository is public. Under
-Settings > Pages, set the source to *GitHub Actions* the first time.
+gallery and these docs. It lives at https://haze-lang.pages.dev/ on Cloudflare Pages (the
+`haze-lang` project). The Website workflow builds it on every push and pull request and deploys it
+from `main`. Deploying needs two repository secrets: `CLOUDFLARE_ACCOUNT_ID`, and
+`CLOUDFLARE_API_TOKEN`, a token made from the *Edit Cloudflare Workers* template or with the
+*Cloudflare Pages: Edit* permission. To deploy by hand after building:
+`npx wrangler pages deploy site/dist --project-name haze-lang --branch main`.
 
 The playground runs a WebAssembly build of Haze, made by [`wasm/build.py`](../wasm/README.md).
 The workflow checks that build against the native one with `node wasm/test_node.mjs`, which
