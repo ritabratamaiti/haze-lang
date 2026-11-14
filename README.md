@@ -5,7 +5,7 @@
   </picture>
 </p>
 
-# Haze: Verifying Software with Uncertain Outcomes
+# Haze: verifying software with uncertain outcomes
 
 [![License: FSL-1.1-ALv2](https://img.shields.io/badge/License-FSL--1.1--ALv2-blue.svg)](LICENSE.md)
 [![Lean 4](https://img.shields.io/badge/built%20with-Lean%204-blue.svg)](https://lean-lang.org)
@@ -20,13 +20,20 @@ requests, together with the parts you don't control: messages that get lost, ser
 down, rates you only have a rough idea of. Then you state what the system should guarantee,
 and Haze checks it.
 
-Because the model includes chance, the answers aren't simply true or false. Haze works out how
-likely each outcome is, exactly, with fractions rather than simulation, over a fixed number of
-steps or over runs of any length, and when a guarantee can fail it shows you a run where it
-does. Some inputs aren't really probabilities. If all you
-know is that packet loss is "around 2%, maybe worse", you can write exactly that, and Haze
-answers with a range: how strongly what you know guarantees the property, and how strongly it
-allows it.
+Because the model includes chance, Haze answers with a probability rather than true or false. It
+computes the probability as an exact fraction, without simulation, within a fixed number of steps
+or over runs of any length. When a guarantee can fail, Haze shows you a run where it does.
+
+Some numbers aren't known well enough to be probabilities. If all you know is that packet loss
+is "around 2%, maybe worse", you can write that, and Haze answers with a range, from the
+*belief* (how strongly what you know guarantees the property) to the *plausibility* (how strongly
+it allows it).
+
+Haze is at version 0.1 and experimental, so the language may still change. It checks
+discrete-time models by enumerating their states, and it has no nondeterminism or continuous time
+yet. For large models, [PRISM](https://www.prismmodelchecker.org/) and
+[Storm](https://www.stormchecker.org/) are better choices; [How Haze compares](docs/Comparison.md)
+goes into the differences.
 
 Haze is written in [Lean 4](https://lean-lang.org/) and borrows its design. Your program is
 translated into a small core language, and a separate kernel checks every declaration again
@@ -37,8 +44,8 @@ computation that might not finish.
 ## Example
 
 Take the payment client from above. It retries when a request or its reply is lost, and the
-server charges the card every time a request reaches it. We want two things: almost every
-payment should go through, and no customer should ever be charged twice.
+server charges the card every time a request reaches it. It should meet two
+requirements: almost every payment goes through, and no customer is ever charged twice.
 
 ```haze
 param loss : Num ~= {0.01: 0.6, 0.02: 1, 0.05: 0.5, 0.1: 0.2}
@@ -58,10 +65,10 @@ bug: the first request went through, its reply was lost, and the retry charged t
 
 ```
 payments_retry.hz:92:1: info: claim delivered
-  belief ≈0.998319 · plausibility ≈0.99997 — graded
+  belief ≈0.998319 · plausibility ≈0.99997 · graded
   bound holds: belief ≥ 0.99
 payments_retry.hz:97:1: error: theorem naive_single_charge
-  belief ≈0.955681 · plausibility ≈0.986011 — graded
+  belief ≈0.955681 · plausibility ≈0.986011 · graded
   theorem rejected: belief is ≈0.955681, not 1
   counterexample at step 3 (path mass ≈9.801e-5 (=9801/100000000), degree 0):
     parameters: loss = 0.01
@@ -91,7 +98,7 @@ After that, the [`examples`](examples) folder has models of common reliability p
 | [`circuit_breaker.hz`](examples/circuit_breaker.hz) | A circuit breaker's invariants, how fast it trips, and how much load it sheds when the upstream is flaky. |
 | [`canary_rollout.hz`](examples/canary_rollout.hz) | Whether a defective build can reach all traffic during a staged rollout. |
 | [`incident_triage.hz`](examples/incident_triage.hz) | The likely root cause of an incident, given which alerts fired. |
-| [`probability_classics.hz`](examples/probability_classics.hz) | Textbook problems with known answers, such as the birthday problem, gambler's ruin and the boy–girl paradox. |
+| [`probability_classics.hz`](examples/probability_classics.hz) | Textbook problems with known answers, such as the birthday problem, gambler's ruin and the boy-or-girl paradox. |
 
 Haze isn't limited to software. The models in [`examples/Gallery`](examples/Gallery) come from
 other fields, and each of their answers has been checked against a closed-form result or an
@@ -107,8 +114,8 @@ independent calculation (see [`scripts/verify_gallery.py`](scripts/verify_galler
 | [`games.hz`](examples/Gallery/games.hz) | Games | The odds in craps (244/495), winning a game of tennis from deuce, and Penney's coin game. |
 | [`queueing.hz`](examples/Gallery/queueing.hz) | Networking | How full a network buffer gets and how many packets it drops when the arrival rate is uncertain. |
 | [`game_physics.hz`](examples/Gallery/game_physics.hz) | Video games | Objects tunneling through walls, energy drift in physics integrators, and jumps that depend on the frame rate. |
-| [`chip_design.hz`](examples/Gallery/chip_design.hz) | Chip design | Why NVIDIA's H100 ships with 132 of its 144 cores enabled: the yield of an 814 mm² die at TSMC's reported defect density, with and without disabling defective cores. |
-| [`security.hz`](examples/Gallery/security.hz) | Security | How often a thief guesses a PIN before a card locks or a phone erases itself, using real PIN statistics, and why most intrusion-detection alarms are false (Axelsson's base-rate analysis). |
+| [`chip_design.hz`](examples/Gallery/chip_design.hz) | Chip design | Why NVIDIA's H100 SXM5 enables only 132 of the 144 SMs on its 814 mm² GH100 die: the die's yield at TSMC's reported defect density, with and without spare SMs. |
+| [`security.hz`](examples/Gallery/security.hz) | Security | How often a thief guesses a PIN before a card locks or a phone erases itself, using PIN frequencies from 3.4 million leaked passwords, and why most intrusion-detection alarms are false (Axelsson's base-rate analysis). |
 
 [`examples/Law/sally_clark.hz`](examples/Law/sally_clark.hz) looks at a real court case. In R v
 Clark, a mother was convicted of murdering her two sons partly on the strength of a "1 in 73
@@ -117,8 +124,8 @@ asks the question the jury should have been asked, using the published analysis 
 
 Haze can also generate tests. `#tests` lists the most likely runs of a model as test cases, with
 the random decisions behind each one, and reports how much of the probability they cover. For a
-property that fails by design some of the time, it sizes a statistical test with a known flake
-rate, so that a correct implementation fails it less than once in a million.
+property that fails by design some of the time, it sizes a statistical test with a known false-alarm rate, so that a correct implementation fails it less than once in a
+million.
 
 Finally, [`examples/Conformance`](examples/Conformance) shows how to use a Haze model as the
 specification of real code. One test runs a Python payment client against every pattern of
@@ -144,14 +151,14 @@ The [releases page](https://github.com/ritabratamaiti/haze-lang/releases) has th
 archives, each with the examples, so you can run `haze examples/payments_retry.hz` straight
 away. Both scripts check each download against the checksums published with the release.
 
-To build Haze on your own machine instead, the way Lean projects are built, set
+To build Haze from source with Lean's toolchain instead, set
 `HAZE_FROM_SOURCE=1` (in PowerShell, `$env:HAZE_FROM_SOURCE = "1"`) before running the script.
 It installs [elan](https://github.com/leanprover/elan) if you don't have it, fetches the source
 and runs `lake build`; the first build takes a few minutes. Platforms without a prebuilt release
 are built from source automatically. This also helps on managed Windows machines that block new
 unsigned programs, since a program you build yourself isn't treated as a download.
 
-There are four other ways to run Haze:
+There are other ways to run Haze:
 
 - **On the website.** The [playground](https://haze-lang.pages.dev/play/) and the
   [tour](https://haze-lang.pages.dev/tour/) run Haze in your browser, compiled to WebAssembly
@@ -160,8 +167,9 @@ There are four other ways to run Haze:
 - **In a notebook.** The *Open in Colab* and *Launch Binder* buttons above open a notebook,
   [`notebooks/try_haze.ipynb`](notebooks/try_haze.ipynb), that installs Haze and walks through a
   few models you can edit and rerun. Both are free; Colab needs a Google account, and Binder needs
-  none. *Open in GitHub Codespaces* starts a full editor with Haze installed and the
-  tutorial open.
+  none.
+- **In GitHub Codespaces.** The *Open in GitHub Codespaces* button starts an editor with Haze
+  installed and the tutorial open.
 - **With Docker.** `docker run --rm -v "$PWD:/work" ghcr.io/ritabratamaiti/haze-lang model.hz`
   checks `model.hz` in the current directory.
 - **In GitHub Actions.** This step installs Haze and fails the build if any declaration is
@@ -188,7 +196,8 @@ lake exe haze FILE.hz            # check a model
 lake test                        # run the test suite
 ```
 
-`haze` exits with status 1 if any declaration is rejected, so it can run in CI. A few options
+`haze` exits with status 1 if any declaration is rejected and 2 if it can't run, so it can run in
+CI. A few options
 are worth knowing: `--fuel N` limits how deeply function calls can nest before an outcome counts
 as unknown (the default is 1000), `--states N` limits how many states an unbounded property
 explores (the default is 100,000), and `--json` prints the results as JSON for other programs.
@@ -196,7 +205,12 @@ explores (the default is 100,000), and `--json` prints the results as JSON for o
 ## Documentation
 
 - [Website](https://haze-lang.pages.dev/), with the playground, a tour and the gallery
-- [Language reference](docs/Language-Reference.md)
+- [Installation](docs/Installation.md) and [your first model](docs/Getting-Started.md)
+- [Reading results](docs/Reading-Results.md)
+- [Language reference](docs/Language-Reference.md) and [command line and JSON](docs/Command-Line.md)
+- [How Haze compares](docs/Comparison.md) with PRISM, Storm, Lean and probabilistic programming
+- [FAQ](docs/FAQ.md)
+
 - [Design and semantics](docs/Design.md), including how Haze relates to Lean
 - [Releasing](docs/Releasing.md), for maintainers
 - [Test suite](tests/README.md)
@@ -209,8 +223,7 @@ Haze is available under the [Functional Source License 1.1](LICENSE.md) with Apa
 future license (FSL-1.1-ALv2). You can use, modify and share Haze for any purpose, including
 inside a company and in commercial work, except offering it, or a product built on it with the
 same functionality, as a competing commercial product or service. Each release becomes
-available under the Apache License 2.0 two years after it is published. For a commercial
-license that covers other uses, please get in touch.
+available under the Apache License 2.0 two years after it is published. For a commercial license that covers other uses, email ritabratamaiti@gmail.com.
 
 "Haze" and the Haze logo are trademarks of Ritabrata Maiti; see [TRADEMARKS.md](TRADEMARKS.md).
 

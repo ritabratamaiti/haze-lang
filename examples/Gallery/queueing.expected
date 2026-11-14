@@ -1,5 +1,5 @@
 examples/Gallery/queueing.hz:22:1: info: theorem never_overflows
-  probability 1 — holds with certainty
+  probability 1 · holds with certainty
   grade prob+fuzzy · 3 parameter assignment(s) · ≤5 states/step
   theorem accepted
 examples/Gallery/queueing.hz:23:1: info: #eval Buffer |= after[50] queue
@@ -22,14 +22,14 @@ examples/Gallery/queueing.hz:23:1: info: #eval Buffer |= after[50] queue
     4  ↦ ≈0.221392
     0  ↦ ≈0.111553
 examples/Gallery/queueing.hz:24:1: info: claim full_at_50
-  belief ≈0.02752 · plausibility ≈0.105496 — graded
+  belief ≈0.02752 · plausibility ≈0.105496 · graded
   grade prob+fuzzy · 3 parameter assignment(s) · ≤5 states/step
   by fuzzy parameter (π = possibility):
     arrival = 0.3  π 1       ≈0.02752
     arrival = 0.4  π 0.6     ≈0.093568
     arrival = 0.5  π 0.3     ≈0.221392
 examples/Gallery/queueing.hz:25:1: info: claim no_drops_in_50
-  belief ≈0.674965 · plausibility ≈0.902332 — graded
+  belief ≈0.674965 · plausibility ≈0.902332 · graded
   grade prob+fuzzy · 3 parameter assignment(s) · ≤5 states/step
   by fuzzy parameter (π = possibility):
     arrival = 0.3  π 1       ≈0.902332

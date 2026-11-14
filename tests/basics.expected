@@ -1,8 +1,8 @@
 tests/basics.hz:13:1: info: claim switch_wins
-  probability 0.666667 (=2/3) — graded
+  probability 0.666667 (=2/3) · graded
   grade prob · 1 parameter assignment(s) · ≤12 states/step
 tests/basics.hz:14:1: info: claim stay_wins
-  probability 0.333333 (=1/3) — graded
+  probability 0.333333 (=1/3) · graded
   grade prob · 1 parameter assignment(s) · ≤9 states/step
   bound holds: plausibility ≤ 0.34
 tests/basics.hz:20:1: info: observe positive
@@ -10,31 +10,31 @@ tests/basics.hz:20:1: info: observe positive
 tests/basics.hz:21:1: info: #prob sick
   probability 0.161017 (=19/118)
 tests/basics.hz:25:1: info: theorem add_comm_small
-  probability 1 — proved
+  probability 1 · proved
   grade crisp · 1 parameter assignment(s) · ≤1 states/step
   theorem accepted
 tests/basics.hz:26:1: error: theorem no_square_49
-  probability 0 — refuted
+  probability 0 · refuted
   grade crisp · 1 parameter assignment(s) · ≤1 states/step
   theorem rejected: belief is 0, not 1
   counterexample (probability 1, degree 0):
     falsified by x = 7
 tests/basics.hz:30:1: info: claim overloaded
-  belief 0 · plausibility 0.4 — graded
+  belief 0 · plausibility 0.4 · graded
   grade fuzzy · 3 parameter assignment(s) · ≤1 states/step
   by fuzzy parameter (π = possibility):
     load = 50  π 0.5     0
     load = 70  π 1       0
     load = 90  π 0.4     1
 tests/basics.hz:31:1: info: claim fine
-  belief 0.6 · plausibility 1 — graded
+  belief 0.6 · plausibility 1 · graded
   grade fuzzy · 3 parameter assignment(s) · ≤1 states/step
   by fuzzy parameter (π = possibility):
     load = 50  π 0.5     1
     load = 70  π 1       1
     load = 90  π 0.4     0
 tests/basics.hz:36:1: info: claim is_hot
-  probability 0.25 — graded
+  probability 0.25 · graded
   grade prob · 1 parameter assignment(s) · ≤2 states/step
 tests/basics.hz:38:1: info: alarm : Bool @prob
 tests/basics.hz:39:1: info: #prob alarm
@@ -45,7 +45,7 @@ tests/basics.hz:46:1: error: expected a number, got a Bool
 tests/basics.hz:54:1: info: #eval collatz(27, 0)
   111
 tests/basics.hz:56:1: info: claim diverges
-  belief 0 · plausibility 1 — graded
+  belief 0 · plausibility 1 · graded
   grade partial · 1 parameter assignment(s) · ≤1 states/step
 tests/basics.hz:57:1: info: def spin(n : Num) : Bool  latent grade @partial (recursive)
 tests/basics.hz:64:1: info: #eval Coin |= after[3] heads
@@ -54,9 +54,9 @@ tests/basics.hz:64:1: info: #eval Coin |= after[3] heads
   3  ↦ 0.125
   0  ↦ 0.125
 tests/basics.hz:65:1: info: claim some_heads
-  probability 0.875 — graded
+  probability 0.875 · graded
   grade prob · 1 parameter assignment(s) · ≤1 states/step
 tests/basics.hz:66:1: info: claim no_heads
-  probability 0.125 — graded
+  probability 0.125 · graded
   grade prob · 1 parameter assignment(s) · ≤1 states/step
 tests/basics.hz:67:1: info: system Coin { heads : Num } @prob

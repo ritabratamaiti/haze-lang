@@ -1,4 +1,4 @@
-examples/probability_classics.hz:10:1: info: #eval total
+examples/probability_classics.hz:11:1: info: #eval total
   7   ↦ 0.166667 (=1/6)
   6   ↦ 0.138889 (=5/36)
   8   ↦ 0.138889 (=5/36)
@@ -10,58 +10,58 @@ examples/probability_classics.hz:10:1: info: #eval total
   11  ↦ 0.055556 (=1/18)
   2   ↦ 0.027778 (=1/36)
   12  ↦ 0.027778 (=1/36)
-examples/probability_classics.hz:11:1: info: #prob total == 7
+examples/probability_classics.hz:12:1: info: #prob total == 7
   probability 0.166667 (=1/6)
-examples/probability_classics.hz:12:1: info: #expect total
+examples/probability_classics.hz:13:1: info: #expect total
   expectation 7
-examples/probability_classics.hz:13:1: info: claim doubles
-  probability 0.166667 (=1/6) — graded
+examples/probability_classics.hz:14:1: info: claim doubles
+  probability 0.166667 (=1/6) · graded
   grade prob · 1 parameter assignment(s) · ≤36 states/step
-examples/probability_classics.hz:14:1: info: claim at_least_one_six
-  probability 0.305556 (=11/36) — graded
+examples/probability_classics.hz:15:1: info: claim at_least_one_six
+  probability 0.305556 (=11/36) · graded
   grade prob · 1 parameter assignment(s) · ≤36 states/step
-examples/probability_classics.hz:18:1: info: #prob heads >= 8
+examples/probability_classics.hz:19:1: info: #prob heads >= 8
   probability 0.054688 (=7/128)
-examples/probability_classics.hz:19:1: info: #expect heads
+examples/probability_classics.hz:20:1: info: #expect heads
   expectation 5
-examples/probability_classics.hz:35:1: info: claim birthday_23
-  probability ≈0.507297 — graded
+examples/probability_classics.hz:36:1: info: claim birthday_23
+  probability ≈0.507297 · graded
   grade prob · 1 parameter assignment(s) · ≤23 states/step
-examples/probability_classics.hz:36:1: info: claim birthday_50
-  probability ≈0.970374 — graded
+examples/probability_classics.hz:37:1: info: claim birthday_50
+  probability ≈0.970374 · graded
   grade prob · 1 parameter assignment(s) · ≤50 states/step
-examples/probability_classics.hz:49:1: info: #eval Polya |= after[5] red
+examples/probability_classics.hz:50:1: info: #eval Polya |= after[5] red
   6  ↦ 0.166667 (=1/6)
   5  ↦ 0.166667 (=1/6)
   4  ↦ 0.166667 (=1/6)
   3  ↦ 0.166667 (=1/6)
   2  ↦ 0.166667 (=1/6)
   1  ↦ 0.166667 (=1/6)
-examples/probability_classics.hz:63:1: info: claim all_within_10
-  probability ≈0.780602 — graded
+examples/probability_classics.hz:64:1: info: claim all_within_10
+  probability ≈0.780602 · graded
   grade prob · 1 parameter assignment(s) · ≤3 states/step
-examples/probability_classics.hz:66:1: info: #expect Coupons |= after[80] draws
+examples/probability_classics.hz:67:1: info: #expect Coupons |= after[80] draws
   expectation ≈8.333333
-examples/probability_classics.hz:82:1: info: claim fair_win
-  probability 0.5 — graded
+examples/probability_classics.hz:83:1: info: claim fair_win
+  probability 0.5 · graded
   grade prob · 1 parameter assignment(s) · 7 reachable states
-examples/probability_classics.hz:83:1: info: claim biased_win
-  probability 0.228571 (=8/35) — graded
+examples/probability_classics.hz:84:1: info: claim biased_win
+  probability 0.228571 (=8/35) · graded
   grade prob · 1 parameter assignment(s) · 7 reachable states
-examples/probability_classics.hz:84:1: info: theorem never_negative
-  probability 1 — holds with certainty
+examples/probability_classics.hz:85:1: info: theorem never_negative
+  probability 1 · holds with certainty
   grade prob · 1 parameter assignment(s) · 7 reachable states
   theorem accepted
-examples/probability_classics.hz:87:1: info: #expect Game(0.5) |= steps until money == 0 or money == 6
+examples/probability_classics.hz:88:1: info: #expect Game(0.5) |= steps until money == 0 or money == 6
   expected steps 9
-examples/probability_classics.hz:93:1: info: claim vague_win
-  belief 0.360125 (=5193/14420) · plausibility 0.5 — graded
+examples/probability_classics.hz:94:1: info: claim vague_win
+  belief 0.360125 (=5193/14420) · plausibility 0.5 · graded
   grade prob+fuzzy · 3 parameter assignment(s) · 7 reachable states
   by fuzzy parameter (π = possibility):
     p = 0.4   π 0.3     0.228571 (=8/35)
     p = 0.45  π 0.7     0.353883 (=729/2060)
     p = 0.5   π 1       0.5
-examples/probability_classics.hz:102:1: info: observe first == Boy or second == Boy
+examples/probability_classics.hz:103:1: info: observe first == Boy or second == Boy
   evidence probability 0.75; worlds renormalized
-examples/probability_classics.hz:103:1: info: #prob first == Boy and second == Boy
+examples/probability_classics.hz:104:1: info: #prob first == Boy and second == Boy
   probability 0.333333 (=1/3)

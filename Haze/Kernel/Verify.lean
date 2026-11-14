@@ -466,7 +466,7 @@ structure Checker where
   maxStates : Nat := 100000
   /-- Whether steps record their random decisions, for `#tests`. -/
   trace : Bool := false
-  /-- The names of the state variables, for labelling recorded decisions. -/
+  /-- The names of the state variables, for labeling recorded decisions. -/
   varNames : Array String := #[]
 
 namespace Checker

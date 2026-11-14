@@ -21,7 +21,7 @@ claim fixed : Drift |= eventually copies == 6    -- exactly 1/3
 claim lost : Drift |= eventually copies == 0     -- exactly 2/3
 #expect Drift |= steps until copies == 0 or copies == 6
 
--- 2. Hardy–Weinberg proportions with a vaguely known allele frequency ----------
+-- 2. Hardy–Weinberg proportions with a roughly known allele frequency ----------
 -- Here the frequency q of a recessive allele is only known as "about 0.2", so it
 -- is a fuzzy parameter: a few candidate values, each with a degree of possibility.
 -- Under random mating a child is heterozygous (one copy of each allele) with

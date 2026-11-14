@@ -10,8 +10,8 @@
 --   * Defect density: TSMC reported about 0.10 defects per cm² for its N5 process in 2020
 --     (TSMC Technology Symposium 2020, as reported by AnandTech), with N7 at about 0.09 at a
 --     similar stage. GH100 is made on TSMC 4N, an N5-family process.
--- Assumptions, labelled as such:
---   * Defects are independent, as in the Poisson yield model. Each square millimetre has a
+-- Assumptions, labeled as such:
+--   * Defects are independent, as in the Poisson yield model. Each square millimeter has a
 --     defect with probability D0 × 1 mm², which is the Poisson model up to terms of order D0²
 --     (real defects cluster a little, which makes yields somewhat higher than this model).
 --   * A defect inside an SM disables that SM; a defect anywhere else on the die, such as in the

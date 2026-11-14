@@ -78,7 +78,7 @@ tests/weighted_tests.hz:28:1: info: #tests[3] Biased |= eventually[3] heads >= 1
     step 1: flip_heads = false
     step 2: flip_heads = true
     state: heads = 1
-  statistical test: a run of code that matches the model fails this property with probability 0.729. Run the real code 444 times and allow up to 366 failures: code that matches the model then fails the test with probability ≈8.97731e-7, and code that fails halfway to always is caught with probability ≈0.990186
+  statistical test: a run of code that matches the model fails this property with probability 0.729. Run the real code 444 times and allow up to 366 failures: code that matches the model then fails the test with probability ≈8.97731e-7, and code that fails with probability halfway between that and 1 is caught with probability ≈0.990186
 tests/weighted_tests.hz:35:1: info: #tests Counter |= always[5] n <= 2
   this is the only run
   the property holds on every run
@@ -87,7 +87,7 @@ tests/weighted_tests.hz:35:1: info: #tests Counter |= always[5] n <= 2
     state: n = 2
   statistical test: the property holds on every run, so one run of the real code is a deterministic test
 tests/weighted_tests.hz:44:1: info: #tests[2] Server |= after[1] not down
-  runs at p = 0.01, the most plausible parameter values
+  runs at p = 0.01, the most possible parameter values
   these 2 runs are all the runs there are
   the property fails with probability 0.01; all the failing runs are listed
   run 1 · probability 0.99 · cumulative 0.99 · passes

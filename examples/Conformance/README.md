@@ -1,10 +1,9 @@
-# Checking Real Code Against a Haze Model
+# Checking real code against a Haze model
 
 A Haze model is most useful when it describes code that actually runs. This sample shows one
-way to keep the two in step, using a pattern that teams working with Lean use in industry:
-write a model of the component, prove what it must guarantee, and then test the real
-implementation against the model. Haze itself only provides the model checking and its
-[JSON output](../../docs/Language-Reference.md#json-output); everything else here is ordinary
+way to keep the two in step, with a common pattern: write a model of the component, prove what it must
+guarantee, and then test the real implementation against the model. Haze itself only provides the model checking and its
+[JSON output](../../docs/Command-Line.md#json-output); everything else here is ordinary
 Python.
 
 The [`payments`](payments) folder holds three files: the model,
@@ -41,8 +40,8 @@ can pass many tests and still fail on a rare path that only an exhaustive check 
 
 ## The model
 
-[`payments.hz`](payments/payments.hz) describes a client that sends a charge request and, after
-a timeout, retries up to three times. The server deduplicates requests by idempotency key, so a
+[`payments.hz`](payments/payments.hz) describes a client that sends a charge request and, after a
+timeout, tries again, making up to three attempts in all. The server deduplicates requests by idempotency key, so a
 retry never charges the card again. Each request and each reply can be lost, and the loss rate
 is only known roughly, so it's a fuzzy parameter:
 
@@ -99,7 +98,7 @@ random. The next section covers both.
 Coverage usually means how much of the code a test suite runs. A suite can run every line and
 still miss the failure that happens most often in production, because it never tried the right
 sequence of events. Probability-weighted testing measures a suite by how much of the system's
-*probable behavior* it covers instead, and it gives every random test an exact flake rate.
+*probable behavior* it covers instead, and it gives every random test a known false-alarm rate.
 
 `#tests` in the model asks Haze for test cases:
 
@@ -139,7 +138,7 @@ often is caught with probability ≈0.990011
 
 Haze picks the smallest number of runs that keeps false alarms below one in a million and still
 catches code that fails twice as often with probability 0.99, and the fewest failures to allow
-for that. It uses the plausible parameter values under which the property fails most often.
+for that. It uses the possible parameter values under which the property fails most often.
 
 The script runs both kinds of test against the client and four broken versions, and reports the
 probability of the behavior on which each broken version was caught:
@@ -174,5 +173,5 @@ clock, the random number generator. That's good practice anyway, and it's what m
 or seeded testing possible. Keep the model focused on the decisions that matter for your
 requirements; a model of a retry policy needs to know whether each request got through, not
 what was in it. Use a fuzzy parameter for any rate you don't know precisely, so that the
-conformance test checks the code at every plausible value. And keep the model next to the
+conformance test checks the code at every possible value. And keep the model next to the
 code, so that changes to both are reviewed in the same pull request and checked by the same CI.

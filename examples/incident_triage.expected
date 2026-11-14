@@ -17,6 +17,6 @@ examples/incident_triage.hz:31:1: info: #outcomes cause == Database
   cause = Network   P 0.234555 (=224/955)  ⇒ false
   cause = Deploy    P 0.169634 (=162/955)  ⇒ false
 examples/incident_triage.hz:35:1: info: claim page_db_oncall
-  probability 0.593717 (=567/955) — graded
+  probability 0.593717 (=567/955) · graded
   grade prob · 1 parameter assignment(s) · ≤4 states/step
   bound holds: belief ≥ 0.5

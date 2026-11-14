@@ -1,10 +1,10 @@
 examples/Gallery/physics.hz:12:1: info: #expect Decay |= after[10] nuclei
   expectation ≈6.973569
 examples/Gallery/physics.hz:13:1: info: claim half_left_after_7
-  probability ≈0.510403 — graded
+  probability ≈0.510403 · graded
   grade prob · 1 parameter assignment(s) · ≤21 states/step
 examples/Gallery/physics.hz:14:1: info: theorem never_grows
-  probability 1 — holds with certainty
+  probability 1 · holds with certainty
   grade prob · 1 parameter assignment(s) · ≤21 states/step
   theorem accepted
 examples/Gallery/physics.hz:23:1: info: #expect VagueDecay |= after[10] nuclei
@@ -22,5 +22,5 @@ examples/Gallery/physics.hz:39:1: info: #eval Ehrenfest |= after[40] left
 examples/Gallery/physics.hz:40:1: info: #expect Ehrenfest |= after[40] left
   expectation ≈2.00002
 examples/Gallery/physics.hz:54:1: info: claim returns_within_20
-  probability ≈0.823803 — graded
+  probability ≈0.823803 · graded
   grade prob · 1 parameter assignment(s) · ≤20 states/step

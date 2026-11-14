@@ -21,7 +21,7 @@ examples/Law/sally_clark.hz:41:1: info: #prob explanation == DoubleSIDS
     dependence = 10, odds = 4.5  π 1       0.818182 (=9/11)
     dependence = 10, odds = 9    π 1       0.9
 examples/Law/sally_clark.hz:42:1: info: claim natural_more_likely
-  belief 0.818182 (=9/11) · plausibility 0.9 — graded
+  belief 0.818182 (=9/11) · plausibility 0.9 · graded
   grade prob+fuzzy · 4 parameter assignment(s) · ≤2 states/step
   bound holds: belief ≥ 0.5
   by fuzzy parameter (π = possibility):

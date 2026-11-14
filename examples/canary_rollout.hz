@@ -4,7 +4,7 @@
 -- the first three stages, monitoring samples 50 requests, and a single failure among
 -- them rolls the release back automatically.
 --
--- "The build is probably fine, but QA was rushed" is a vague belief about the defect
+-- "The build is probably fine, but QA was rushed" is a rough judgment about the defect
 -- rate, not a probability, so the defect rate is a fuzzy parameter. Haze keeps the two
 -- kinds of uncertainty apart and reports intervals.
 
@@ -36,7 +36,7 @@ system Rollout {
   }
 }
 
--- A bad build must never reach 100% of traffic. Because the defect rate is vague,
+-- A bad build must never reach 100% of traffic. Because the defect rate is only roughly known,
 -- the answer is graded rather than a plain yes or no.
 claim bad_build_contained : Rollout |= always[4] (stage == Full implies defect == 0)
 claim reaches_full : Rollout |= eventually[4] stage == Full

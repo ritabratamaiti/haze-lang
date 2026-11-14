@@ -1,4 +1,4 @@
-# Test Suite
+# Test suite
 
 Haze is tested with golden tests: each test is a Haze file, and its expected output is stored
 next to it in a `.expected` file. Every `.hz` file in this directory and in

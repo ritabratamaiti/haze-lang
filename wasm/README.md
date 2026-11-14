@@ -26,12 +26,12 @@ Lean stopped publishing a WebAssembly build of its runtime and standard library 
 - links it all with [`shim.c`](shim.c) into `haze.mjs` and a 2.8 MB `haze.wasm`.
 
 The browser build has no threads. Lean runs `Task.spawn` immediately when its task manager isn't
-started, so Haze's parallel checks simply run one after another, and the page needs no special
+started, so Haze's parallel checks run one after another, and the page needs no special
 headers. The build also leaves out libuv (the few file functions the runtime refers to are
 stubbed in [`uv_stubs.c`](uv_stubs.c)) and GMP.
 
 Without GMP, arithmetic on very large numbers is slow. Most models check in well under a second,
-but [`examples/chip_design.hz`](../examples/chip_design.hz) takes many minutes in the browser
+but [`examples/Gallery/chip_design.hz`](../examples/Gallery/chip_design.hz) takes many minutes in the browser
 against eight seconds natively. The website shows that example's precomputed output.
 
 ## The interface

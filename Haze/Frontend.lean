@@ -204,7 +204,7 @@ def solverNotes (rows : List BranchResult) (limit : Nat) : List String :=
     [s!"exploration stopped at {limit} states; what follows the unexplored states counts as unknown (raise the limit with `explore N` or --states)"]
   else []) ++
   (if rows.all (·.exact) then [] else
-    ["large parts of the state space were solved numerically; the bounds are certified in exact arithmetic"])
+    ["components with more than 120 states were solved in floating point, and their bounds checked in exact arithmetic"])
 
 /--
 Combines lower (or upper) expectations that may be infinite, written `none`, over the α-cuts of
@@ -301,9 +301,9 @@ def maxTableRows : Nat := 6
 
 /--
 Formats per-assignment results, given as (assignment, possibility, value, text). Small tables are
-shown in full. For larger ones, the summary shows the lowest, highest and most plausible results,
+shown in full. For larger ones, the summary shows the lowest, highest and most possible results,
 and then how much the result moves when each parameter is varied alone while the others keep
-their most plausible values, which shows which uncertain quantity matters most.
+their most possible values, which shows which uncertain quantity matters most.
 -/
 def paramTable (env : Env) (rows : List (List (String × Value) × Rat × Rat × String)) : List String :=
   let label := fun (a : List (String × Value)) => fmtAssign env a
@@ -321,8 +321,8 @@ def paramTable (env : Env) (rows : List (List (String × Value) × Rat × Rat ×
     let w := [lowest, highest, core].foldl (fun m r => max m (label r.1).length) 0
     let out := #[s!"by fuzzy parameter (π = possibility), {rows.length} assignments:",
       s!"  lowest          {line w lowest}", s!"  highest         {line w highest}",
-      s!"  most plausible  {line w core}",
-      "what moves the result most (each parameter varied alone, the others at their most plausible values):"]
+      s!"  most possible   {line w core}",
+      "what moves the result most (each parameter varied alone, the others at their most possible values):"]
     let names := core.1.map (·.1)
     let mut effects : Array (Rat × String) := #[]
     for n in names do
@@ -452,7 +452,7 @@ def doClaim (d : DeclStx) (name : String) (isThm : Bool) (spec : PropSpec) (boun
           else s!"bound fails: plausibility {fmtQ iv.pl} > {fmtQ q}")
       | false, .none => (true, "")
     let size := if spec.mode.unbounded then s!"{maxN} reachable states" else s!"≤{maxN} states/step"
-    let lines := [s!"{fmtInterval iv} — {status g iv}",
+    let lines := [s!"{fmtInterval iv} · {status g iv}",
         s!"grade {g} · {rows.length} parameter assignment(s) · {size}"]
       ++ solverNotes rows s.opts.states
       ++ (if verdict.isEmpty then [] else [verdict])
@@ -645,7 +645,7 @@ def doQuery (d : DeclStx) (k : QueryKind) (spec : PropSpec) : FM Unit := do
       | .ok (rows, _) => pure rows.toArray
       | .error e => emit d.pos "error" e; return
     let some si := spec.sys.bind (env.systems[·]?) | emit d.pos "error" "#tests needs a system"; return
-    -- tests are generated at the most plausible parameter values
+    -- tests are generated at the most possible parameter values
     let mut bi := 0
     for i in [0:branches.size] do
       if branches[i]!.poss > branches[bi]!.poss then bi := i
@@ -670,7 +670,7 @@ def doQuery (d : DeclStx) (k : QueryKind) (spec : PropSpec) : FM Unit := do
         ((tr.filter (·.step == t)).map fun e => s!"{e.what} = {fmtValue env e.value}")
     let mut lines : Array String := #[]
     if !b.assign.isEmpty then
-      lines := lines.push s!"runs at {fmtAssign env b.assign}, the most plausible parameter values"
+      lines := lines.push s!"runs at {fmtAssign env b.assign}, the most possible parameter values"
     let suite := res.runs.filter (·.inSuite)
     lines := lines.push (if res.complete && suite.size == res.runs.size then
         (if suite.size == 1 then "this is the only run" else s!"these {suite.size} runs are all the runs there are")
@@ -694,8 +694,8 @@ def doQuery (d : DeclStx) (k : QueryKind) (spec : PropSpec) : FM Unit := do
       lines := lines.push head
       for l in choicesOf r ++ fmtConfig env rel (some si) [] r.configs.back! do
         lines := lines.push ("  " ++ l)
-    -- a statistical test of the real code, sized for the most failure-prone plausible values
-    -- size it for the plausible parameter values under which the property fails most often
+    -- a statistical test of the real code, sized for the most failure-prone possible values
+    -- size it for the possible parameter values under which the property fails most often
     let mut qi := 0
     for i in [0:rows.size] do
       if rows[i]!.poss > 0 && 1 - rows[i]!.lo > 1 - rows[qi]!.lo then qi := i
@@ -708,7 +708,7 @@ def doQuery (d : DeclStx) (k : QueryKind) (spec : PropSpec) : FM Unit := do
       else match plan with
       | some p =>
         let atParams := if qAssign.isEmpty then "" else s!" at {fmtAssign env qAssign}"
-        s!"statistical test{atParams}: a run of code that matches the model fails this property with probability {fmtQ qMax}. Run the real code {p.runs} times and allow up to {p.allowed} failures: code that matches the model then fails the test with probability {fmtF p.falseAlarm}, and code that fails {if qMax < 1/2 then "twice as often" else "halfway to always"} is caught with probability {fmtF p.power}"
+        s!"statistical test{atParams}: a run of code that matches the model fails this property with probability {fmtQ qMax}. Run the real code {p.runs} times and allow up to {p.allowed} failures: code that matches the model then fails the test with probability {fmtF p.falseAlarm}, and code that fails {if qMax < 1/2 then "twice as often" else "with probability halfway between that and 1"} is caught with probability {fmtF p.power}"
       | none => "statistical test: telling correct code from code that fails twice as often would take more than 10 million runs; replaying the runs above is the practical test"
     lines := lines.push statLine
     let stateJson := fun (c : Config) => Json.obj

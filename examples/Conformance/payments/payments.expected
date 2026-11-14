@@ -1,21 +1,21 @@
 examples/Conformance/payments/payments.hz:58:1: info: theorem single_charge
-  probability 1 — holds with certainty
+  probability 1 · holds with certainty
   grade prob+fuzzy · 4 parameter assignment(s) · ≤5 states/step
   theorem accepted
 examples/Conformance/payments/payments.hz:59:1: info: theorem ack_means_charged
-  probability 1 — holds with certainty
+  probability 1 · holds with certainty
   grade prob+fuzzy · 4 parameter assignment(s) · ≤5 states/step
   theorem accepted
 examples/Conformance/payments/payments.hz:60:1: info: theorem bounded_attempts
-  probability 1 — holds with certainty
+  probability 1 · holds with certainty
   grade prob+fuzzy · 4 parameter assignment(s) · ≤4 states/step
   theorem accepted
 examples/Conformance/payments/payments.hz:61:1: info: theorem terminates
-  probability 1 — holds with certainty
+  probability 1 · holds with certainty
   grade prob+fuzzy · 4 parameter assignment(s) · ≤1 states/step
   theorem accepted
 examples/Conformance/payments/payments.hz:64:1: info: claim delivered
-  belief ≈0.998319 · plausibility ≈0.99997 — graded
+  belief ≈0.998319 · plausibility ≈0.99997 · graded
   grade prob+fuzzy · 4 parameter assignment(s) · ≤4 states/step
   bound holds: belief ≥ 0.99
   by fuzzy parameter (π = possibility):
@@ -95,7 +95,7 @@ examples/Conformance/payments/payments.hz:71:1: info: #expect Client |= after[6]
     loss = 0.05  π 0.5     E ≈187.858961
     loss = 0.1   π 0.2     E 312.41028
 examples/Conformance/payments/payments.hz:77:1: info: #tests[6] Client |= always[6] charges <= 1
-  runs at loss = 0.02, the most plausible parameter values
+  runs at loss = 0.02, the most possible parameter values
   the 6 most likely runs make up ≈0.999569 of the probability
   the property holds on every run
   run 1 · probability 0.9604 · cumulative 0.9604 · passes
@@ -126,7 +126,7 @@ examples/Conformance/payments/payments.hz:77:1: info: #tests[6] Client |= always
     state: phase = Done, attempts = 3, charges = 1, acked = true, latency = 2080
   statistical test: the property holds on every run, so one run of the real code is a deterministic test
 examples/Conformance/payments/payments.hz:78:1: info: #tests[3] Client |= after[6] acked
-  runs at loss = 0.02, the most plausible parameter values
+  runs at loss = 0.02, the most possible parameter values
   the 3 most likely runs make up ≈0.998432 of the probability
   the property fails with probability ≈6.20991e-5 (=970299/15625000000); the failing runs listed make up ≈0.381326 of that
   run 1 · probability 0.9604 · cumulative 0.9604 · passes

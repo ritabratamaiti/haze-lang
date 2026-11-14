@@ -1,4 +1,4 @@
-# Design and Semantics
+# Design and semantics
 
 This document explains how Haze is put together and what its answers mean precisely. It's
 written for readers who know some typed functional programming and basic probability. If you
@@ -35,7 +35,7 @@ maintaining a fork of Lean's compiler and runtime.
 
 So Haze keeps the architecture and replaces what sits inside it. It has its own elaborator, an
 environment of checked declarations, and a small kernel that checks every declaration again,
-but its core language and the judgement its kernel decides are different. Because Haze is
+but its core language and the judgment its kernel decides are different. Because Haze is
 written in Lean, its kernel can be read, run and partly proved correct in the same system (see
 [Trust and testing](#trust-and-testing)).
 
@@ -47,7 +47,7 @@ written in Lean, its kernel can be read, run and partly proved correct in the sa
 | `Lean.Elab` | `Haze.Elab` | An `if` whose condition is a `Deg` becomes the stochastic conditional `Expr.choose`. |
 | `Lean.Expr` | `Haze.Expr`, `Haze.Stmt` | Adds stochastic conditionals, random primitives, categorical choice, system state and bounded quantifiers, and drops universes and dependent types. |
 | `Lean.Declaration` | `Haze.Decl` and the records in `Haze.Env` | Adds fuzzy parameters, random nodes, transition systems, and theorems that store a belief–plausibility interval instead of a proof. |
-| The kernel type checker | `Haze.Kernel.Check` | Decides the graded judgement `Γ ⊢ e : T @ g`, described below. |
+| The kernel type checker | `Haze.Kernel.Check` | Decides the graded judgment `Γ ⊢ e : T @ g`, described below. |
 | Kernel reduction | `Haze.Kernel.Eval`, `Haze.Kernel.Verify` | Computes exact results: a distribution monad, model checking and α-cut integration. |
 | `Lean.Environment.addDecl` | `Haze.Kernel.addDecl`, `Haze.Frontend.processDecl` | A declaration is added only after both the type checker and its semantic action succeed. |
 
@@ -84,7 +84,9 @@ You can also state the grade you expect, and the kernel holds you to it:
 
 ### Exact numbers
 
-Numbers are exact rationals (Lean's `Rat`), so every probability Haze reports is exact. When a
+Numbers are exact rationals (Lean's `Rat`). Every probability Haze reports is either exact or,
+for large components of an unbounded property, a pair of bounds checked in exact arithmetic (see
+[Unbounded properties](#unbounded-properties)). When a
 fraction is long, messages round it and show the exact value next to it, as in
 `0.666667 (=2/3)`, and very small numbers are written in scientific notation, as in
 `≈1.37018e-8 (=1/72982849)`.
@@ -116,7 +118,7 @@ declared, with what it depends on, so its runtime errors are reported where it i
 A fuzzy parameter is a normal possibility distribution `π` over finitely many values: every
 value has a possibility between 0 and 1, and at least one has possibility 1. Haze reads it as a
 random set. Drawing `α` uniformly from `(0, 1]` gives the α-cut `{v | π v ≥ α}`, the set of
-values that are still plausible at level `α`.
+values that are still possible at level `α`.
 
 To evaluate a property, Haze goes through every joint assignment `y` of the fuzzy parameters.
 The possibility of an assignment is the smallest possibility among its values. With `y` fixed,

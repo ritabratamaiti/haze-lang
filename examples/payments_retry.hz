@@ -1,11 +1,11 @@
--- A payments client that times out and retries when the network loses a message.
+-- A payment client that times out and retries when the network loses a message.
 --
--- Retries make delivery more likely, but they raise a worrying question: can a
+-- Retries make delivery more likely, but they raise a question: can a
 -- customer be charged twice? This file models two versions of the client and server
 -- to answer that, and to measure how often a payment gets through.
 --
--- We only know the loss rate vaguely ("around 2%, could be worse"), so it is a fuzzy
--- parameter rather than a probability, so answers that depend on it come out as
+-- The loss rate is only known roughly ("around 2%, could be worse"), so it is a fuzzy
+-- parameter rather than a probability. Answers that depend on it come out as
 -- [belief, plausibility] intervals.
 
 enum Phase = Sending | Waiting | Done | GaveUp

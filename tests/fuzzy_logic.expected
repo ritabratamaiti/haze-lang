@@ -37,7 +37,7 @@ tests/fuzzy_logic.hz:37:1: info: #eval exists t in 18..22, t is warm
 tests/fuzzy_logic.hz:38:1: info: #eval forall t in 5..4, t is warm
   deg 1
 tests/fuzzy_logic.hz:42:1: info: claim warm_ish
-  probability 0.68254 (=43/63) — graded
+  probability 0.68254 (=43/63) · graded
   grade prob · 1 parameter assignment(s) · ≤9 states/step
 tests/fuzzy_logic.hz:44:1: info: act : Num @prob
 tests/fuzzy_logic.hz:45:1: info: #expect act

@@ -11,7 +11,7 @@ import Haze.Core
 The kernel type checker checks every elaborated declaration again, independently of the
 elaborator, before the declaration enters the environment. It plays the role of Lean's C++ kernel
 (reached through `Lean.Environment.addDecl`). Unlike Lean's kernel, it computes a graded
-judgement `Γ ⊢ e : T @ g`, and it rejects a declaration whose grade exceeds the grade written in
+judgment `Γ ⊢ e : T @ g`, and it rejects a declaration whose grade exceeds the grade written in
 its annotation, such as `@ prob`.
 
 ## Main Definitions
@@ -81,7 +81,7 @@ def expectTy (what : String) (expected actual : Ty) : CheckM Unit :=
     throw s!"kernel: type mismatch in {what}: expected {expected}, got {actual}"
 
 /--
-Infers the type and grade of a term, that is, the graded judgement `Γ ⊢ e : T @ g`.
+Infers the type and grade of a term, that is, the graded judgment `Γ ⊢ e : T @ g`.
 
 The grade of a term joins the grades of its parts. Stochastic conditionals, random primitives and
 categorical choices add `prob`, a global variable contributes its own grade (`fuzzy` for a fuzzy

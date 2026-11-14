@@ -1,11 +1,15 @@
-# Haze Language Reference
+# Language reference
+
+The language reference describes every part of Haze as of version 0.1. It's reference material
+rather than a tutorial: to learn the language, start with [your first model](Getting-Started.md)
+or the [tour](https://haze-lang.pages.dev/tour/).
 
 A Haze file holds a model and the questions you want to ask about it. Haze reads the file
 from top to bottom, one declaration at a time, checking each one with its kernel and then
 running it. If a declaration is rejected, Haze reports the error, skips it and carries on with
 the next one, so one mistake doesn't hide the results of the rest of the file.
 
-## The Parts of a File
+## The parts of a file
 
 Because a declaration can only refer to the ones before it, most files follow the same order:
 
@@ -22,7 +26,7 @@ Because a declaration can only refer to the ones before it, most files follow th
 The sections below go through these parts in order. After them come the expression language,
 types and grades, and how to read Haze's output.
 
-### 1. Settings
+### Settings
 
 When `and`, `or` and `implies` combine degrees of truth, there is more than one reasonable way
 to do it. `logic` picks one, and the choice applies to the declarations that follow it:
@@ -34,14 +38,14 @@ logic lukasiewicz  -- max(0, a + b - 1) and min(1, a + b)
 ```
 
 `explore N` sets how many states Haze explores for an unbounded property (see
-[Claims and Theorems](#8-claims-and-theorems)), from that point in the file on. The default is
+[Claims and theorems](#claims-and-theorems)), from that point in the file on. The default is
 100,000, and `haze --states N` changes the default for a whole run.
 
 ```haze
 explore 5000
 ```
 
-### 2. Enumeration Types
+### Enumeration types
 
 An enumeration type lists its possible values. The names of the values must be unique in the
 file:
@@ -50,7 +54,7 @@ file:
 enum Phase = Sending | Waiting | Done | GaveUp
 ```
 
-### 3. Fuzzy Parameters
+### Fuzzy parameters
 
 Use a fuzzy parameter for a quantity you can't pin down but that isn't random either, such as
 a loss rate you only know roughly. You list the values it could plausibly have, each with a
@@ -62,9 +66,9 @@ param loss : Num ~= {0.01: 0.6, 0.02: 1, 0.05: 0.5, 0.1: 0.2}
 
 The values must be literals of the declared type, none may be listed twice, and at least one
 must have possibility 1 (the parameter must be _normal_, meaning that at least one value is
-fully plausible). Anything that depends on a fuzzy parameter has the grade `fuzzy`.
+fully possible). Anything that depends on a fuzzy parameter has the grade `fuzzy`.
 
-### 4. Random Inputs and Derived Values
+### Random inputs and derived values
 
 `input` declares a random value with a given distribution. `def` without parameters declares a
 value computed from earlier ones, and it may make random choices of its own:
@@ -85,7 +89,7 @@ its actual grade is higher:
 def noisy : Num @crisp := uniform(1, 3)   -- rejected: the term has grade prob
 ```
 
-### 5. Functions and Fuzzy Sets
+### Functions and fuzzy sets
 
 A `def` with a parameter list declares a function. Unlike a value, a function makes fresh
 random choices every time it's called, which is what you want for something like a network
@@ -111,7 +115,7 @@ claim warm_day : temp is hot
 claim very_warm_day : temp is very hot
 ```
 
-### 6. Observations
+### Observations
 
 `observe` tells Haze that something was seen to be true. Worlds where it's false are discarded,
 and the probabilities of the rest are rescaled by Bayes' rule:
@@ -124,7 +128,7 @@ observe not cache_misses
 Haze reports how likely the evidence was. An observation is rejected if it's impossible under
 every parameter value, or if Haze can't decide it because it ran out of fuel.
 
-### 7. Transition Systems
+### Transition systems
 
 A system has state variables, each with an initial value, and a `step` block that runs once
 per time step:
@@ -173,7 +177,7 @@ system Pipeline(generated_tests : Bool, review : Bool) {
 claim wrong_merge : Pipeline(true, false) |= after[3] (stage == Merged and wrong)
 ```
 
-### 8. Claims and Theorems
+### Claims and theorems
 
 Claims and theorems are the questions you ask about a model. A claim asks how strongly a
 property holds, optionally with a bound it has to meet; a theorem asks Haze to show that the
@@ -189,7 +193,7 @@ theorem single_charge : Idempotent |= always[6] charges <= 1
 A claim without a bound is always accepted, and Haze reports how strongly the property holds.
 A claim `with prob >= q` is accepted if the belief is at least `q`, and one `with prob <= q` if
 the plausibility is at most `q`. A theorem is accepted only if the belief is 1: the property
-holds on every path that can happen, for every plausible parameter value, with no unknown
+holds on every path that can happen, for every possible parameter value, with no unknown
 outcomes.
 
 A property is a term of type `Bool` or `Deg`, optionally about a system:
@@ -247,7 +251,7 @@ where the property does hold, since that is what the bound was meant to rule out
 example comes from a parameter value that breaks the bound. Variables that can't affect the
 property aren't shown.
 
-### 9. Queries
+### Queries
 
 Queries print information about the model without changing it:
 
@@ -276,7 +280,7 @@ run 2 · probability 0.019208 · cumulative 0.979608 · passes
   state: phase = Done, attempts = 2, charges = 1, acked = true, latency = 1080
 ```
 
-A decision is labelled with the name it is assigned to (by `let` or to a state variable), or
+A decision is labeled with the name it is assigned to (by `let` or to a state variable), or
 with the condition of an `if` or `match`. Naming random decisions with `let` makes runs easier
 to replay against real code. Runs that reach the same state by different decisions are listed
 separately, since a test has to make those decisions. A run ends at the horizon, when the system
@@ -291,11 +295,11 @@ The last line is a statistical test, for checking code against a property that f
 some of the time. If a run of code that matches the model fails `φ` with probability `q`, Haze
 gives the smallest number of runs, and the number of failures to allow, so that matching code
 fails the test with probability at most one in a million, while code that fails twice as often
-(for `q ≥ 1/2`, halfway to always) is caught with probability at least 0.99. If `φ` never fails,
+(for `q ≥ 1/2`, with probability halfway between that and 1) is caught with probability at least 0.99. If `φ` never fails,
 one run is a deterministic test.
 
-With fuzzy parameters, the runs use the most plausible parameter values, and the statistical
-test uses the plausible values under which `φ` fails most often.
+With fuzzy parameters, the runs use the most possible parameter values, and the statistical
+test uses the possible values under which `φ` fails most often.
 
 ## Expressions
 
@@ -332,7 +336,7 @@ that depend on parameters and other values, such as `{Correct: solves, Wrong: 1 
 Computed weights are checked when the distribution is evaluated: none may be negative, and
 together they must sum to exactly 1.
 
-### Built-in Functions
+### Built-in functions
 
 | Function | Result |
 |---|---|
@@ -345,7 +349,7 @@ together they must sum to exactly 1.
 | `abs`, `floor`, `min`, `max` | The usual operations on numbers. |
 | `deg(e)`, `num(e)` | Conversions to `Deg` (checked to be between 0 and 1) and to `Num`. |
 
-## Types and Grades
+## Types and grades
 
 There are four kinds of type: `Bool`, `Num` (exact rational numbers), `Deg` (degrees of truth
 between 0 and 1) and the enumeration types you declare. A `Bool` can be used where a `Deg` is
@@ -365,7 +369,7 @@ Every term also has a _grade_, which records the kinds of uncertainty it can car
 Grades combine, as in `prob+fuzzy`. `#check` and `#print` show them, and an `@` annotation on a
 definition sets an upper limit.
 
-## Lexical Structure
+## Lexical structure
 
 * Line comments start with `--`, and block comments are written `/- … -/`.
 * Identifiers start with a letter and contain letters, digits, `_` and `'`.
@@ -378,7 +382,7 @@ definition sets an upper limit.
 * The symbols `≈`, `≤`, `≥`, `≠`, `⊨`, `→` and `⇒` may be written instead of `~=`, `<=`,
   `>=`, `!=`, `|=`, `->` and `=>`.
 
-## Results and Messages
+## Results and messages
 
 Every message has the form `file:line:column: severity: text`, where the severity is `info`
 or `error`.
@@ -387,11 +391,11 @@ When there are no fuzzy parameters and no unknown outcomes, the result of a clai
 is a single probability. Otherwise it's a pair: the _belief_, how strongly the model
 guarantees the property, and the _plausibility_, how strongly it allows it. If the result
 depends on the values of fuzzy parameters, a table shows the result for each value together
-with its possibility `π`. [`Design.md`](Design.md) gives the precise definitions.
+with its possibility `π`. [Reading results](Reading-Results.md) explains how to read them, and [Design and semantics](Design.md#fuzzy-parameters) gives the precise definitions.
 
 With more than six parameter assignments, the table is replaced by a summary. It shows the
-assignments with the lowest, highest and most plausible results, and then varies each parameter
-on its own, keeping the others at their most plausible values, to rank the parameters by how
+assignments with the lowest, highest and most possible results, and then varies each parameter
+on its own, keeping the others at their most possible values, to rank the parameters by how
 much they move the result. That ranking says which estimate is worth improving first. Parameters
 that a property can't read are left out.
 
@@ -404,46 +408,6 @@ the true value but is no longer a single exact number.
 All numbers are exact. A number with a long decimal expansion is rounded and marked with `≈`,
 followed by the exact fraction when it's short, as in `0.666667 (=2/3)`. Numbers below 0.001 are
 shown in scientific notation, as in `≈1.37018e-8 (=1/72982849)`.
-
-## Command-Line Interface
-
-`haze [--fuel N] [--states N] [--json] FILE.hz...` checks each file and prints its messages.
-`--fuel N` sets how deeply function calls can nest before an outcome counts as unknown (the
-default is 1000), `--states N` sets the default for `explore`, `--version` prints the version, and
-`--json` prints one JSON record per message instead of text, as described below. The exit
-status is 0 if every declaration was accepted and 1 otherwise, which makes `haze` easy to run in
-continuous integration.
-
-### JSON Output
-
-With `--json`, each message is printed as a JSON object on its own line. Every record has the
-fields `file`, `line`, `column`, `severity` and `message` (the text `haze` would otherwise
-print). Records that carry a result also have a `kind` and the fields below:
-
-| `kind` | Fields |
-|---|---|
-| `theorem`, `claim` | `name`, `accepted`, `grade`, `belief`, `plausibility`, `branches`, `counterexample` |
-| `prob` | `query`, `belief`, `plausibility`, `branches` |
-| `expect` | `query`, `lower`, `upper`, `branches`, each with an `expectation` (or, for `steps until`, a `lower` and `upper`, which are `null` when infinite) |
-| `eval` | `query`, `branches`, each with a `distribution` of `value` and `probability` pairs |
-| `check` | `query`, `type`, `grade` |
-| `observe` | `query`, `evidence`, the probability of the evidence for each parameter assignment |
-| `tests` | `query`, `parameters`, `covered`, `complete`, `failure_probability`, `runs`, `statistical` |
-
-For `tests`, each run has its `probability`, `suite` (whether it's one of the `n` most likely),
-`degree`, `passes`, `inputs`, `initial` state, and `steps`. Each step has its number, the
-`choices` made in it (each with `what` and `value`) and the `state` after it. `statistical` has
-the `parameters` it was sized for, `failure_rate`, `runs`, `allowed_failures`, `false_alarm` and
-`power`, or is `null` when the property never fails.
-
-`branches` lists the result for each assignment of the fuzzy parameters, with its `parameters`
-and `possibility`; for properties it has the `lower` and `upper` bounds. A `counterexample` has
-the `step`, `parameters`, `inputs` and `state` of the example described under
-[Claims and Theorems](#8-claims-and-theorems), or is `null`.
-
-Numbers stay exact: probabilities and numeric values are strings such as `"2/3"`, which
-exact-fraction libraries (Python's `fractions.Fraction`, for example) read directly. Booleans
-are JSON Booleans, enumeration values are their names, and an unknown outcome is `null`.
 
 ## Limits
 
@@ -468,3 +432,6 @@ a state variable that can't influence the property, directly or through the vari
 computed from and the conditions around its assignments, isn't tracked at all. A clock or a
 counter that a property never reads doesn't split its states. For scale, the models in this repository have up to
 about a thousand states per step, and each file checks in well under a minute.
+
+The `haze` command's options, its exit status and its JSON output are described in
+[Command line and JSON](Command-Line.md).

@@ -1,5 +1,5 @@
 examples/Gallery/chip_design.hz:36:1: info: claim perfect_die
-  belief ≈0.422106 · plausibility ≈0.46546 — graded
+  belief ≈0.422106 · plausibility ≈0.46546 · graded
   grade prob+fuzzy · 6 parameter assignment(s) · ≤290 states/step
   by fuzzy parameter (π = possibility):
     d0 = 0.0009, sm_mm2 = 3  π 0.6     ≈0.480499
@@ -9,7 +9,7 @@ examples/Gallery/chip_design.hz:36:1: info: claim perfect_die
     d0 = 0.0011, sm_mm2 = 3  π 0.6     ≈0.408243
     d0 = 0.0011, sm_mm2 = 4  π 0.6     ≈0.408243
 examples/Gallery/chip_design.hz:41:1: info: claim sellable_as_h100
-  belief ≈0.667004 · plausibility ≈0.799509 — graded
+  belief ≈0.667004 · plausibility ≈0.799509 · graded
   grade prob+fuzzy · 6 parameter assignment(s) · ≤290 states/step
   by fuzzy parameter (π = possibility):
     d0 = 0.0009, sm_mm2 = 3  π 0.6     ≈0.708961
@@ -28,7 +28,7 @@ examples/Gallery/chip_design.hz:46:1: info: #expect dead_sms
     d0 = 0.0011, sm_mm2 = 3  π 0.6     E ≈0.474677
     d0 = 0.0011, sm_mm2 = 4  π 0.6     E ≈0.632555
 examples/Gallery/chip_design.hz:47:1: info: claim few_dead
-  belief ≈0.999592 · plausibility ≈0.999937 — graded
+  belief ≈0.999592 · plausibility ≈0.999937 · graded
   grade prob+fuzzy · 6 parameter assignment(s) · ≤290 states/step
   bound holds: belief ≥ 0.99
   by fuzzy parameter (π = possibility):

@@ -3,7 +3,7 @@ Probability-weighted testing of payments_client.py, using the tests that Haze ge
 payments.hz with `#tests`.
 
 Ordinary test suites are measured by how much code they run. This one is measured by how much of
-the system's probable behaviour it covers. Haze lists the runs of the model in order of
+the system's probable behavior it covers. Haze lists the runs of the model in order of
 probability, with the random decisions behind each one, and this script replays each run against
 the real client with a scripted network. Its coverage is the total probability of the runs that
 pass.
@@ -17,7 +17,7 @@ It runs in three steps:
    design when every message is lost, so a single run proves nothing. Haze computes how many runs
    to make and how many failures to allow, so that a correct client fails the test less than once
    in a million while a client that fails twice as often is caught.
-3. Repeat both against mutants of the client, and report the probability of the behaviour on which
+3. Repeat both against mutants of the client, and report the probability of the behavior on which
    each mutant was caught.
 
 Run it from the repository root after `lake build`:

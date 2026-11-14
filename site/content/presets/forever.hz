@@ -1,5 +1,5 @@
 -- Craps: the shooter keeps rolling until the point comes up again or a 7.
--- That can take any number of rolls, and Haze still gets the exact answer.
+-- That can take any number of rolls. The chance of winning is 244/495.
 enum Phase = ComeOut | OnPoint | Won | Lost
 
 system Craps {

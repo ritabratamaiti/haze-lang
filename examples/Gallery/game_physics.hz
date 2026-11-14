@@ -1,4 +1,4 @@
--- Proofs about the fixed-timestep physics that video games use.
+-- Proofs and probabilities for the tick-based physics that video games use.
 --
 -- Game engines advance physics in discrete ticks. Haze runs the same update rules
 -- with exact rational arithmetic, so it can prove a property for every initial

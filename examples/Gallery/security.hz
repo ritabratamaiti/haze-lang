@@ -8,7 +8,7 @@
 -- A thief with a stolen card or phone tries the most popular PINs first. How likely the thief
 -- is to succeed depends on how people choose PINs and on how many guesses the system allows.
 --
--- Nick Berry of DataGenetics analysed 3.4 million four-digit sequences from leaked password
+-- Nick Berry of DataGenetics analyzed 3.4 million four-digit sequences from leaked password
 -- databases ("PIN number analysis", 2012). The 20 most common, which together make up 26.83%,
 -- are below. `pin` is the rank of the victim's PIN on that list, and 0 means it isn't on it.
 input pin : Num ~ {1: 0.10713, 2: 0.06016, 3: 0.01881, 4: 0.01197, 5: 0.00745,
@@ -37,8 +37,7 @@ theorem card_lockout : Thief(3) |= always guesses <= 3
 theorem phone_lockout : Thief(10) |= always guesses <= 10
 
 -- Banks lock a card after 3 wrong guesses; an iPhone with "Erase Data" erases itself after 10
--- (Apple Platform Security guide). With PINs chosen like these, both limits still let the thief
--- in surprisingly often.
+-- (Apple Platform Security guide). With PINs chosen like these, both limits still let the thief in about one time in five.
 claim card_three_guesses : Thief(3) |= eventually unlocked        -- 18.61%
 claim phone_ten_guesses : Thief(10) |= eventually unlocked        -- 23.335%
 

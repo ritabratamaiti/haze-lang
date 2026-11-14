@@ -1,9 +1,8 @@
 # Contributing to Haze
 
-Thanks for your interest in Haze. This page explains how to propose a change and what a good
-pull request looks like. Before you start, it's worth reading the
-[language reference](docs/Language-Reference.md) and the [design document](docs/Design.md), so
-that your change fits how the rest of Haze works.
+Bug reports, examples and fixes are welcome. For anything larger than a small fix, open an issue
+first so we can agree on the approach. The [language reference](docs/Language-Reference.md) and
+[Design and semantics](docs/Design.md) describe how the parts fit together.
 
 ## Before you open a pull request
 

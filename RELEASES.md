@@ -1,9 +1,9 @@
-# Release Notes
+# Release notes
 
 Haze doesn't promise backwards compatibility between versions yet. When a release breaks
 existing models, its notes will say so.
 
-## v0.1.0 (6 November 2026)
+## v0.1.0 (November 6, 2026)
 
 This is the first version of Haze.
 
@@ -29,7 +29,7 @@ weights of a categorical distribution can be computed from parameters and other 
 ### Kernel
 
 The kernel's type system records whether a term depends on chance, on fuzzy parameters, or on
-a computation that might not finish, and it enforces declared grades. All arithmetic is exact.
+a computation that might not finish, and it enforces declared grades. Probabilities are exact rationals.
 Outcomes that run out of fuel count as unknown and widen the result instead of being guessed.
 Fuzzy parameters give results as belief and plausibility, computed by integrating over
 α-cuts. Systems are model checked up to a bound, with counterexamples when a property fails,
@@ -37,11 +37,12 @@ and the grade lattice and the fuzzy connectives come with theorems proved in Lea
 
 `always` and `eventually` can be used without a bound, and `#expect S |= steps until φ` gives
 the expected number of steps until a property holds. The kernel explores the reachable states
-and solves the resulting linear equations exactly, component by component. Large components are
-solved in floating point and certified in exact arithmetic, and systems with infinitely many
+and solves the resulting linear equations component by component: exactly for components of up to
+120 states, and in floating point for larger ones, with the bounds then checked in exact
+arithmetic, and systems with infinitely many
 states are explored up to a limit set by `explore N` or `--states`, with the unexplored part
-counted as unknown. The samples that used long horizons to approximate such answers (craps,
-tennis, Penney's game, genetic drift and gambler's ruin) now state them exactly.
+counted as unknown. The craps, tennis, Penney's game, genetic drift and gambler's ruin examples
+use unbounded properties.
 
 `#tests` turns a model into tests for the code it describes. It lists the runs of a system from
 the most likely to the least, with the random decisions behind each one, reports how much of the
@@ -49,13 +50,15 @@ probability they cover, and adds the most likely failing runs. For properties th
 some of the time, it sizes a statistical test with a known false-alarm rate. The conformance
 sample replays these runs against a real client.
 
-Checking runs on every core: parameter assignments, large frontiers and the random choices
-within a step are processed in parallel, with the same results as before.
+Checking uses every core: parameter assignments, large frontiers and the random choices within a
+step are processed in parallel, and the results don't depend on the number of cores.
 
 Checking only tracks what a property can observe. Each query builds just the inputs and
 parameters that it or an earlier observation reads, and state variables outside the property's
-cone of influence aren't tracked. A failed `with prob <=` bound now shows a run where the
-property holds, taken from a parameter value that breaks the bound.
+cone of influence aren't tracked. When a `with prob <=` bound fails, Haze shows a run where the property holds, taken from a parameter value that breaks the bound.
+
+When a result depends on more than six parameter assignments, the output summarizes them and
+ranks the parameters by how much each one moves the result.
 
 ### Tools
 
@@ -67,6 +70,3 @@ checksums and can also build Haze from source. Haze is also available as a Docke
 GitHub Codespaces. A website with a playground, a tour and the gallery runs Haze in the
 browser, compiled to WebAssembly. Haze is released under the Functional Source
 License (FSL-1.1-ALv2).
-`python scripts/bench.py` times the models in `bench`. The test
-suite runs with `lake test`. When a result depends on more than six parameter assignments, the
-output summarizes them and ranks the parameters by how much each one moves the result.

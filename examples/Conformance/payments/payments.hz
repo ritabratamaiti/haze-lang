@@ -71,7 +71,7 @@ claim delivered : Client |= after[6] acked with prob >= 0.99
 #expect Client |= after[6] latency
 
 -- Probability-weighted tests. The first lists the most likely runs, which test_weighted.py
--- replays against the implementation, so the suite covers the behaviour that happens most often.
+-- replays against the implementation, so the suite covers the behavior that happens most often.
 -- The second adds a statistical test for a property that fails by design some of the time:
 -- a payment can give up after three lost messages.
 #tests[6] Client |= always[6] charges <= 1

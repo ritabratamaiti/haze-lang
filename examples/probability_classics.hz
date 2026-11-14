@@ -1,5 +1,6 @@
 -- Classic probability problems, each with a known closed-form answer.
--- Haze computes every result below exactly, so you can check it against the formula
+-- Haze computes the results below exactly (the coupon collector's expectation uses a finite
+-- horizon), so you can check each one against the formula
 -- in the comment next to it.
 
 -- 1. Two fair dice ------------------------------------------------------------

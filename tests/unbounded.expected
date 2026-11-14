@@ -1,18 +1,18 @@
 tests/unbounded.hz:13:1: info: #prob Gambler |= eventually money == 40
   probability ≈0.310003
 tests/unbounded.hz:14:1: info: claim ruin
-  probability ≈0.689997 — graded
+  probability ≈0.689997 · graded
   grade prob · 1 parameter assignment(s) · 41 reachable states
 tests/unbounded.hz:15:1: info: #expect Gambler |= steps until money == 0 or money == 40
   expected steps ≈379.994606
 tests/unbounded.hz:16:1: info: theorem in_range
-  probability 1 — holds with certainty
+  probability 1 · holds with certainty
   grade prob · 1 parameter assignment(s) · 41 reachable states
   theorem accepted
 tests/unbounded.hz:24:1: info: #expect Coin |= steps until heads
   expected steps 2
 tests/unbounded.hz:25:1: info: claim never_heads
-  probability 0 — fails with certainty
+  probability 0 · fails with certainty
   grade prob · 1 parameter assignment(s) · 2 reachable states
 tests/unbounded.hz:33:1: info: #expect MaybeStuck |= steps until phase == 1
   expected steps ∞
@@ -26,13 +26,13 @@ tests/unbounded.hz:43:1: info: #prob Counter |= always near(n)
 tests/unbounded.hz:44:1: info: #prob Counter |= always n >= 1
   probability 0
 tests/unbounded.hz:48:1: error: theorem stays_below_two
-  probability 0 — refuted
+  probability 0 · refuted
   grade crisp · 1 parameter assignment(s) · 4 reachable states
   theorem rejected: belief is 0, not 1
   counterexample at step 2 (path mass 1, degree 0):
     state: n = 2
 tests/unbounded.hz:49:1: error: claim rarely_three
-  probability 1 — proved
+  probability 1 · proved
   grade crisp · 1 parameter assignment(s) · 4 reachable states
   bound fails: plausibility 1 > 0.5
   a run where it happens, at step 3 (path mass 1):
@@ -40,15 +40,15 @@ tests/unbounded.hz:49:1: error: claim rarely_three
 tests/unbounded.hz:63:1: info: #prob Queue |= eventually len == 0
   belief ≈1 · plausibility 1
   exploration stopped at 300 states; what follows the unexplored states counts as unknown (raise the limit with `explore N` or --states)
-  large parts of the state space were solved numerically; the bounds are certified in exact arithmetic
+  components with more than 120 states were solved in floating point, and their bounds checked in exact arithmetic
 tests/unbounded.hz:70:1: info: #prob Walk |= eventually x == 5
   belief ≈0.131687 · plausibility 1
   exploration stopped at 300 states; what follows the unexplored states counts as unknown (raise the limit with `explore N` or --states)
-  large parts of the state space were solved numerically; the bounds are certified in exact arithmetic
+  components with more than 120 states were solved in floating point, and their bounds checked in exact arithmetic
 tests/unbounded.hz:71:1: info: #expect Walk |= steps until x == 5
   lower expectation ≈648.8107 · upper expectation ∞
   exploration stopped at 300 states; what follows the unexplored states counts as unknown (raise the limit with `explore N` or --states)
-  large parts of the state space were solved numerically; the bounds are certified in exact arithmetic
+  components with more than 120 states were solved in floating point, and their bounds checked in exact arithmetic
 tests/unbounded.hz:74:1: error: kernel: `steps until` gives a number of steps; use it with #expect
 tests/unbounded.hz:75:1: error: kernel: `steps until` needs a Bool property, got Deg
 tests/unbounded.hz:76:1: error: kernel: `given` is only supported with after[k] or without a modality

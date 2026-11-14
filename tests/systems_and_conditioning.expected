@@ -10,7 +10,7 @@ tests/systems_and_conditioning.hz:38:1: error: runtime: uniform(5, 1) is empty
 tests/systems_and_conditioning.hz:42:1: info: #prob die == 6 given die >= 4
   probability 0.333333 (=1/3)
 tests/systems_and_conditioning.hz:43:1: error: claim not_six
-  probability 0.666667 (=2/3) — graded
+  probability 0.666667 (=2/3) · graded
   grade prob · 1 parameter assignment(s) · ≤6 states/step
   bound fails: belief 0.666667 (=2/3) < 0.8
   counterexample (probability 0.166667 (=1/6), degree 0):
@@ -23,7 +23,7 @@ tests/systems_and_conditioning.hz:49:1: info: #prob pick == 1
     p = 0.4  π 0.5     0.4
 tests/systems_and_conditioning.hz:50:1: error: runtime: distribution weights sum to 0.4, not 1
 tests/systems_and_conditioning.hz:61:1: info: theorem bounded
-  probability 1 — holds with certainty
+  probability 1 · holds with certainty
   grade prob · 1 parameter assignment(s) · ≤4 states/step
   theorem accepted
 tests/systems_and_conditioning.hz:62:1: info: #prob Counter(3, true) |= after[3] n == 3
@@ -38,7 +38,7 @@ tests/systems_and_conditioning.hz:89:1: info: #expect Chain |= after[2] t
 tests/systems_and_conditioning.hz:90:1: info: #prob Chain |= after[2] t == 2
   probability 0.25
 tests/systems_and_conditioning.hz:99:1: error: claim rarely_two
-  belief 0.01 · plausibility 0.185 — graded
+  belief 0.01 · plausibility 0.185 · graded
   grade prob+fuzzy · 2 parameter assignment(s) · ≤3 states/step
   bound fails: plausibility 0.185 > 0.1
   by fuzzy parameter (π = possibility):
@@ -52,7 +52,7 @@ tests/systems_and_conditioning.hz:106:1: info: #prob both
   by fuzzy parameter (π = possibility), 9 assignments:
     lowest          a1 = 0.1, a2 = 0.4  π 0.5     0.04
     highest         a1 = 0.3, a2 = 0.6  π 0.5     0.18
-    most plausible  a1 = 0.2, a2 = 0.5  π 1       0.1
-  what moves the result most (each parameter varied alone, the others at their most plausible values):
+    most possible   a1 = 0.2, a2 = 0.5  π 1       0.1
+  what moves the result most (each parameter varied alone, the others at their most possible values):
     a1: 0.1 → 0.05, 0.2 → 0.1, 0.3 → 0.15  (range 0.1)
     a2: 0.4 → 0.08, 0.5 → 0.1, 0.6 → 0.12  (range 0.04)

@@ -6,7 +6,7 @@
 -- read your own writes. Haze proves this for W = 2, R = 2, and for the cheaper
 -- W = 2, R = 1 it finds a stale read and measures how often it happens.
 
-param drop : Num ~= {0.01: 1, 0.05: 0.6, 0.2: 0.2}   -- per-message loss rate, known only vaguely
+param drop : Num ~= {0.01: 1, 0.05: 0.6, 0.2: 0.2}   -- per-message loss rate, only roughly known
 
 enum Phase = Write | Read | Finished
 
@@ -77,6 +77,6 @@ theorem read_your_writes : Quorum22 |= always[2] ((phase == Finished and acked) 
 theorem read_your_writes_r1 : Quorum21 |= always[2] ((phase == Finished and acked) implies fresh)
 claim stale_read_risk : Quorum21 |= after[2] (acked and not fresh)
 
--- Availability: under the vague loss model, writes should be acknowledged at least
+-- Availability: under the roughly known loss rate, writes should be acknowledged at least
 -- 95% of the time.
 claim write_available : Quorum22 |= after[2] acked with prob >= 0.95

@@ -10,7 +10,7 @@ import Haze.Frontend
 
 `haze [--fuel N] [--states N] [--json] FILE.hz...` checks Haze source files and prints their messages, or one
 JSON record per message with `--json`. The exit status is 1 if any declaration was rejected and 2
-if the arguments are invalid.
+if the arguments are invalid or a file can't be read.
 -/
 
 /-- The version of Haze, which `haze --version` prints. -/
@@ -41,12 +41,17 @@ def main (args : List String) : IO UInt32 := do
     | "--json" :: tl => json := true; rest := tl
     | ("-h" :: _) | ("--help" :: _) => IO.println usage; return 0
     | ("-V" :: _) | ("--version" :: _) => IO.println s!"haze {version}"; return 0
-    | f :: tl => files := files.push f; rest := tl
+    | f :: tl =>
+      if f.startsWith "-" && f != "-" then
+        IO.eprintln s!"haze: unknown option {f}\n{usage}"; return 2
+      files := files.push f; rest := tl
     | [] => pure ()
   if files.isEmpty then IO.eprintln usage; return 2
   let mut errors := 0
   for f in files do
-    let src ← IO.FS.readFile f
+    let src ← match ← (IO.FS.readFile f).toBaseIO with
+      | .ok src => pure src
+      | .error e => IO.eprintln s!"haze: can't read {f}: {e}"; return 2
     let (out, n) := if json then Haze.Frontend.runJson f src opts else Haze.Frontend.run f src opts
     unless out.isEmpty do IO.println out
     errors := errors + n

@@ -14,7 +14,7 @@ types, values, grades, declarations and the environment. They play the roles tha
 
 Compared with Lean's core language, there are a few differences:
 
-* The typing judgement is graded. In `Γ ⊢ e : T @ g`, the grade `g` records which kinds of
+* The typing judgment is graded. In `Γ ⊢ e : T @ g`, the grade `g` records which kinds of
   uncertainty `e` can carry: randomness, fuzziness and possible non-termination.
 * Stochastic conditionals (`Expr.choose`), random primitives (`Expr.rand`, `Expr.cat`) and the
   state of a transition system (`Expr.svar`, `Expr.crashed`) are part of the term language.

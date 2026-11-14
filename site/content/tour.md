@@ -39,7 +39,7 @@ Most software has state that changes step by step. A `system` declares state var
 `after[k]` at step `k`, `always[k]` at every step up to `k`, and `eventually[k]` at some step up
 to `k`.
 
-This worker calls a service that fails 20% of the time and retries up to three times.
+This worker calls a service that fails 20% of the time, and makes up to three calls in all.
 
 ```haze
 system Worker {
@@ -107,8 +107,8 @@ claim rarely_three_tries : Retry |= eventually[3] tries == 3 with prob <= 0.01
 
 ## Rough numbers
 
-You rarely know a rate exactly. A fuzzy parameter (`param ... ~=`) lists the values you think
-are possible, each with how plausible it is, from 0 to 1. The answer is then a range: the
+You rarely know a rate exactly. A fuzzy parameter (`param ... ~=`) lists the values you think are possible, each with a possibility from 0 to 1, where 1 means
+fully possible. The answer is then a range: the
 *belief* is how strongly what you know guarantees the property, and the *plausibility* is how
 strongly it allows it. The table shows the result for each value. Here the claim fails: at the
 pessimistic 5% rate, one retry isn't quite enough. Try `with prob >= 0.99`.
@@ -163,10 +163,12 @@ theorem never_negative : Game |= always money >= 0
 ## Tests ranked by probability
 
 `#tests` turns a model into test cases for the real code. It lists the runs from the most likely
-to the least, so a few tests cover almost all the behaviour that actually happens, and it adds
+to the least, so a few tests cover almost all the behavior that actually happens, and it adds
 the rare runs where the property fails. For a property that fails by design some of the time,
-it also sizes a statistical test with a known false-alarm rate. The rest of the documentation is
-on the [docs](../docs/) page.
+it also sizes a statistical test with a known false-alarm rate.
+
+This is the last chapter. [Your first model](../docs/first-model/) goes further, and the
+[language reference](../docs/reference/) covers the rest of the language.
 
 ```haze
 system Job {

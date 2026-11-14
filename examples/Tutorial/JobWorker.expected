@@ -8,22 +8,22 @@ examples/Tutorial/JobWorker.hz:40:1: info: #expect work_ms
   expectation 174
 examples/Tutorial/JobWorker.hz:56:1: info: call_succeeds(500) : Bool @prob
 examples/Tutorial/JobWorker.hz:74:1: info: claim no_outage
-  belief 0.5 · plausibility 1 — graded
+  belief 0.5 · plausibility 1 · graded
   grade fuzzy · 3 parameter assignment(s) · ≤1 states/step
   by fuzzy parameter (π = possibility):
     outage = 0    π 1       1
     outage = 0.1  π 0.5     0
     outage = 0.5  π 0.2     0
 examples/Tutorial/JobWorker.hz:133:1: info: theorem bounded_calls
-  probability 1 — holds with certainty
+  probability 1 · holds with certainty
   grade prob+fuzzy · 3 parameter assignment(s) · ≤12 states/step
   theorem accepted
 examples/Tutorial/JobWorker.hz:134:1: info: theorem never_crashes
-  probability 1 — holds with certainty
+  probability 1 · holds with certainty
   grade prob+fuzzy · 3 parameter assignment(s) · ≤12 states/step
   theorem accepted
 examples/Tutorial/JobWorker.hz:138:1: error: theorem first_try
-  belief ≈0.844897 · plausibility 0.926313 (=14821/16000) — graded
+  belief ≈0.844897 · plausibility 0.926313 (=14821/16000) · graded
   grade prob+fuzzy · 3 parameter assignment(s) · ≤6 states/step
   theorem rejected: belief is ≈0.844897, not 1
   by fuzzy parameter (π = possibility):
@@ -35,7 +35,7 @@ examples/Tutorial/JobWorker.hz:138:1: error: theorem first_try
     inputs: size = Small
     state: phase = Succeeded, calls = 2
 examples/Tutorial/JobWorker.hz:142:1: info: claim mostly_succeeds
-  belief ≈0.916353 · plausibility 0.948688 (=15179/16000) — graded
+  belief ≈0.916353 · plausibility 0.948688 (=15179/16000) · graded
   grade prob+fuzzy · 3 parameter assignment(s) · ≤3 states/step
   bound holds: belief ≥ 0.8
   by fuzzy parameter (π = possibility):
@@ -43,14 +43,14 @@ examples/Tutorial/JobWorker.hz:142:1: info: claim mostly_succeeds
     outage = 0.1  π 0.5     ≈0.942119
     outage = 0.5  π 0.2     ≈0.796867
 examples/Tutorial/JobWorker.hz:159:1: info: claim finishes_quickly
-  belief ≈0.876789 · plausibility 0.931427 (=89417/96000) — graded
+  belief ≈0.876789 · plausibility 0.931427 (=89417/96000) · graded
   grade prob+fuzzy · 3 parameter assignment(s) · ≤12 states/step
   by fuzzy parameter (π = possibility):
     outage = 0    π 1       0.931427 (=89417/96000)
     outage = 0.1  π 0.5     ≈0.906922
     outage = 0.5  π 0.2     ≈0.694996
 examples/Tutorial/JobWorker.hz:160:1: info: claim finishes_very_quickly
-  belief ≈0.850676 · plausibility ≈0.919533 — graded
+  belief ≈0.850676 · plausibility ≈0.919533 · graded
   grade prob+fuzzy · 3 parameter assignment(s) · ≤12 states/step
   by fuzzy parameter (π = possibility):
     outage = 0    π 1       ≈0.919533

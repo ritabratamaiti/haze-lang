@@ -11,6 +11,10 @@ node build.mjs --serve           # builds dist/ and serves it on http://localhos
 
 - `build.mjs` checks every preset, tour chapter and gallery example ahead of time and writes the
   pages. The gallery list and the home page text are in this file.
+- The docs pages are the Markdown files in `../docs` (and the conformance README), rendered by
+  `build.mjs`. `DOC_SECTIONS` in `build.mjs` sets their order in the sidebar, their URLs and the
+  one-line summaries. Haze code blocks that check without errors get an *Open in the playground*
+  link.
 - `content/presets/*.hz` are the playground's examples, and `content/tour.md` is the tour: one
   `##` chapter each, with prose and a `haze` code block.
 - `src/` is the browser code: the editor, the engine worker, the result cards, share links and the
