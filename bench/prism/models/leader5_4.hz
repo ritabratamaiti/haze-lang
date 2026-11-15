@@ -1,0 +1,120 @@
+-- Itai and Rodeh's synchronous leader election, 5 processes choosing from 4 values
+-- (PRISM: dtmcs/leader_sync/leader5_4.pm), step for step: each round is a pick,
+-- 4 reads and a decision
+enum Phase = Pick | Read | Decide | Elected
+
+system Leader {
+  var phase : Phase := Pick
+  var c : Num := 1
+  var u1 : Bool := false
+  var v1 : Num := 0
+  var p1 : Num := 0
+  var u2 : Bool := false
+  var v2 : Num := 0
+  var p2 : Num := 0
+  var u3 : Bool := false
+  var v3 : Num := 0
+  var p3 : Num := 0
+  var u4 : Bool := false
+  var v4 : Num := 0
+  var p4 : Num := 0
+  var u5 : Bool := false
+  var v5 : Num := 0
+  var p5 : Num := 0
+  step {
+    match phase {
+      Pick => {
+        let r1 := uniform(0, 3)
+        p1 := r1
+        v1 := r1
+        u1 := true
+        let r2 := uniform(0, 3)
+        p2 := r2
+        v2 := r2
+        u2 := true
+        let r3 := uniform(0, 3)
+        p3 := r3
+        v3 := r3
+        u3 := true
+        let r4 := uniform(0, 3)
+        p4 := r4
+        v4 := r4
+        u4 := true
+        let r5 := uniform(0, 3)
+        p5 := r5
+        v5 := r5
+        u5 := true
+        phase := Read
+      }
+      Read => {
+        let ou1 := u1
+        let ov1 := v1
+        let ou2 := u2
+        let ov2 := v2
+        let ou3 := u3
+        let ov3 := v3
+        let ou4 := u4
+        let ov4 := v4
+        let ou5 := u5
+        let ov5 := v5
+        if c < 4 {
+          u1 := ou1 and p1 != ov2
+          v1 := ov2
+          if not ou1 { p1 := 0 }
+          u2 := ou2 and p2 != ov3
+          v2 := ov3
+          if not ou2 { p2 := 0 }
+          u3 := ou3 and p3 != ov4
+          v3 := ov4
+          if not ou3 { p3 := 0 }
+          u4 := ou4 and p4 != ov5
+          v4 := ov5
+          if not ou4 { p4 := 0 }
+          u5 := ou5 and p5 != ov1
+          v5 := ov1
+          if not ou5 { p5 := 0 }
+          c := c + 1
+        } else {
+          u1 := ou1 and p1 != ov2
+          v1 := 0
+          if ou1 { p1 := 0 }
+          u2 := ou2 and p2 != ov3
+          v2 := 0
+          if ou2 { p2 := 0 }
+          u3 := ou3 and p3 != ov4
+          v3 := 0
+          if ou3 { p3 := 0 }
+          u4 := ou4 and p4 != ov5
+          v4 := 0
+          if ou4 { p4 := 0 }
+          u5 := ou5 and p5 != ov1
+          v5 := 0
+          if ou5 { p5 := 0 }
+          phase := Decide
+        }
+      }
+      Decide => {
+        if u1 or u2 or u3 or u4 or u5 { phase := Elected } else { phase := Pick; c := 1 }
+        u1 := false
+        v1 := 0
+        p1 := 0
+        u2 := false
+        v2 := 0
+        p2 := 0
+        u3 := false
+        v3 := 0
+        p3 := 0
+        u4 := false
+        v4 := 0
+        p4 := 0
+        u5 := false
+        v5 := 0
+        p5 := 0
+      }
+      _ => skip
+    }
+  }
+}
+
+#prob Leader |= eventually[6] phase == Elected
+#expect Leader |= steps until phase == Elected

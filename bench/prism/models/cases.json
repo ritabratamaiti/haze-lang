@@ -1,0 +1,231 @@
+[
+ {
+  "model": "Knuth-Yao die",
+  "size": "",
+  "haze": "dice.hz",
+  "prism": "simple/dice/dice.pm",
+  "consts": "x=1",
+  "props": [
+   [
+    "probability of a 6",
+    "P=? [ F s=7 & d=6 ]"
+   ],
+   [
+    "expected coin flips",
+    "R{\"coin_flips\"}=? [ F s=7 ]"
+   ]
+  ]
+ },
+ {
+  "model": "Herman",
+  "size": "N = 3",
+  "haze": "herman3.hz",
+  "prism": "dtmcs/herman/herman3.pm",
+  "consts": "k=0,K=0",
+  "props": [
+   [
+    "stable within 10 steps",
+    "filter(state, P=? [ F<=10 \"stable\" ], x1=0&x2=0&x3=0)"
+   ],
+   [
+    "expected steps to stabilize",
+    "filter(state, R{\"steps\"}=? [ F \"stable\" ], x1=0&x2=0&x3=0)"
+   ]
+  ]
+ },
+ {
+  "model": "Herman",
+  "size": "N = 5",
+  "haze": "herman5.hz",
+  "prism": "dtmcs/herman/herman5.pm",
+  "consts": "k=0,K=0",
+  "props": [
+   [
+    "stable within 10 steps",
+    "filter(state, P=? [ F<=10 \"stable\" ], x1=0&x2=0&x3=0&x4=0&x5=0)"
+   ],
+   [
+    "expected steps to stabilize",
+    "filter(state, R{\"steps\"}=? [ F \"stable\" ], x1=0&x2=0&x3=0&x4=0&x5=0)"
+   ]
+  ]
+ },
+ {
+  "model": "Herman",
+  "size": "N = 7",
+  "haze": "herman7.hz",
+  "prism": "dtmcs/herman/herman7.pm",
+  "consts": "k=0,K=0",
+  "props": [
+   [
+    "stable within 10 steps",
+    "filter(state, P=? [ F<=10 \"stable\" ], x1=0&x2=0&x3=0&x4=0&x5=0&x6=0&x7=0)"
+   ],
+   [
+    "expected steps to stabilize",
+    "filter(state, R{\"steps\"}=? [ F \"stable\" ], x1=0&x2=0&x3=0&x4=0&x5=0&x6=0&x7=0)"
+   ]
+  ]
+ },
+ {
+  "model": "Herman",
+  "size": "N = 9",
+  "haze": "herman9.hz",
+  "prism": "dtmcs/herman/herman9.pm",
+  "consts": "k=0,K=0",
+  "props": [
+   [
+    "stable within 10 steps",
+    "filter(state, P=? [ F<=10 \"stable\" ], x1=0&x2=0&x3=0&x4=0&x5=0&x6=0&x7=0&x8=0&x9=0)"
+   ],
+   [
+    "expected steps to stabilize",
+    "filter(state, R{\"steps\"}=? [ F \"stable\" ], x1=0&x2=0&x3=0&x4=0&x5=0&x6=0&x7=0&x8=0&x9=0)"
+   ]
+  ]
+ },
+ {
+  "model": "Leader election",
+  "size": "N = 3, K = 2",
+  "haze": "leader3_2.hz",
+  "round": 4,
+  "prism": "dtmcs/leader_sync/leader3_2.pm",
+  "consts": "L=1",
+  "props": [
+   [
+    "leader in the first round",
+    "P=? [ F<=4 \"elected\" ]"
+   ],
+   [
+    "expected rounds",
+    "R{\"num_rounds\"}=? [ F \"elected\" ]"
+   ]
+  ]
+ },
+ {
+  "model": "Leader election",
+  "size": "N = 3, K = 4",
+  "haze": "leader3_4.hz",
+  "round": 4,
+  "prism": "dtmcs/leader_sync/leader3_4.pm",
+  "consts": "L=1",
+  "props": [
+   [
+    "leader in the first round",
+    "P=? [ F<=4 \"elected\" ]"
+   ],
+   [
+    "expected rounds",
+    "R{\"num_rounds\"}=? [ F \"elected\" ]"
+   ]
+  ]
+ },
+ {
+  "model": "Leader election",
+  "size": "N = 4, K = 2",
+  "haze": "leader4_2.hz",
+  "round": 5,
+  "prism": "dtmcs/leader_sync/leader4_2.pm",
+  "consts": "L=1",
+  "props": [
+   [
+    "leader in the first round",
+    "P=? [ F<=5 \"elected\" ]"
+   ],
+   [
+    "expected rounds",
+    "R{\"num_rounds\"}=? [ F \"elected\" ]"
+   ]
+  ]
+ },
+ {
+  "model": "Leader election",
+  "size": "N = 4, K = 4",
+  "haze": "leader4_4.hz",
+  "round": 5,
+  "prism": "dtmcs/leader_sync/leader4_4.pm",
+  "consts": "L=1",
+  "props": [
+   [
+    "leader in the first round",
+    "P=? [ F<=5 \"elected\" ]"
+   ],
+   [
+    "expected rounds",
+    "R{\"num_rounds\"}=? [ F \"elected\" ]"
+   ]
+  ]
+ },
+ {
+  "model": "Leader election",
+  "size": "N = 5, K = 2",
+  "haze": "leader5_2.hz",
+  "round": 6,
+  "prism": "dtmcs/leader_sync/leader5_2.pm",
+  "consts": "L=1",
+  "props": [
+   [
+    "leader in the first round",
+    "P=? [ F<=6 \"elected\" ]"
+   ],
+   [
+    "expected rounds",
+    "R{\"num_rounds\"}=? [ F \"elected\" ]"
+   ]
+  ]
+ },
+ {
+  "model": "Leader election",
+  "size": "N = 5, K = 4",
+  "haze": "leader5_4.hz",
+  "round": 6,
+  "prism": "dtmcs/leader_sync/leader5_4.pm",
+  "consts": "L=1",
+  "props": [
+   [
+    "leader in the first round",
+    "P=? [ F<=6 \"elected\" ]"
+   ],
+   [
+    "expected rounds",
+    "R{\"num_rounds\"}=? [ F \"elected\" ]"
+   ]
+  ]
+ },
+ {
+  "model": "Leader election",
+  "size": "N = 6, K = 2",
+  "haze": "leader6_2.hz",
+  "round": 7,
+  "prism": "dtmcs/leader_sync/leader6_2.pm",
+  "consts": "L=1",
+  "props": [
+   [
+    "leader in the first round",
+    "P=? [ F<=7 \"elected\" ]"
+   ],
+   [
+    "expected rounds",
+    "R{\"num_rounds\"}=? [ F \"elected\" ]"
+   ]
+  ]
+ },
+ {
+  "model": "Leader election",
+  "size": "N = 6, K = 4",
+  "haze": "leader6_4.hz",
+  "round": 7,
+  "prism": "dtmcs/leader_sync/leader6_4.pm",
+  "consts": "L=1",
+  "props": [
+   [
+    "leader in the first round",
+    "P=? [ F<=7 \"elected\" ]"
+   ],
+   [
+    "expected rounds",
+    "R{\"num_rounds\"}=? [ F \"elected\" ]"
+   ]
+  ]
+ }
+]

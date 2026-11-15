@@ -1,0 +1,17 @@
+-- Knuth and Yao's die: a fair six-sided die from fair coin flips (PRISM: simple/dice/dice.pm)
+system Die {
+  var s : Num := 0
+  var d : Num := 0
+  step {
+    if s == 0 { if flip(0.5) { s := 1 } else { s := 2 } }
+    else if s == 1 { if flip(0.5) { s := 3 } else { s := 4 } }
+    else if s == 2 { if flip(0.5) { s := 5 } else { s := 6 } }
+    else if s == 3 { if flip(0.5) { s := 1 } else { s := 7; d := 1 } }
+    else if s == 4 { s := 7; if flip(0.5) { d := 2 } else { d := 3 } }
+    else if s == 5 { s := 7; if flip(0.5) { d := 4 } else { d := 5 } }
+    else if s == 6 { if flip(0.5) { s := 2 } else { s := 7; d := 6 } }
+  }
+}
+
+#prob Die |= eventually s == 7 and d == 6
+#expect Die |= steps until s == 7

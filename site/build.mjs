@@ -132,6 +132,7 @@ const DOC_SECTIONS = [
   ["Background", [
     ["design", "Design and semantics", "docs/Design.md", "How Haze follows Lean's design, and the precise meaning of its results."],
     ["comparison", "How Haze compares", "docs/Comparison.md", "PRISM, Storm, Lean, probabilistic programming and testing tools, and when to use each."],
+    ["prism", "Checking against PRISM and Storm", "docs/Benchmarks.md", "PRISM's example models checked with Haze, PRISM and Storm, and how the answers compare."],
     ["faq", "FAQ", "docs/FAQ.md", "Status, exact numbers, model size, licensing and other common questions."]]],
 ];
 const DOCS = DOC_SECTIONS.flatMap(([section, pages]) => pages.map(([id, label, path, summary]) => ({ id, label, path, summary, section })));

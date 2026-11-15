@@ -26,7 +26,9 @@ Haze in most respects:
 - **Maturity.** Both have been developed and used in research for many years, with many
   published case studies. Haze is new.
 
-If you need any of these, use PRISM or Storm.
+If you need any of these, use PRISM or Storm. On the models they have in common, the three tools agree:
+[Checking Haze against PRISM and Storm](Benchmarks.md) compares their answers on PRISM's
+example models.
 
 Haze differs in a few ways that matter for checking software:
 

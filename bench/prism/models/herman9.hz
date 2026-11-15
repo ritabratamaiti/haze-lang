@@ -1,0 +1,39 @@
+-- Herman's self-stabilizing ring with 9 processes (PRISM: dtmcs/herman/herman9.pm),
+-- starting with every process holding a token
+def tok(a : Bool, b : Bool) : Num := if a == b then 1 else 0
+
+system Herman {
+  var x1 : Bool := false
+  var x2 : Bool := false
+  var x3 : Bool := false
+  var x4 : Bool := false
+  var x5 : Bool := false
+  var x6 : Bool := false
+  var x7 : Bool := false
+  var x8 : Bool := false
+  var x9 : Bool := false
+  step {
+    let o1 := x1
+    let o2 := x2
+    let o3 := x3
+    let o4 := x4
+    let o5 := x5
+    let o6 := x6
+    let o7 := x7
+    let o8 := x8
+    let o9 := x9
+    if o1 == o9 { x1 := flip(0.5) } else { x1 := o9 }
+    if o2 == o1 { x2 := flip(0.5) } else { x2 := o1 }
+    if o3 == o2 { x3 := flip(0.5) } else { x3 := o2 }
+    if o4 == o3 { x4 := flip(0.5) } else { x4 := o3 }
+    if o5 == o4 { x5 := flip(0.5) } else { x5 := o4 }
+    if o6 == o5 { x6 := flip(0.5) } else { x6 := o5 }
+    if o7 == o6 { x7 := flip(0.5) } else { x7 := o6 }
+    if o8 == o7 { x8 := flip(0.5) } else { x8 := o7 }
+    if o9 == o8 { x9 := flip(0.5) } else { x9 := o8 }
+  }
+}
+
+explore 2000000
+#prob Herman |= eventually[10] tok(x1, x9) + tok(x2, x1) + tok(x3, x2) + tok(x4, x3) + tok(x5, x4) + tok(x6, x5) + tok(x7, x6) + tok(x8, x7) + tok(x9, x8) == 1
+#expect Herman |= steps until tok(x1, x9) + tok(x2, x1) + tok(x3, x2) + tok(x4, x3) + tok(x5, x4) + tok(x6, x5) + tok(x7, x6) + tok(x8, x7) + tok(x9, x8) == 1

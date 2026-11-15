@@ -41,6 +41,8 @@ before accepting it. What Haze adds is what that kernel keeps track of: besides 
 each term, it records whether the term depends on chance, on a rough estimate, or on a
 computation that might not finish.
 
+[![Haze in the browser: the chance of a double charge as the loss rate changes, then an idempotency key fixes the bug](docs/images/demo.gif)](https://haze-lang.pages.dev/)
+
 ## Example
 
 Take the payment client from above. It retries when a request or its reply is lost, and the
@@ -208,7 +210,8 @@ explores (the default is 100,000), and `--json` prints the results as JSON for o
 - [Installation](docs/Installation.md) and [your first model](docs/Getting-Started.md)
 - [Reading results](docs/Reading-Results.md)
 - [Language reference](docs/Language-Reference.md) and [command line and JSON](docs/Command-Line.md)
-- [How Haze compares](docs/Comparison.md) with PRISM, Storm, Lean and probabilistic programming
+- [How Haze compares](docs/Comparison.md) with PRISM, Storm, Lean and probabilistic programming,
+  and [checking Haze against PRISM and Storm](docs/Benchmarks.md)
 - [FAQ](docs/FAQ.md)
 
 - [Design and semantics](docs/Design.md), including how Haze relates to Lean

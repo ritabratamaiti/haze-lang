@@ -1,0 +1,21 @@
+-- Herman's self-stabilizing ring with 3 processes (PRISM: dtmcs/herman/herman3.pm),
+-- starting with every process holding a token
+def tok(a : Bool, b : Bool) : Num := if a == b then 1 else 0
+
+system Herman {
+  var x1 : Bool := false
+  var x2 : Bool := false
+  var x3 : Bool := false
+  step {
+    let o1 := x1
+    let o2 := x2
+    let o3 := x3
+    if o1 == o3 { x1 := flip(0.5) } else { x1 := o3 }
+    if o2 == o1 { x2 := flip(0.5) } else { x2 := o1 }
+    if o3 == o2 { x3 := flip(0.5) } else { x3 := o2 }
+  }
+}
+
+explore 2000000
+#prob Herman |= eventually[10] tok(x1, x3) + tok(x2, x1) + tok(x3, x2) == 1
+#expect Herman |= steps until tok(x1, x3) + tok(x2, x1) + tok(x3, x2) == 1
