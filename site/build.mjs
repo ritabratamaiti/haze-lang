@@ -201,7 +201,7 @@ function layout({ root, path, title, description, body, script, data, wide, cano
 <meta name="description" content="${esc(description)}">
 ${canonical !== undefined ? `<link rel="canonical" href="${SITE_URL}${canonical}">\n<meta property="og:url" content="${SITE_URL}${canonical}">\n` : ""}<meta property="og:title" content="${esc(title)}">
 <meta property="og:description" content="${esc(description)}">
-<meta property="og:image" content="${SITE_URL}images/logo-dark.png">
+<meta property="og:image" content="${SITE_URL}images/social-preview.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="${root}images/icon-dark.svg" type="image/svg+xml">
 <link rel="stylesheet" href="${root}assets/styles.css">
@@ -423,7 +423,7 @@ page("docs", layout({ root: "../", path: "docs/", canonical: "docs/", title: "Do
 
 cpSync(join(SITE, "styles.css"), join(DIST, "assets", "styles.css"));
 mkdirSync(join(DIST, "images"), { recursive: true });
-for (const f of ["icon-dark.svg", "icon-light.svg", "logo-dark.svg", "logo-light.svg", "logo-dark.png"]) cpSync(join(REPO, "docs", "images", f), join(DIST, "images", f));
+for (const f of ["icon-dark.svg", "icon-light.svg", "logo-dark.svg", "logo-light.svg", "logo-dark.png", "social-preview.png"]) cpSync(join(REPO, "docs", "images", f), join(DIST, "images", f));
 mkdirSync(join(DIST, "engine"), { recursive: true });
 for (const f of ["haze.mjs", "haze.wasm"]) cpSync(join(ENGINE, f), join(DIST, "engine", f));
 writeFileSync(join(DIST, ".nojekyll"), "");
