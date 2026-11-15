@@ -1,2 +1,5 @@
 * text=auto eol=lf
 *.expected text eol=lf
+
+# GitHub doesn't know Haze; Lean's highlighting fits its comments and keywords
+*.hz linguist-language=Lean

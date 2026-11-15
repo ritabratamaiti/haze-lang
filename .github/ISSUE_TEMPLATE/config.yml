@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or idea
+    url: https://github.com/ritabratamaiti/haze-lang/discussions
+    about: Ask how to model something, or share what you've built with Haze.
+  - name: Documentation
+    url: https://haze-lang.pages.dev/docs/
+    about: Installation, a first model, the language reference and the FAQ.
+  - name: Security problem
+    url: https://github.com/ritabratamaiti/haze-lang/security/advisories/new
+    about: Report a vulnerability privately. See SECURITY.md for what counts as one.

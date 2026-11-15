@@ -215,7 +215,7 @@ explores (the default is 100,000), and `--json` prints the results as JSON for o
 - [Releasing](docs/Releasing.md), for maintainers
 - [Test suite](tests/README.md)
 - [Release notes](RELEASES.md)
-- [Contributing](CONTRIBUTING.md)
+- [Contributing](CONTRIBUTING.md), the [code of conduct](CODE_OF_CONDUCT.md) and the [security policy](SECURITY.md)
 
 ## License
 
