@@ -3,7 +3,7 @@
 Haze doesn't promise backwards compatibility between versions yet. When a release breaks
 existing models, its notes will say so.
 
-## v0.1.0 (November 6, 2026)
+## v0.1.0 (November 17, 2026)
 
 This is the first version of Haze.
 
