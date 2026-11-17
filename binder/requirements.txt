@@ -1,0 +1,2 @@
+# Binder needs an environment file to build. The notebook needs nothing beyond Jupyter, which
+# Binder installs; postBuild installs haze.
