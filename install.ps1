@@ -19,7 +19,19 @@ $fromSource = [bool]$env:HAZE_FROM_SOURCE -or [bool]$env:HAZE_SOURCE_DIR
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ("haze-" + [Guid]::NewGuid())
 New-Item -ItemType Directory -Force $tmp | Out-Null
 
+# The newest release's tag, read from where github.com/OWNER/REPO/releases/latest redirects. Unlike
+# the API, that page isn't rate limited for machines that share an IP address.
 function Get-LatestVersion {
+  try {
+    $req = [System.Net.HttpWebRequest]::Create("https://github.com/$repo/releases/latest")
+    $req.AllowAutoRedirect = $false
+    $req.Method = "HEAD"
+    $req.UserAgent = "haze-install"
+    try { $resp = $req.GetResponse() } catch [System.Net.WebException] { $resp = $_.Exception.Response }
+    $location = $resp.Headers["Location"]
+    $resp.Close()
+    if ($location -match '/releases/tag/([^/?#]+)$') { return $Matches[1] }
+  } catch {}
   try { (Invoke-RestMethod "https://api.github.com/repos/$repo/releases/latest").tag_name } catch { "" }
 }
 

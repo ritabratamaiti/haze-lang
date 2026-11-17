@@ -32,9 +32,15 @@ esac
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
+# The newest release's tag, read from where github.com/OWNER/REPO/releases/latest redirects. Unlike
+# the API, that page isn't rate limited for machines that share an IP address.
 latest() {
-  curl -sSfL "https://api.github.com/repos/$repo/releases/latest" 2>/dev/null |
-    sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -n 1
+  url="$(curl -sSfLI -o /dev/null -w '%{url_effective}' "https://github.com/$repo/releases/latest" 2>/dev/null)"
+  case "$url" in
+    */releases/tag/*) echo "${url##*/}" ;;
+    *) curl -sSfL "https://api.github.com/repos/$repo/releases/latest" 2>/dev/null |
+         sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -n 1 ;;
+  esac
 }
 
 if [ -n "$from_source" ]; then
