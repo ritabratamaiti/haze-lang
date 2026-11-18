@@ -1,0 +1,45 @@
+-- A task graded by Haze: pick a retry policy for a payment client.
+--
+-- The task given to an agent (or a person): "A client sends a charge request and waits for the
+-- reply. Either message can be lost; the loss rate is about 1%, maybe 5%, at worst 10%. Choose how
+-- many attempts the client makes and whether requests carry an idempotency key, so that payments
+-- go through at least 99.9% of the time and no customer is ever charged twice."
+--
+-- The two definitions under "submission" are the answer. grade.py replaces them with a submitted
+-- answer and runs Haze; the answer passes only if every claim and theorem below is accepted. The
+-- requirements themselves are fixed by the task author, so an answer can't weaken them.
+
+param loss : Num ~= {0.01: 1, 0.05: 0.6, 0.1: 0.3}
+
+enum Phase = Sending | Waiting | Done | GaveUp
+
+system Client(max_attempts : Num, idempotent : Bool) {
+  var phase : Phase := Sending
+  var attempts : Num := 0
+  var charges : Num := 0
+  step {
+    match phase {
+      Sending => {
+        attempts := attempts + 1
+        let request_lost := flip(loss)
+        if request_lost { phase := Waiting }
+        else {
+          if not idempotent or charges == 0 { charges := charges + 1 }
+          let reply_lost := flip(loss)
+          if reply_lost { phase := Waiting } else { phase := Done }
+        }
+      }
+      Waiting => { if attempts < max_attempts { phase := Sending } else { phase := GaveUp } }
+      _ => skip
+    }
+  }
+}
+
+-- submission
+def max_attempts_answer : Num := 5
+def idempotent_answer : Bool := true
+
+-- requirements
+claim delivered : Client(max_attempts_answer, idempotent_answer) |= eventually phase == Done
+  with prob >= 0.999
+theorem never_charged_twice : Client(max_attempts_answer, idempotent_answer) |= always charges <= 1

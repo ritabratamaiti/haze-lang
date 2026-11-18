@@ -1,0 +1,12 @@
+examples/Verifier/retry_policy.hz:43:1: info: claim delivered
+  belief ≈0.999923 · plausibility ≈1 · graded
+  grade prob+fuzzy · 3 parameter assignment(s) · 16 reachable states
+  bound holds: belief ≥ 0.999
+  by fuzzy parameter (π = possibility):
+    loss = 0.01  π 1       ≈1
+    loss = 0.05  π 0.6     ≈0.999991
+    loss = 0.1   π 0.3     ≈0.999752
+examples/Verifier/retry_policy.hz:45:1: info: theorem never_charged_twice
+  probability 1 · holds with certainty
+  grade prob+fuzzy · 3 parameter assignment(s) · 26 reachable states
+  theorem accepted
