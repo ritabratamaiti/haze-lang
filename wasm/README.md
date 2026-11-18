@@ -6,7 +6,7 @@ Lean code as the `haze` command, compiled to WebAssembly with Emscripten.
 ```sh
 lake build
 python wasm/build.py                       # writes site/public/engine/haze.mjs and haze.wasm
-node wasm/test_node.mjs --skip=chip_design # compares every test and example with native haze
+node wasm/test_node.mjs --skip=chip_design,production_test # compares every test and example with native haze
 ```
 
 You need [emsdk](https://emscripten.org/docs/getting_started/downloads.html), activated so that

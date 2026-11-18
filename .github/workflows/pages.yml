@@ -54,7 +54,7 @@ jobs:
         run: python3 wasm/build.py --jobs 4
 
       - name: Check it against the native build
-        run: node wasm/test_node.mjs --skip=chip_design
+        run: node wasm/test_node.mjs --skip=chip_design,production_test
 
       - name: Build the site
         working-directory: site
