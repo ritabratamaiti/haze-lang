@@ -99,6 +99,7 @@ const EXAMPLES = [
   ["examples/probability_classics.hz", "Probability", "Probability classics", "The birthday problem, gambler's ruin, the boy-or-girl paradox and more, with known answers."],
   ["examples/Gallery/games.hz", "Games", "Craps, tennis and Penney's game", "The odds in craps (244/495), winning a game of tennis from deuce, and Penney's coin game."],
   ["examples/Gallery/security.hz", "Security", "PIN guessing and intrusion alarms", "Leaked PIN frequencies against lockout limits, and why most intrusion alarms are false."],
+  ["examples/Gallery/production_test.hz", "Electronics test", "Guard bands in production test", "How often a noisy meter ships out-of-spec parts, why retesting makes it worse, and the guard band that fixes it."],
   ["examples/Gallery/chip_design.hz", "Chip design", "Why big GPUs disable cores", "The yield of NVIDIA's 814 mm² GH100 die at TSMC's reported defect density, with and without spare SMs."],
   ["examples/Gallery/reliability.hz", "Reliability", "Voting and redundancy", "A proof that a three-way voter masks any single failure, plus redundant pumps and availability."],
   ["examples/Gallery/queueing.hz", "Networking", "Network buffers", "How full a buffer gets and how many packets it drops when the arrival rate is uncertain."],
@@ -109,7 +110,7 @@ const EXAMPLES = [
   ["examples/Gallery/game_physics.hz", "Video games", "Game physics", "Tunneling through walls, energy drift in integrators, and frame-rate dependent jumps."],
   ["examples/Law/sally_clark.hz", "Law", "R v Clark", "The \"1 in 73 million\" statistic from a real court case, and the question the jury should have asked."],
 ];
-const SLOW = new Set(["examples/Gallery/chip_design.hz"]);
+const SLOW = new Set(["examples/Gallery/chip_design.hz", "examples/Gallery/production_test.hz"]);
 const GALLERY = EXAMPLES.map(([path, field, title, desc]) => {
   const code = read(join(REPO, path));
   return { id: slug(path), path, field, title, desc, code, records: check(code, { native: true }), slow: SLOW.has(path) };

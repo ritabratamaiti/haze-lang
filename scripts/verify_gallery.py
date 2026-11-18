@@ -345,6 +345,38 @@ results.append((abs(float(post(F(1), F(1, 100000))) - 0.6667) < 1e-3 and abs(flo
 check(b, "#expect (if alarm then 100000 else 0)",
       *interval([(pi, 100000 * (base * dr + (1 - base) * fa)) for pi, dr, fa in ids]))
 
+# ---- production test --------------------------------------------------------
+# Enumerates the same discretized model directly, without Haze, and compares the out-of-spec
+# share with the normal-distribution figure it approximates.
+b = blocks("examples/Gallery/production_test.hz")
+spread = [((k - 112) * 2 - 1, q) for k, q in binom(225, F(1, 2))]
+meter = binom(8, F(1, 2))
+units = [(F(1), 2), (F(1, 2), 3)]
+bad = lambda e: abs(e) > 30
+def q_pass(e, u, g):
+    return sum(q for r, q in meter if abs(e + (r - 4) * u) <= 30 - g)
+def joint(u, g, want_bad=None, retest=False):
+    total = F(0)
+    for e, pe in spread:
+        if want_bad is not None and bad(e) != want_bad: continue
+        qp = q_pass(e, u, g)
+        total += pe * (1 - (1 - qp) ** 3 if retest else qp)
+    return total
+out = sum(q for e, q in spread if bad(e))
+check(b, "#prob not in_spec", out, name="production test: share out of spec")
+import math
+normal = 2 * (1 - 0.5 * (1 + math.erf(2 / math.sqrt(2))))
+results.append((abs(float(out) - normal) < 1e-3, "  ...close to the normal figure 2(1 - Phi(2)) = 4.55%", f"{normal:.6f}"))
+check(b, "claim false_accept_z540", *interval([(pi, joint(u, 0, True)) for pi, u in units]))
+check(b, "#prob in_spec and not passes(r1, 0)", *interval([(pi, sum(pe for e, pe in spread if not bad(e)) - joint(u, 0, False)) for pi, u in units]))
+check(b, "claim shipped_under_1000_ppm", *interval([(pi, joint(u, 0, True) / joint(u, 0)) for pi, u in units]))
+check(b, "claim retest_under_1000_ppm", *interval([(pi, joint(u, 0, True, True) / joint(u, 0, None, True)) for pi, u in units]))
+check(b, "claim guard_6_under_1000_ppm", *interval([(pi, joint(u, 6, True) / joint(u, 6)) for pi, u in units]))
+check(b, "#prob in_spec and not passes(r1, 6)", *interval([(pi, sum(pe for e, pe in spread if not bad(e)) - joint(u, 6, False)) for pi, u in units]))
+check(b, "theorem guard_8_ships_only_good", *interval([(pi, 1 - joint(u, 8, True)) for pi, u in units]))
+results.append((all(joint(u, 12, True) == 0 for _, u in units), "production test: a 12 mV guard band never ships a bad part", "0"))
+check(b, "#prob in_spec and not passes(r1, 12)", *interval([(pi, sum(pe for e, pe in spread if not bad(e)) - joint(u, 12, False)) for pi, u in units]))
+
 passed = sum(r[0] for r in results)
 for ok, name, exp in results:
     print("PASS" if ok else "FAIL", name, "|", exp)

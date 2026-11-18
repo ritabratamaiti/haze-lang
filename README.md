@@ -116,6 +116,7 @@ independent calculation (see [`scripts/verify_gallery.py`](scripts/verify_galler
 | [`games.hz`](examples/Gallery/games.hz) | Games | The odds in craps (244/495), winning a game of tennis from deuce, and Penney's coin game. |
 | [`queueing.hz`](examples/Gallery/queueing.hz) | Networking | How full a network buffer gets and how many packets it drops when the arrival rate is uncertain. |
 | [`game_physics.hz`](examples/Gallery/game_physics.hz) | Video games | Objects tunneling through walls, energy drift in physics integrators, and jumps that depend on the frame rate. |
+| [`production_test.hz`](examples/Gallery/production_test.hz) | Electronics test | How often a production test with a noisy meter ships out-of-spec parts, why retesting failed parts makes it worse, and which guard band meets a target for every plausible meter error. |
 | [`chip_design.hz`](examples/Gallery/chip_design.hz) | Chip design | Why NVIDIA's H100 SXM5 enables only 132 of the 144 SMs on its 814 mm² GH100 die: the die's yield at TSMC's reported defect density, with and without spare SMs. |
 | [`security.hz`](examples/Gallery/security.hz) | Security | How often a thief guesses a PIN before a card locks or a phone erases itself, using PIN frequencies from 3.4 million leaked passwords, and why most intrusion-detection alarms are false (Axelsson's base-rate analysis). |
 

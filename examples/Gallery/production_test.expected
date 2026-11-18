@@ -1,0 +1,65 @@
+examples/Gallery/production_test.hz:30:1: info: #prob not in_spec
+  probability ≈0.04526
+examples/Gallery/production_test.hz:36:1: info: claim false_accept_z540
+  belief ≈0.006209 · plausibility ≈0.007775 · graded
+  grade prob+fuzzy · 2 parameter assignment(s) · ≤2034 states/step
+  bound holds: plausibility ≤ 0.02
+  by fuzzy parameter (π = possibility):
+    unit = 2  π 1       ≈0.006209
+    unit = 3  π 0.5     ≈0.009341
+examples/Gallery/production_test.hz:37:1: info: #prob in_spec and not passes(r1, 0)
+  belief ≈0.010088 · plausibility ≈0.012227
+  by fuzzy parameter (π = possibility):
+    unit = 2  π 1       ≈0.010088
+    unit = 3  π 0.5     ≈0.014367
+examples/Gallery/production_test.hz:38:1: error: claim shipped_under_1000_ppm
+  belief ≈0.00653 · plausibility ≈0.008182 · graded
+  grade prob+fuzzy · 2 parameter assignment(s) · ≤2034 states/step
+  bound fails: plausibility ≈0.008182 > 0.001
+  by fuzzy parameter (π = possibility):
+    unit = 2  π 1       ≈0.00653
+    unit = 3  π 0.5     ≈0.009835
+  a world where it happens (probability ≈9.90424e-6):
+    parameters: unit = 2
+    inputs: k = 94, r1 = 8
+examples/Gallery/production_test.hz:43:1: error: claim retest_under_1000_ppm
+  belief ≈0.014112 · plausibility ≈0.017273 · graded
+  grade prob+fuzzy · 2 parameter assignment(s) · ≤164754 states/step
+  bound fails: plausibility ≈0.017273 > 0.001
+  by fuzzy parameter (π = possibility):
+    unit = 2  π 1       ≈0.014112
+    unit = 3  π 0.5     ≈0.020433
+  a world where it happens (probability ≈1.51127e-10):
+    parameters: unit = 2
+    inputs: k = 94, r1 = 0, r2 = 0, r3 = 8
+examples/Gallery/production_test.hz:49:1: info: claim guard_6_under_1000_ppm
+  belief ≈5.56269e-5 · plausibility ≈4.81982e-4 · graded
+  grade prob+fuzzy · 2 parameter assignment(s) · ≤2034 states/step
+  bound holds: plausibility ≤ 0.001
+  by fuzzy parameter (π = possibility):
+    unit = 2  π 1       ≈5.56269e-5
+    unit = 3  π 0.5     ≈9.08336e-4
+examples/Gallery/production_test.hz:50:1: info: #prob in_spec and not passes(r1, 6)
+  belief ≈0.07048 · plausibility ≈0.07103
+  by fuzzy parameter (π = possibility):
+    unit = 2  π 1       ≈0.07048
+    unit = 3  π 0.5     ≈0.071579
+examples/Gallery/production_test.hz:51:1: error: theorem guard_8_ships_only_good
+  belief ≈0.99976 · plausibility 1 · graded
+  grade prob+fuzzy · 2 parameter assignment(s) · ≤2034 states/step
+  theorem rejected: belief is ≈0.99976, not 1
+  by fuzzy parameter (π = possibility):
+    unit = 2  π 1       1
+    unit = 3  π 0.5     ≈0.99952
+  counterexample (probability ≈1.84944e-5, degree 0):
+    parameters: unit = 3
+    inputs: k = 96, r1 = 8
+examples/Gallery/production_test.hz:52:1: info: theorem guard_12_ships_only_good
+  probability 1 · holds with certainty
+  grade prob+fuzzy · 2 parameter assignment(s) · ≤2034 states/step
+  theorem accepted
+examples/Gallery/production_test.hz:53:1: info: #prob in_spec and not passes(r1, 12)
+  belief ≈0.191621 · plausibility ≈0.192986
+  by fuzzy parameter (π = possibility):
+    unit = 2  π 1       ≈0.192986
+    unit = 3  π 0.5     ≈0.190256
