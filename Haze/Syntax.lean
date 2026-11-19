@@ -206,6 +206,10 @@ inductive SDecl where
   | explore (n : Nat)
   | enumD (n : String) (ctors : List String)
   | param (n : String) (ty : String) (support : List (SExpr × SExpr))
+  /-- A continuous fuzzy parameter, such as `param p : Num ~= tri(0.01, 0.02, 0.05)`. -/
+  | cparam (n : String) (ty : String) (shape : String) (args : List SExpr)
+  /-- `levels N`: the number of possibility levels for continuous fuzzy parameters. -/
+  | levels (n : Nat)
   | input (n : String) (ty : String) (e : SExpr)
   | defD (n : String) (params : Option (List (String × String))) (ret : String)
       (grade : Option (List String)) (body : SExpr)
@@ -549,6 +553,10 @@ def decl : P SDecl := do
     advance; let n ← number
     unless n.den == 1 && n.num > 0 do failAt "explore expects a positive whole number of states"
     pure (.explore n.num.toNat)
+  | .ident "levels" =>
+    advance; let n ← number
+    unless n.den == 1 && n.num > 0 do failAt "levels expects a positive whole number"
+    pure (.levels n.num.toNat)
   | .ident "enum" =>
     advance
     let n ← ident; expectSym "="
@@ -559,6 +567,12 @@ def decl : P SDecl := do
     advance
     let n ← ident; expectSym ":"
     let ty ← typeName; expectSym "~="
+    if !(← isSym "{") then
+      let shape ← ident
+      expectSym "("
+      let args ← sepBy expr "," ")"
+      expectSym ")"
+      return .cparam n ty shape args
     expectSym "{"
     let sup ← sepBy (do let v ← expr; expectSym ":"; let m ← expr; pure (v, m)) "," "}"
     expectSym "}"

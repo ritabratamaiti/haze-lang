@@ -106,16 +106,27 @@ inductive Value where
   | num (q : Rat)
   | deg (q : Rat)
   | tag (ty : String) (idx : Nat)
+  /--
+  Some number or degree from `lo` to `hi`, with `lo < hi`; `openLo` and `openHi` exclude an end.
+  Intervals arise only while the kernel bounds a property over a range of values of a continuous
+  fuzzy parameter, and every operation on them gives a result that contains every possible result.
+  -/
+  | ival (lo hi : Rat) (openLo openHi : Bool)
   deriving DecidableEq, Hashable, Repr, Inhabited
 
 /--
 The result of an evaluation: a value, or `stuck` if evaluation ran out of fuel. Since nothing is
 known about a stuck outcome, it widens the belief–plausibility interval of any property that
 depends on it.
+
+`amb xs` is one of the outcomes in `xs`, but which one isn't known. It arises when an interval
+can't decide a comparison or a probability, and the model checker takes the worst and the best
+choice, so it widens results less than `stuck` does.
 -/
 inductive Res (α : Type) where
   | ok (a : α)
   | stuck
+  | amb (xs : List α)
   deriving DecidableEq, Hashable, Repr, Inhabited
 
 /-- The fuzzy logics. The active logic determines what `and` and `or` mean on degrees. -/
@@ -259,6 +270,28 @@ structure Interval where
   pl : Rat
   deriving DecidableEq, Repr, Inhabited
 
+/--
+The possibility distribution of a continuous fuzzy parameter.
+
+* `trap a b c d` rises linearly from possibility 0 at `a` to 1 at `b`, is 1 up to `c`, and falls
+  to 0 at `d`. A triangle `tri(a, m, b)` is `trap a m m b`.
+* `likelihood k n` is the binomial likelihood of a probability after `k` failures in `n` trials,
+  scaled so that its largest value is 1. It is the possibility distribution that the data alone
+  supports.
+-/
+inductive Shape where
+  | trap (a b c d : Rat)
+  | likelihood (k n : Nat)
+  deriving DecidableEq, Repr, Inhabited
+
+/--
+The most possible value of a continuous fuzzy parameter: the middle of the values of possibility
+1 for a trapezoid, and the observed failure rate for a likelihood.
+-/
+def Shape.core : Shape → Rat
+  | .trap _ b c _ => (b + c) / 2
+  | .likelihood k n => (k : Rat) / n
+
 /-- How a global variable gets its value. -/
 inductive GlobalKind where
   /--
@@ -266,6 +299,8 @@ inductive GlobalKind where
   membership function is normal, meaning that at least one value has membership 1.
   -/
   | param (support : List (Value × Rat))
+  /-- A continuous fuzzy parameter, a number with the given possibility distribution. -/
+  | cparam (shape : Shape)
   /--
   A random node, which has one value in each world. `isInput` marks nodes declared with `input`.
   -/
@@ -339,6 +374,9 @@ inductive Decl where
   | explore (n : Nat)
   | enumD (name : String) (ctors : Array String)
   | param (name : String) (ty : Ty) (support : List (Value × Rat))
+  | cparam (name : String) (shape : Shape)
+  /-- `levels N`: the number of possibility levels used for continuous fuzzy parameters. -/
+  | levels (n : Nat)
   | node (name : String) (ty : Ty) (val : Expr) (isInput : Bool) (declared : Option Grade)
   | fn (f : FunInfo) (declared : Option Grade)
   | observe (cond : Expr)
@@ -459,5 +497,6 @@ def fmtValue (env : Env) : Value → String
   | .num q => fmtQ q
   | .deg q => s!"deg {fmtQ q}"
   | .tag ty i => env.ctorName ty i
+  | .ival lo hi ol oh => s!"{if ol then "(" else "["}{fmtQ lo}, {fmtQ hi}{if oh then ")" else "]"}"
 
 end Haze

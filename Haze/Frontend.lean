@@ -5,7 +5,7 @@ Authors: Ritabrata Maiti
 -/
 import Haze.Elab
 import Haze.Json
-import Haze.Kernel.Verify
+import Haze.Kernel.Continuous
 
 /-!
 # Front End
@@ -35,6 +35,8 @@ states explored for an unbounded property.
 structure Options where
   fuel : Nat := 1000
   states : Nat := Checker.defaultMaxStates
+  /-- The number of possibility levels for continuous fuzzy parameters. -/
+  levels : Nat := 10
   deriving Inhabited
 
 /--
@@ -87,7 +89,7 @@ The JSON form of a distribution. The unknown outcome, from running out of fuel, 
 def jsonDist (env : Env) (xs : List (Res Value × Rat)) : Json :=
   .arr (xs.map fun (r, q) => .obj [("value", match r with
       | .ok v => Json.value env v
-      | .stuck => .null), ("probability", Json.rat q)])
+      | .stuck | .amb _ => .null), ("probability", Json.rat q)])
 
 def indent (lines : List String) : String :=
   String.intercalate "" (lines.map ("\n  " ++ ·))
@@ -102,7 +104,7 @@ def fmtAssign (env : Env) (a : List (String × Value)) : String :=
 
 def fmtRes (env : Env) : Res Value → String
   | .ok v => fmtValue env v
-  | .stuck => "⊥"
+  | .stuck | .amb _ => "⊥"
 
 def inputsOf (env : Env) (relevant : Array Bool) (w : World) : List (String × String) := Id.run do
   let mut out := #[]
@@ -157,15 +159,15 @@ assignment. With `N` the probability that both hold and `C` the probability that
 holds but the property doesn't, the result is `N / (N + C)`. When some outcomes are unknown, the
 two quantities are intervals, and the bounds take the least and most favorable combination.
 -/
-def runConditional (env : Env) (fuel : Nat) (bs : Array Branch) (spec : PropSpec) (cond : Expr) :
-    Except String (List BranchResult × Option Witness) := do
+def runConditional (env : Env) (fuel : Nat) (bs : Array Branch) (spec : PropSpec) (cond : Expr)
+    (robust := false) : Except String (List BranchResult × Option Witness) := do
   let φ := asDegree env spec
   let zero : Expr := .lit (.deg 0)
   let base := { spec with given := none }
-  let num := { checkerFor env fuel { base with body := .ite cond φ zero } with splitSteps := bs.size < 4 }
-  let cmp := { checkerFor env fuel { base with body := .ite cond (.prim .tnot [φ]) zero } with splitSteps := bs.size < 4 }
+  let num := { checkerFor env fuel { base with body := .ite cond φ zero } with splitSteps := bs.size < 4, robust }
+  let cmp := { checkerFor env fuel { base with body := .ite cond (.prim .tnot [φ]) zero } with splitSteps := bs.size < 4, robust }
   -- a counterexample is a configuration where the condition holds and the property fails
-  let wit := checkerFor env fuel { base with body := .ite cond φ (.lit (.deg 1)) }
+  let wit := { checkerFor env fuel { base with body := .ite cond φ (.lit (.deg 1)) } with robust }
   let mut rows := #[]
   let mut witness := none
   let results ← parMapM bs fun b => do
@@ -186,10 +188,11 @@ Checks a property on every branch. Returns the result for each branch, and the c
 from the first branch that has one.
 -/
 def runSpec (env : Env) (fuel : Nat) (bs : Array Branch) (spec : PropSpec)
-    (maxStates := Checker.defaultMaxStates) : Except String (List BranchResult × Option Witness) := do
+    (maxStates := Checker.defaultMaxStates) (robust := false) :
+    Except String (List BranchResult × Option Witness) := do
   if let some cond := spec.given then
-    return ← runConditional env fuel bs spec cond
-  let ck := { checkerFor env fuel spec maxStates with splitSteps := bs.size < 4 }
+    return ← runConditional env fuel bs spec cond robust
+  let ck := { checkerFor env fuel spec maxStates with splitSteps := bs.size < 4, robust }
   let mut rows := #[]
   let mut wit := none
   -- the parameter assignments are independent, so they are checked in parallel
@@ -375,6 +378,120 @@ def branchesFor (spec : PropSpec) : FM (Except String (Array Branch)) := do
   | .error e => return .error e
 
 /--
+The continuous fuzzy parameters that a property, its condition and the observations so far can
+read, with the global variables they can read.
+-/
+def continuousFor (spec : PropSpec) : FM (Array Continuous.CParam × Array Bool) := do
+  let s ← get
+  let sys := spec.sys.bind (s.env.systems[·]?)
+  let keep := relevantGlobals s.env sys spec.body (spec.args ++ spec.given.toList ++ s.observed)
+  let mut out := #[]
+  for h : i in [0:s.env.globals.size] do
+    let g := s.env.globals[i]
+    if let .cparam sh := g.kind then
+      if keep[i]?.getD true then out := out.push { name := g.name, shape := sh }
+  return (out, keep)
+
+/-- The numeric constants in a term. -/
+partial def exprLits : Expr → List Rat
+  | .lit (.num q) | .lit (.deg q) => [q]
+  | .prim _ args | .call _ args | .rand _ args => args.flatMap exprLits
+  | .ite a b c | .choose a b c => exprLits a ++ exprLits b ++ exprLits c
+  | .cat alts => alts.flatMap (exprLits ·.1)
+  | .catW alts => alts.flatMap fun (e, w) => exprLits e ++ exprLits w
+  | .letE a b => exprLits a ++ exprLits b
+  | .quant _ _ _ a b c => exprLits a ++ exprLits b ++ exprLits c
+  | .matchE e arms d => exprLits e ++ arms.flatMap (exprLits ·.2) ++ (d.map exprLits).getD []
+  | _ => []
+
+/-- The numeric constants in a statement. -/
+partial def stmtLits : Stmt → List Rat
+  | .assign _ e | .assert e => exprLits e
+  | .seq a b => stmtLits a ++ stmtLits b
+  | .ite c t e | .choose c t e => exprLits c ++ stmtLits t ++ stmtLits e
+  | .matchS e arms d => exprLits e ++ arms.flatMap (stmtLits ·.2) ++ stmtLits d
+  | .letS v b _ => exprLits v ++ stmtLits b
+  | .skip => []
+
+/--
+The constants that a model and a property contain. A continuous parameter's range is split at
+them first, since comparisons with them are what an interval can leave undecided.
+-/
+def modelCuts (env : Env) (spec : PropSpec) : Array Rat :=
+  let fromSpec := exprLits spec.body ++ (spec.given.map exprLits).getD [] ++ spec.args.flatMap exprLits
+  let fromFuns := env.funs.toList.flatMap fun (_, f) => exprLits f.body
+  let fromSys := env.systems.toList.flatMap fun (_, si) => si.init.toList.flatMap exprLits ++ stmtLits si.step
+  let fromNodes := env.globals.toList.flatMap fun g => match g.kind with
+    | .node v _ => exprLits v
+    | _ => []
+  ((fromSpec ++ fromFuns ++ fromSys ++ fromNodes).eraseDups.take 64).toArray
+
+/-- The number of interval checks spent on one bound in the search over a cut. -/
+def searchBudget : Nat := 40
+
+/-- Checks a property with continuous fuzzy parameters `cps`. -/
+def runContinuous (spec : PropSpec) (cps : Array Continuous.CParam) (keep : Array Bool) :
+    FM (Except String Continuous.Result) := do
+  let s ← get
+  let build := fun box => do
+    let (bs, _) ← buildBranches s.env s.opts.fuel s.ops keep box
+    pure bs
+  let check := fun (b : Branch) (robust : Bool) => do
+    let (rs, _) ← runSpec s.env s.opts.fuel #[b] spec s.opts.states robust
+    match rs with
+    | r :: _ => pure r
+    | [] => throw "kernel: no result"
+  return Continuous.run cps s.opts.levels searchBudget (modelCuts s.env spec) build check
+
+/-- The branch for a point found by `runContinuous`, to look for counterexamples at. -/
+def branchAt (keep : Array Bool) (pt : List (String × Value) × Nat) : FM (Array Branch) := do
+  let s ← get
+  match buildBranches s.env s.opts.fuel s.ops keep pt.1 with
+  | .ok (bs, _) => return (bs[pt.2]?).toArray
+  | .error _ => return #[]
+
+/-- Formats an assignment, with `x in [a, b]` for a range of values. -/
+def fmtAssignIn (env : Env) (a : List (String × Value)) : String :=
+  ", ".intercalate (a.map fun (n, v) => match v with
+    | .ival .. => s!"{n} in {fmtValue env v}"
+    | _ => s!"{n} = {fmtValue env v}")
+
+/-- Formats a result range: one number, or the lowest and the highest. -/
+def fmtRange (lo hi : Rat) : String := if lo == hi then fmtQ lo else s!"{fmtQ lo} to {fmtQ hi}"
+
+/--
+Notes on a result with continuous fuzzy parameters: how close the levels are, and the result at
+the most possible values.
+-/
+def continuousNotes (env : Env) (r : Continuous.Result) : List String :=
+  let bracket := if r.inner.bel == r.outer.bel && r.inner.pl == r.outer.pl then [] else
+    [s!"{r.levels} possibility levels: the exact belief is at most {fmtQ (qmax r.outer.bel r.inner.bel)}, " ++
+     s!"the exact plausibility at least {fmtQ (qmin r.outer.pl r.inner.pl)} (more with `levels N`)"]
+  let search := if r.closed then [] else
+    ["some ranges of parameter values weren't narrowed down fully, so those bounds are cautious"]
+  let core := r.core.map fun (a, _, c) => s!"at the most possible values, {fmtAssignIn env a}: {fmtRange c.lo c.hi}"
+  bracket ++ search ++ core
+
+/--
+The results by possibility level: over the values at least that possible, the lowest and highest
+result. Shows the narrowest and widest cut and one in the middle.
+-/
+def continuousTable (env : Env) (r : Continuous.Result) : List String := Id.run do
+  let rows := r.bottoms.zip r.rows
+  let levels := (r.bottoms.eraseDups.mergeSort fun a b => b ≤ a)
+  let some hiL := levels.head? | return []
+  let loL := levels.getLast!
+  let mid := levels.foldl (fun b l => if (l - 1/2).abs < (b - 1/2).abs then l else b) hiL
+  let shown := [hiL, mid, loL].eraseDups
+  let label := fun (n : Rat) => if n == 0 then "all values" else s!"π ≥ {fmtQ n}"
+  let picked := rows.filter fun (n, _) => shown.contains n
+  let picked := picked.mergeSort fun a b => b.1 ≤ a.1
+  let w := picked.foldl (fun m (n, x) => max m ((label n).length + 2 + (fmtAssignIn env x.assign).length)) 0
+  return "by possibility level (lowest to highest over the values at least that possible):" ::
+    (picked.take 12).map fun (n, x) =>
+      s!"  {padRight s!"{label n}  {fmtAssignIn env x.assign}" w}  {fmtRange x.lo x.hi}"
+
+/--
 Checks a claim or theorem and reports the result. If it is rejected, the report includes a
 counterexample when the model checker found one. An accepted claim is added to the environment.
 -/
@@ -385,10 +502,37 @@ def doClaim (d : DeclStx) (name : String) (isThm : Bool) (spec : PropSpec) (boun
   let bs ← match ← branchesFor spec with
     | .ok bs => pure bs
     | .error e => emit d.pos "error" e; return
-  match runSpec env s.opts.fuel bs spec s.opts.states with
+  let (cps, keep) ← continuousFor spec
+  -- the results, the counterexample, the interval, the branches that fail the bound, notes and a
+  -- table of results by parameter value
+  let outcome : Except String (List BranchResult × Option Witness × Interval × Array Branch ×
+      Array Branch × List String × List String × String) ← if cps.isEmpty then
+      pure do
+        let (rows, wit) ← runSpec env s.opts.fuel bs spec s.opts.states
+        let iv := integrate (rows.map fun r => (r.poss, r.lo, r.hi))
+        let low := match bound with
+          | .ge q => (bs.zip rows.toArray).filterMap fun (b, r) => if r.lo < q then some b else none
+          | _ => bs
+        let high := match bound with
+          | .le q => (bs.zip rows.toArray).filterMap fun (b, r) => if q < r.hi then some b else none
+          | _ => bs
+        pure (rows, wit, iv, low, high, solverNotes rows s.opts.states, branchTable env rows,
+          s!"{rows.length} parameter assignment(s)")
+    else
+      match ← runContinuous spec cps keep with
+      | .error e => pure (.error e)
+      | .ok r =>
+        let low ← branchAt keep r.worst
+        let high ← branchAt keep r.bestPt
+        let wit := match runSpec env s.opts.fuel low spec s.opts.states with
+          | .ok (_, w) => w
+          | .error _ => none
+        pure (.ok (r.rows, wit, r.outer, low, high,
+          continuousNotes env r ++ solverNotes r.rows s.opts.states, continuousTable env r,
+          s!"{r.levels} possibility levels · {r.checks} checks"))
+  match outcome with
   | .error e => emit d.pos "error" e
-  | .ok (rows, wit) =>
-    let iv := integrate (rows.map fun r => (r.poss, r.lo, r.hi))
+  | .ok (rows, wit, iv, low, high, notes, table, howMany) =>
     let maxN := rows.foldl (fun m r => max m r.maxStates) 0
     let sys := spec.sys.bind (env.systems[·]?)
     let ck0 := checkerFor env s.opts.fuel spec
@@ -396,9 +540,9 @@ def doClaim (d : DeclStx) (name : String) (isThm : Bool) (spec : PropSpec) (boun
     let rel := relevantGlobals env ck0.sys spec.body (spec.args ++ spec.given.toList)
     -- Take the example from a parameter assignment that breaks the bound.
     let failing : Array Branch := match isThm, bound with
-      | false, .ge q => (bs.zip rows.toArray).filterMap fun (b, r) => if r.lo < q then some b else none
-      | false, .le q => (bs.zip rows.toArray).filterMap fun (b, r) => if q < r.hi then some b else none
-      | _, _ => bs
+      | false, .le _ => high
+      | false, .ge _ => low
+      | _, _ => if cps.isEmpty then bs else low
     -- When an upper bound fails, the useful example is a run where the property does happen.
     -- It is found as a counterexample to the negated property.
     let (wit, happens) : Option Witness × Bool := match isThm, bound with
@@ -453,10 +597,10 @@ def doClaim (d : DeclStx) (name : String) (isThm : Bool) (spec : PropSpec) (boun
       | false, .none => (true, "")
     let size := if spec.mode.unbounded then s!"{maxN} reachable states" else s!"≤{maxN} states/step"
     let lines := [s!"{fmtInterval iv} · {status g iv}",
-        s!"grade {g} · {rows.length} parameter assignment(s) · {size}"]
-      ++ solverNotes rows s.opts.states
+        s!"grade {g} · {howMany} · {size}"]
+      ++ notes
       ++ (if verdict.isEmpty then [] else [verdict])
-      ++ branchTable env rows
+      ++ table
       ++ (if ok then [] else witLines)
     let kind := if isThm then "theorem" else "claim"
     let cex : Json := match wit with
@@ -524,6 +668,11 @@ def doQuery (d : DeclStx) (k : QueryKind) (spec : PropSpec) : FM Unit := do
     match ← branchesFor spec with
     | .ok bs => pure bs
     | .error e => emit d.pos "error" e; return
+  if !(k matches .check | .prob) then
+    let (cps, _) ← continuousFor spec
+    if !cps.isEmpty then
+      let vals := ", ".intercalate (cps.toList.map fun c => s!"{c.name} = {fmtQ c.shape.core}")
+      emit d.pos "info" s!"{(d.text.splitOn " ").headD d.text} uses the most possible values of continuous fuzzy parameters: {vals}"
   match k with
   | .check =>
     match checkSpec env spec true with
@@ -550,6 +699,18 @@ def doQuery (d : DeclStx) (k : QueryKind) (spec : PropSpec) : FM Unit := do
     emit d.pos "info" s!"{d.text}{indent lines}"
       [("kind", .str "eval"), ("query", .str d.text), ("branches", .arr js.toList)]
   | .prob =>
+    let (cps, keep) ← continuousFor spec
+    if !cps.isEmpty then
+      match ← runContinuous spec cps keep with
+      | .error e => emit d.pos "error" e
+      | .ok r =>
+        emit d.pos "info" s!"{d.text}{indent ([fmtInterval r.outer] ++ continuousNotes env r ++
+            solverNotes r.rows s.opts.states ++ continuousTable env r)}"
+          ([("kind", .str "prob"), ("query", .str d.text)] ++ jsonInterval r.outer ++
+            [("exact_belief_at_most", Json.rat (qmax r.outer.bel r.inner.bel)),
+             ("exact_plausibility_at_least", Json.rat (qmin r.outer.pl r.inner.pl)),
+             ("levels", Json.nat r.levels), ("branches", jsonBranches env r.rows)])
+      return
     match runSpec env fuel branches spec s.opts.states with
     | .error e => emit d.pos "error" e
     | .ok (rows, _) =>
@@ -595,7 +756,7 @@ def doQuery (d : DeclStx) (k : QueryKind) (spec : PropSpec) : FM Unit := do
           | .ok (.num v) | .ok (.deg v) => e := e + q * v
           | .ok (.bool v) => e := e + q * (if v then 1 else 0)
           | .ok _ => emit d.pos "error" "#expect needs a numeric expression"; return
-          | .stuck => emit d.pos "error" s!"expectation undefined: mass {fmtQ q} ran out of fuel"; return
+          | .stuck | .amb _ => emit d.pos "error" s!"expectation undefined: mass {fmtQ q} ran out of fuel"; return
         rows := rows.push (b, e)
     let iv := integrateNum (rows.toList.map fun (b, e) => (b.poss, e))
     let head := if iv.bel == iv.pl then s!"expectation {fmtQ iv.bel}"
@@ -747,7 +908,8 @@ def doPrint (d : DeclStx) (n : String) : FM Unit := do
     let ps := ", ".intercalate (f.params.map fun (x, t) => s!"{x} : {t}")
     emit d.pos "info" s!"def {n}({ps}) : {f.ret}  latent grade @{f.latent}{if f.recursive then " (recursive)" else ""}"
   else if let some g := env.global? n then
-    let kind := match g.kind with | .param _ => "param" | .node _ true => "input" | .node _ false => "def"
+    let kind := match g.kind with
+      | .param _ | .cparam _ => "param" | .node _ true => "input" | .node _ false => "def"
     emit d.pos "info" s!"{kind} {n} : {g.ty} @{g.grade}"
   else if let some si := env.systems[n]? then
     let fmt := fun (vs : List (String × Ty)) => ", ".intercalate (vs.map fun (x, t) => s!"{x} : {t}")
@@ -778,6 +940,10 @@ def processDecl (d : DeclStx) : FM Unit := do
       | .param n _ sup =>
         commit
         modify fun s => { s with ops := s.ops.push (.param n sup), cache := [] }
+      | .cparam n shape =>
+        commit
+        modify fun s => { s with ops := s.ops.push (.cparam n shape), cache := [] }
+      | .levels n => commit; modify fun s => { s with opts := { s.opts with levels := n } }
       | .node _ _ val _ _ =>
         -- Evaluate the new node now, with what it depends on, so that its runtime errors are
         -- reported here even if no query reads it.
@@ -790,6 +956,11 @@ def processDecl (d : DeclStx) : FM Unit := do
       | .observe c =>
         let ops := s.ops.push (.observe c)
         let keep := relevantGlobals env' none c s.observed
+        let continuous := (env'.globals.zip keep).filterMap fun (g, k) =>
+          if k && g.kind matches .cparam _ then some g.name else none
+        if let some n := continuous[0]? then
+          emit d.pos "error" s!"an observation can't depend on the continuous fuzzy parameter {n} yet; give it a list of values, or use likelihood(failures, trials) for counts"
+          return
         match buildBranches env' fuel ops keep with
         | .error e => emit d.pos "error" e
         | .ok (_, none) => emit d.pos "error" "internal: observation produced no result"

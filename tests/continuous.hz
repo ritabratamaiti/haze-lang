@@ -1,0 +1,73 @@
+-- Continuous fuzzy parameters: triangles, trapezoids, likelihoods and their errors.
+
+param p : Num ~= tri(0.01, 0.02, 0.05)
+param w : Num ~= trap(0.25, 0.4, 0.6, 0.75)
+param r : Num ~= likelihood(3, 200)
+param q : Num ~= {0.1: 1, 0.3: 0.4}
+
+enum Phase = Trying | Done | Failed
+
+-- three attempts: P(done) = 1 - p^3, which falls as p rises
+system Retry {
+  var phase : Phase := Trying
+  var tries : Num := 0
+  step {
+    match phase {
+      Trying => {
+        tries := tries + 1
+        if flip(p) { if tries >= 3 { phase := Failed } } else { phase := Done }
+      }
+      _ => skip
+    }
+  }
+}
+#prob Retry |= eventually phase == Done
+#prob Retry |= eventually[2] phase == Done
+#prob Retry |= after[1] phase == Done given tries == 1
+claim retry_ok : Retry |= eventually phase == Done with prob >= 0.9999
+claim retry_tight : Retry |= eventually phase == Done with prob >= 0.99995
+
+-- a rate learned from 3 failures in 200 calls
+system Learned {
+  var ok : Bool := false
+  var done : Bool := false
+  step { if not done { ok := flip(1 - r); done := true } }
+}
+#prob Learned |= after[1] ok
+
+-- two flips of the same parameter in one step: the bounds are cautious, but sound
+system Two {
+  var a : Bool := false
+  var b : Bool := false
+  var done : Bool := false
+  step { if not done { a := flip(w); b := flip(w); done := true } }
+}
+#prob Two |= after[1] a != b
+
+-- discrete and continuous parameters together
+def ok_mix : Bool := flip(1 - q) and flip(1 - w)
+#prob ok_mix
+
+-- comparisons with a constant split the range there, so this theorem can be proved
+system Cmp {
+  var x : Num := 0
+  step { if w > 0.6 { x := 1 } else { x := 2 } }
+}
+theorem cmp_cases : Cmp |= after[1] (w <= 0.6 implies x == 2)
+#prob Cmp |= after[1] x == 2
+
+-- queries that use the most possible values
+#eval ok_mix
+#expect Retry |= steps until phase == Done
+
+levels 4
+#prob Learned |= after[1] ok
+
+-- errors
+param bad1 : Bool ~= tri(0, 1, 2)
+param bad2 : Num ~= tri(0, 1)
+param bad3 : Num ~= tri(0.3, 0.2, 0.4)
+param bad4 : Num ~= likelihood(5, 3)
+param bad5 : Num ~= gauss(0, 1)
+levels 2000
+observe flip(p)

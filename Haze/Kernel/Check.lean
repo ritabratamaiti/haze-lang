@@ -55,6 +55,7 @@ def typeOfValue (env : Env) : Value → CheckM Ty
   | .tag ty i => match env.enums[ty]? with
     | some cs => if i < cs.size then pure (.enum ty) else throw s!"kernel: bad constructor index for {ty}"
     | none => throw s!"kernel: unknown enum {ty}"
+  | .ival .. => throw "kernel: an interval is not a literal"
 
 /--
 The parameter types and result type of a primitive. Equality and inequality accept two arguments
@@ -349,6 +350,19 @@ def addDecl (env : Env) : Decl → CheckM Env
     unless support.any (·.2 == 1) do
       throw s!"kernel: fuzzy parameter {n} is not normal (no value has membership 1)"
     pure (env.addGlobal { name := n, ty, grade := .fuzzyG, kind := .param support })
+  | .cparam n shape => do
+    if env.contains n then throw s!"kernel: {n} already declared"
+    match shape with
+    | .trap a b c d =>
+      unless a ≤ b && b ≤ c && c ≤ d do
+        throw s!"kernel: the corners of {n} must be in increasing order"
+    | .likelihood k t =>
+      unless k ≤ t && 0 < t do
+        throw s!"kernel: likelihood of {n} needs 0 < trials and failures ≤ trials"
+    pure (env.addGlobal { name := n, ty := .num, grade := .fuzzyG, kind := .cparam shape })
+  | .levels n => do
+    unless 0 < n && n ≤ 1000 do throw "kernel: levels must be between 1 and 1000"
+    pure env
   | .node n ty val isInput declared => do
     if env.contains n then throw s!"kernel: {n} already declared"
     let (t, g) ← infer { env } val

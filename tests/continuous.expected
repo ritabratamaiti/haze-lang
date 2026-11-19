@@ -1,0 +1,118 @@
+tests/continuous.hz:24:1: info: #prob Retry |= eventually phase == Done
+  belief ≈0.999943 · plausibility ≈0.999997
+  10 possibility levels: the exact belief is at most ≈0.999955, the exact plausibility at least ≈0.999996 (more with `levels N`)
+  at the most possible values, p = 0.02: 0.999992
+  by possibility level (lowest to highest over the values at least that possible):
+    π ≥ 0.9  p in [0.019, 0.023]   ≈0.999988 to ≈0.999993
+    π ≥ 0.5  p in [0.015, 0.035]   ≈0.999957 to ≈0.999997
+    all values  p in [0.01, 0.05]  0.999875 to 0.999999
+tests/continuous.hz:25:1: info: #prob Retry |= eventually[2] phase == Done
+  belief ≈0.998594 · plausibility ≈0.999782
+  10 possibility levels: the exact belief is at most ≈0.998804, the exact plausibility at least ≈0.999752 (more with `levels N`)
+  at the most possible values, p = 0.02: 0.9996
+  by possibility level (lowest to highest over the values at least that possible):
+    π ≥ 0.9  p in [0.019, 0.023]   0.999471 to 0.999639
+    π ≥ 0.5  p in [0.015, 0.035]   0.998775 to 0.999775
+    all values  p in [0.01, 0.05]  0.9975 to 0.9999
+tests/continuous.hz:26:1: info: #prob Retry |= after[1] phase == Done given tries == 1
+  belief 0.9635 · plausibility 0.9855
+  10 possibility levels: the exact belief is at most 0.9665, the exact plausibility at least 0.9845 (more with `levels N`)
+  at the most possible values, p = 0.02: 0.98
+  by possibility level (lowest to highest over the values at least that possible):
+    π ≥ 0.9  p in [0.019, 0.023]   0.977 to 0.981
+    π ≥ 0.5  p in [0.015, 0.035]   0.965 to 0.985
+    all values  p in [0.01, 0.05]  0.95 to 0.99
+tests/continuous.hz:27:1: info: claim retry_ok
+  belief ≈0.999943 · plausibility ≈0.999997 · graded
+  grade prob+fuzzy · 10 possibility levels · 80 checks · 7 reachable states
+  10 possibility levels: the exact belief is at most ≈0.999955, the exact plausibility at least ≈0.999996 (more with `levels N`)
+  at the most possible values, p = 0.02: 0.999992
+  bound holds: belief ≥ 0.9999
+  by possibility level (lowest to highest over the values at least that possible):
+    π ≥ 0.9  p in [0.019, 0.023]   ≈0.999988 to ≈0.999993
+    π ≥ 0.5  p in [0.015, 0.035]   ≈0.999957 to ≈0.999997
+    all values  p in [0.01, 0.05]  0.999875 to 0.999999
+tests/continuous.hz:28:1: error: claim retry_tight
+  belief ≈0.999943 · plausibility ≈0.999997 · graded
+  grade prob+fuzzy · 10 possibility levels · 80 checks · 7 reachable states
+  10 possibility levels: the exact belief is at most ≈0.999955, the exact plausibility at least ≈0.999996 (more with `levels N`)
+  at the most possible values, p = 0.02: 0.999992
+  bound fails: belief ≈0.999943 < 0.99995
+  by possibility level (lowest to highest over the values at least that possible):
+    π ≥ 0.9  p in [0.019, 0.023]   ≈0.999988 to ≈0.999993
+    π ≥ 0.5  p in [0.015, 0.035]   ≈0.999957 to ≈0.999997
+    all values  p in [0.01, 0.05]  0.999875 to 0.999999
+  counterexample at step 3 (path mass 0.000125, never reached on this path):
+    parameters: p = 0.05
+    state: phase = Failed, tries = 3
+tests/continuous.hz:36:1: info: #prob Learned |= after[1] ok
+  belief ≈0.968474 · plausibility ≈0.993478
+  14 possibility levels: the exact belief is at most ≈0.972674, the exact plausibility at least ≈0.992121 (more with `levels N`)
+  at the most possible values, r = 0.015: 0.985
+  by possibility level (lowest to highest over the values at least that possible):
+    π ≥ 0.9  r in [≈0.011388, ≈0.019292]  ≈0.980708 to ≈0.988612
+    π ≥ 0.5  r in [≈0.006999, ≈0.027452]  ≈0.972548 to ≈0.993001
+    all values  r in [0, 1]               0 to 1
+tests/continuous.hz:45:1: info: #prob Two |= after[1] a != b
+  belief ≈0.428426 · plausibility ≈0.511581
+  10 possibility levels: the exact belief is at most 0.440175, the exact plausibility at least 0.5 (more with `levels N`)
+  some ranges of parameter values weren't narrowed down fully, so those bounds are cautious
+  at the most possible values, w = 0.5: 0.5
+  by possibility level (lowest to highest over the values at least that possible):
+    π ≥ 0.9  w in [0.385, 0.615]   ≈0.470783 to ≈0.509209
+    π ≥ 0.5  w in [0.325, 0.675]   ≈0.437861 to ≈0.510818
+    all values  w in [0.25, 0.75]  0.374756 (=1535/4096) to 0.514404 (=2107/4096)
+tests/continuous.hz:49:1: info: #prob ok_mix
+  belief 0.26395 · plausibility 0.61425
+  10 possibility levels: the exact belief is at most 0.29145, the exact plausibility at least 0.59175 (more with `levels N`)
+  at the most possible values, q = 0.1, w = 0.5: 0.45
+  at the most possible values, q = 0.3, w = 0.5: 0.35
+  by possibility level (lowest to highest over the values at least that possible):
+    π ≥ 0.9  q = 0.1, w in [0.385, 0.615]   0.3465 to 0.5535
+    π ≥ 0.5  q = 0.1, w in [0.325, 0.675]   0.2925 to 0.6075
+    all values  q = 0.1, w in [0.25, 0.75]  0.225 to 0.675
+    all values  q = 0.3, w in [0.25, 0.75]  0.175 to 0.525
+tests/continuous.hz:56:1: info: theorem cmp_cases
+  probability 1 · holds with certainty
+  grade fuzzy · 10 possibility levels · 90 checks · ≤3 states/step
+  at the most possible values, w = 0.5: 1
+  theorem accepted
+  by possibility level (lowest to highest over the values at least that possible):
+    π ≥ 0.9  w in [0.385, 0.615]   1
+    π ≥ 0.5  w in [0.325, 0.675]   1
+    all values  w in [0.25, 0.75]  1
+tests/continuous.hz:57:1: info: #prob Cmp |= after[1] x == 2
+  belief 0 · plausibility 1
+  10 possibility levels: the exact belief is at most 0.1, the exact plausibility at least 1 (more with `levels N`)
+  at the most possible values, w = 0.5: 1
+  by possibility level (lowest to highest over the values at least that possible):
+    π ≥ 0.9  w in [0.385, 0.615]   0 to 1
+    π ≥ 0.5  w in [0.325, 0.675]   0 to 1
+    all values  w in [0.25, 0.75]  0 to 1
+tests/continuous.hz:60:1: info: #eval uses the most possible values of continuous fuzzy parameters: w = 0.5
+tests/continuous.hz:60:1: info: #eval ok_mix
+  when w = 0.5, q = 0.1 (π 1):
+    false  ↦ 0.55
+    true   ↦ 0.45
+  when w = 0.5, q = 0.3 (π 0.4):
+    false  ↦ 0.65
+    true   ↦ 0.35
+tests/continuous.hz:61:1: info: #expect uses the most possible values of continuous fuzzy parameters: p = 0.02
+tests/continuous.hz:61:1: info: #expect Retry |= steps until phase == Done
+  expected steps ∞
+  with positive probability the property never holds, so the expectation is infinite
+tests/continuous.hz:64:1: info: #prob Learned |= after[1] ok
+  belief ≈0.964561 · plausibility ≈0.994385
+  8 possibility levels: the exact belief is at most ≈0.975012, the exact plausibility at least ≈0.99099 (more with `levels N`)
+  at the most possible values, r = 0.015: 0.985
+  by possibility level (lowest to highest over the values at least that possible):
+    π ≥ 0.75  r in [≈0.009379, ≈0.022476]  ≈0.977524 to ≈0.990621
+    π ≥ 0.5  r in [≈0.006999, ≈0.027452]   ≈0.972548 to ≈0.993001
+    all values  r in [0, 1]                0 to 1
+tests/continuous.hz:67:1: error: a continuous fuzzy parameter must be a Num, not Bool
+tests/continuous.hz:68:1: error: tri takes 3 arguments
+tests/continuous.hz:69:1: error: kernel: the corners of bad3 must be in increasing order
+tests/continuous.hz:70:1: error: kernel: likelihood of bad4 needs 0 < trials and failures ≤ trials
+tests/continuous.hz:71:1: error: unknown possibility distribution gauss (expected tri, trap or likelihood)
+tests/continuous.hz:72:1: error: kernel: levels must be between 1 and 1000
+tests/continuous.hz:73:1: error: an observation can't depend on the continuous fuzzy parameter p yet; give it a list of values, or use likelihood(failures, trials) for counts

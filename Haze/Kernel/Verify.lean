@@ -4,7 +4,7 @@ Released under the Functional Source License 1.1 (FSL-1.1-ALv2) as described in 
 Authors: Ritabrata Maiti
 -/
 import Haze.Kernel.Eval
-import Haze.Kernel.Solve
+import Haze.Kernel.Robust
 
 /-!
 # Worlds, Fuzzy Parameters and Model Checking
@@ -154,6 +154,7 @@ def observe (env : Env) (fuel : Nat) (cond : Expr) (bs : Array Branch) :
         | .ok (.bool true) => kept := kept.push (w, p * q); z := z + p * q
         | .ok _ => pure ()
         | .stuck => throw "kernel: observation could not be decided within the fuel bound"
+        | .amb _ => throw "kernel: an observation can't depend on a continuous fuzzy parameter"
     evidence := evidence ++ [(b.assign, z)]
     if z == 0 then dropped := dropped + 1
     else out := out.push { b with worlds := M.compactList (kept.toList.map fun (w, p) => (w, p / z)) }
@@ -166,6 +167,7 @@ variable, in the order of `Env.globals`.
 -/
 inductive WorldOp where
   | param (name : String) (support : List (Value × Rat))
+  | cparam (name : String) (shape : Shape)
   | node (val : Expr)
   | observe (cond : Expr)
   deriving Inhabited
@@ -184,8 +186,13 @@ It avoids building the joint distribution of every random input in the program, 
 exponentially with the number of inputs, and splitting on parameters that don't matter.
 
 Also returns the result of the last observation, if there is one.
+
+`box` gives the value of each continuous fuzzy parameter: a number, or an interval when the
+property is to be bounded over a range of values. A parameter without one takes its most
+possible value.
 -/
-def buildBranches (env : Env) (fuel : Nat) (ops : Array WorldOp) (keep : Array Bool) :
+def buildBranches (env : Env) (fuel : Nat) (ops : Array WorldOp) (keep : Array Bool)
+    (box : List (String × Value) := []) :
     Except String (Array Branch × Option ObserveResult) := do
   let mut bs : Array Branch := #[{}]
   let mut last := none
@@ -194,6 +201,13 @@ def buildBranches (env : Env) (fuel : Nat) (ops : Array WorldOp) (keep : Array B
     match op with
     | .param n sup =>
       if keep[gi]?.getD true then bs := addParam n sup bs
+      else bs := bs.map fun b => { b with worlds := b.worlds.map fun (w, p) => (w.push .stuck, p) }
+      gi := gi + 1
+    | .cparam n shape =>
+      if keep[gi]?.getD true then
+        let v := (box.lookup n).getD (.num shape.core)
+        bs := bs.map fun b => { b with assign := b.assign ++ [(n, v)],
+                                       worlds := b.worlds.map fun (w, p) => (w.push (.ok v), p) }
       else bs := bs.map fun b => { b with worlds := b.worlds.map fun (w, p) => (w.push .stuck, p) }
       gi := gi + 1
     | .node v =>
@@ -468,6 +482,12 @@ structure Checker where
   trace : Bool := false
   /-- The names of the state variables, for labeling recorded decisions. -/
   varNames : Array String := #[]
+  /--
+  Whether some continuous fuzzy parameter holds an interval, so that outcomes can be ambiguous.
+  Every property is then checked over the explored state space, where the worst and best
+  resolution of each ambiguity can be found.
+  -/
+  robust : Bool := false
 
 namespace Checker
 
@@ -496,12 +516,24 @@ def toDeg : Value → Except String Rat
   | .num q => pure q
   | v => throw s!"kernel: property evaluated to non-truth value {repr v}"
 
-/-- The distribution of the degree of the property in a configuration. -/
+/--
+The degrees that a value can stand for. An interval stands for every degree between its ends,
+but its ends are enough to decide whether all or none of them reach a threshold.
+-/
+def degreesOf : Value → Except String (List Rat)
+  | .ival l h _ _ => pure [l, h]
+  | v => return [← toDeg v]
+
+/--
+The distribution of the degree of the property in a configuration. A degree that depends on an
+interval is ambiguous, and lists the ends of its range.
+-/
 def degrees (ck : Checker) (cfg : Config) : Except String (List (Res Rat × Rat)) := do
   let xs ← liftM (eval (ck.ctx cfg) ck.body)
   xs.mapM fun (r, q) => match r with
-    | .ok v => return (.ok (← toDeg v), q)
+    | .ok v => return (match ← degreesOf v with | [d] => .ok d | ds => .amb ds, q)
     | .stuck => pure (.stuck, q)
+    | .amb vs => return (.amb (← vs.mapM degreesOf).flatten, q)
 
 /-- The distribution of the value of the property in a configuration. -/
 def values (ck : Checker) (cfg : Config) : Except String (List (Res Value × Rat)) :=
@@ -517,6 +549,10 @@ def step (ck : Checker) (cfg : Config) (par := false) : Except String (List (Res
   return xs.map fun (r, q) => match r with
     | .ok st => (.ok { cfg with st }, q)
     | .stuck => (.stuck, q)
+    | .amb sts =>
+      match sts.eraseDups with
+      | [st] => (.ok { cfg with st }, q)
+      | sts => (.amb (sts.map fun st => { cfg with st }), q)
 
 /--
 The initial configurations of a branch, after projecting its worlds onto the relevant variables,
@@ -541,7 +577,7 @@ def initial (ck : Checker) (b : Branch) : Except String (List (Config × Rat) ×
         | .ok vars =>
           let vars := vars.mapIdx fun i v => if ck.relevantVars[i]?.getD true then v else .bool false
           out := out.push ({ world := w, st := { vars } }, p * q)
-        | .stuck => unk := unk + p * q
+        | .stuck | .amb _ => unk := unk + p * q
   return (M.compactList out.toList, unk)
 
 /-- Fails when the number of configurations exceeds `maxFrontier`. -/
@@ -567,7 +603,7 @@ def after (ck : Checker) (b : Branch) (k : Nat) : Except String (List (Config ×
     for (r, m) in succ do
       match r with
       | .ok c' => next := next.push (c', m)
-      | .stuck => unk := unk + m
+      | .stuck | .amb _ => unk := unk + m
     frontier := M.compactList next.toList
     maxN := max maxN frontier.length
     guard maxN
@@ -580,15 +616,22 @@ def defaultMaxStates : Nat := 100000
 
 /--
 The reachable part of a system's state space, explored breadth first. `succ` gives each expanded
-state's successors and `stuck` the probability that its step runs out of fuel. `depth` gives the
-step at which a state was first found, and `parent` the state it was found from, with the
-probability of that transition (or, for an initial state, its initial probability).
+state's successors and `stuck` the probability that its step runs out of fuel. `sets` gives the
+ambiguous successors of a state: each is a set of states, one of which follows with the given
+probability. `depth` gives the step at which a state was first found, and `parent` the state it
+was found from, with the probability of that transition (or, for an initial state, its initial
+probability).
+
+When the exploration has a horizon, a state is a configuration together with the step at which
+it is reached, and the states at the horizon are `final`: they have no successors.
 -/
 structure StateSpace where
   configs : Array Config
   succ : Array (Array (Nat × Rat))
+  sets : Array (Array (Array Nat × Rat))
   stuck : Array Rat
   expanded : Array Bool
+  final : Array Bool
   depth : Array Nat
   parent : Array (Option Nat × Rat)
   init : Array (Nat × Rat)
@@ -616,31 +659,42 @@ Explores the states reachable from the initial configurations of a branch. Each 
 search is expanded in parallel. Once `maxStates` states are known, the search stops, and the
 states found but not expanded are left as they are: what happens after them counts as unknown,
 which keeps the result sound for systems with infinitely many states.
+
+With a `horizon` of `k` steps, the same configuration reached at different steps gives different
+states, and the states reached after `k` steps are final.
 -/
-def explore (ck : Checker) (b : Branch) : Except String StateSpace := do
+def explore (ck : Checker) (b : Branch) (horizon : Option Nat := none) : Except String StateSpace := do
   let (cfgs, unk0) ← ck.initial b
-  let mut ix : HashMap Config Nat := {}
+  let mut ix : HashMap (Config × Nat) Nat := {}
   let mut configs : Array Config := #[]
   let mut depth : Array Nat := #[]
   let mut parent : Array (Option Nat × Rat) := #[]
   let mut init : Array (Nat × Rat) := #[]
   for (c, w) in cfgs do
-    match ix[c]? with
+    match ix[(c, 0)]? with
     | some i => init := init.push (i, w)
     | none =>
-      ix := ix.insert c configs.size
+      ix := ix.insert (c, 0) configs.size
       init := init.push (configs.size, w)
       configs := configs.push c; depth := depth.push 0; parent := parent.push (none, w)
   let mut succ : Array (Array (Nat × Rat)) := Array.replicate configs.size #[]
+  let mut sets : Array (Array (Array Nat × Rat)) := Array.replicate configs.size #[]
   let mut stuck : Array Rat := Array.replicate configs.size 0
   let mut expanded : Array Bool := Array.replicate configs.size false
+  let mut final : Array Bool := Array.replicate configs.size false
   let mut level : Array Nat := Array.range configs.size
   let mut d := 0
   let mut truncated := false
   while !level.isEmpty do
+    if horizon == some d then
+      for i in level do
+        expanded := expanded.set! i true
+        final := final.set! i true
+      break
     if configs.size ≥ ck.maxStates then
       truncated := true
       break
+    let t := if horizon.isSome then d + 1 else 0
     let par := ck.splitSteps && level.size < parThreshold
     -- copy out this level's configurations, so that no task holds on to `configs` while it grows
     let current := level.map (configs[·]!)
@@ -648,27 +702,36 @@ def explore (ck : Checker) (b : Branch) : Except String StateSpace := do
     let mut next : Array Nat := #[]
     for (i, xs) in level.zip results do
       let mut out : Array (Nat × Rat) := #[]
+      let mut amb : Array (Array Nat × Rat) := #[]
       let mut st : Rat := 0
       for (r, q) in xs do
-        match r with
-        | .stuck => st := st + q
-        | .ok c' =>
-          match ix[c']? with
-          | some j => out := out.push (j, q)
+        let cs : List Config := match r with
+          | .ok c' => [c'] | .amb cs => cs | .stuck => []
+        if cs.isEmpty then
+          st := st + q
+          continue
+        let mut js : Array Nat := #[]
+        for c' in cs do
+          match ix[(c', t)]? with
+          | some j => js := js.push j
           | none =>
             let j := configs.size
-            ix := ix.insert c' j
+            ix := ix.insert (c', t) j
             configs := configs.push c'; depth := depth.push (d + 1); parent := parent.push (some i, q)
-            succ := succ.push #[]; stuck := stuck.push 0; expanded := expanded.push false
+            succ := succ.push #[]; sets := sets.push #[]; stuck := stuck.push 0
+            expanded := expanded.push false; final := final.push false
             next := next.push j
-            out := out.push (j, q)
+            js := js.push j
+        let uniq := js.toList.eraseDups.toArray
+        if uniq.size == 1 then out := out.push (uniq[0]!, q) else amb := amb.push (uniq, q)
       succ := succ.set! i (M.compactList out.toList).toArray
+      sets := sets.set! i amb
       stuck := stuck.set! i st
       expanded := expanded.set! i true
     guard configs.size
     level := next
     d := d + 1
-  return { configs, succ, stuck, expanded, depth, parent, init, initUnk := unk0, truncated }
+  return { configs, succ, sets, stuck, expanded, final, depth, parent, init, initUnk := unk0, truncated }
 
 /--
 Splits the distribution of a property's degree in each state into the probability of a "hit"
@@ -678,18 +741,23 @@ def splitDegrees (degs : Array (List (Res Rat × Rat))) (hit : Rat → Bool) : A
   degs.map fun ds => ds.foldl (init := (0, 0, 0)) fun (h, u, c) (r, q) => match r with
     | .ok d => if hit d then (h + q, u, c) else (h, u, c + q)
     | .stuck => (h, u + q, c)
+    -- an ambiguous degree is a hit only if all of its values are, and unknown if only some are
+    | .amb ds => if ds.all hit then (h + q, u, c) else if ds.any hit then (h, u + q, c) else (h, u, c + q)
 
 /--
 The linear system for the probability of eventually hitting, given the split of each state.
 The lower system counts unknown outcomes as never hitting, and the upper one as hitting.
 -/
-def reachSystem (sp : StateSpace) (split : Array (Rat × Rat × Rat)) (upper : Bool) : Solve.System :=
+def reachSystem (sp : StateSpace) (split : Array (Rat × Rat × Rat)) (upper : Bool) : Robust.SetSystem :=
   { b := (Array.range sp.configs.size).map fun s =>
       let (h, u, c) := split[s]!
       if upper then h + u + c * (if sp.expanded[s]! then sp.stuck[s]! else 1) else h
     rows := (Array.range sp.configs.size).map fun s =>
       let (_, _, c) := split[s]!
-      if sp.expanded[s]! && c != 0 then sp.succ[s]!.map fun (t, p) => (t, c * p) else #[] }
+      if sp.expanded[s]! && c != 0 then sp.succ[s]!.map fun (t, p) => (t, c * p) else #[]
+    sets := (Array.range sp.configs.size).map fun s =>
+      let (_, _, c) := split[s]!
+      if sp.expanded[s]! && c != 0 then sp.sets[s]!.map fun (ts, p) => (ts, c * p) else #[] }
 
 /--
 Checks `always φ` or `eventually φ` over the infinite run, on one branch.
@@ -700,10 +768,12 @@ and `always φ` is one minus the probability of reaching a state where it fails.
 The layer-cake formula `E[X] = Σⱼ (θⱼ - θⱼ₋₁) P(X ≥ θⱼ)` reduces both to probabilities of
 reaching a state where the degree is at least, or below, each value `θⱼ` that it takes.
 -/
-def runUnbounded (ck : Checker) (isAlways : Bool) (b : Branch) :
-    Except String (BranchResult × Option Witness) := do
-  let sp ← ck.explore b
-  let degs ← parMapM sp.configs ck.degrees
+def runUnbounded (ck : Checker) (isAlways : Bool) (b : Branch) (horizon : Option Nat := none)
+    (onlyFinal := false) : Except String (BranchResult × Option Witness) := do
+  let sp ← ck.explore b horizon
+  -- with `onlyFinal`, the property is looked at only in the final states
+  let degs ← parMapM (Array.range sp.configs.size) fun s =>
+    if onlyFinal && !sp.final[s]! then pure [(.ok 0, 1)] else ck.degrees sp.configs[s]!
   let n := sp.configs.size
   let mut seen : HashSet Rat := {}
   let mut ths : Array Rat := #[1]
@@ -716,8 +786,9 @@ def runUnbounded (ck : Checker) (isAlways : Bool) (b : Branch) :
   let all := Array.replicate n true
   let sols ← parMapM' thresholds fun θ => do
     let split := splitDegrees degs (if isAlways then (· < θ) else (θ ≤ ·))
-    pure (Solve.solve (reachSystem sp split false) all (some 1),
-          Solve.solve (reachSystem sp split true) all (some 1))
+    -- the lower bound resolves ambiguities against hitting, and the upper bound in favor of it
+    pure (Robust.solve (reachSystem sp split false) true (some 1),
+          Robust.solve (reachSystem sp split true) false (some 1))
   let known := sp.init.foldl (fun acc (_, w) => acc + w) 0
   let mut lo : Rat := 0
   let mut hi : Rat := 0
@@ -742,7 +813,7 @@ def runUnbounded (ck : Checker) (isAlways : Bool) (b : Branch) :
     for s in [0:n] do
       if let some (d, q) := degs[s]!.findSome? fun (r, q) => match r with
           | .ok d => if d < 1 && q > 0 then some (d, q) else none
-          | .stuck => none then
+          | _ => none then
         wit := some { step := sp.depth[s]!, assign := b.assign, config := sp.configs[s]!,
                       degree := d, mass := sp.pathMass s * q }
         break
@@ -877,7 +948,7 @@ def expectedDegree (ck : Checker) (cfg : Config) : Except String (Option Rat) :=
   for (r, q) in ← ck.degrees cfg do
     match r with
     | .ok d => e := e + q * d
-    | .stuck => return none
+    | _ => return none
   return some e
 
 /--
@@ -955,7 +1026,7 @@ def weightedRuns (ck : Checker) (mode : Temporal) (b : Branch) (maxRuns : Nat) (
     for (r, q) in succ do
       if q == 0 then continue
       match r with
-      | .stuck =>
+      | .stuck | .amb _ =>
         heap := heapPush heap { node with prob := node.prob * q, seq, final := some none }
       | .ok c' =>
         -- stamp the decisions made in this step with its number
@@ -978,6 +1049,15 @@ def runBranch (ck : Checker) (mode : Temporal) (b : Branch) :
   let mut hi : Rat := 0
   let mut wit : Option Witness := none
   let mut maxN := 0
+  if ck.robust then
+    -- ambiguous transitions need the worst and best resolution, which is found on the state
+    -- space unrolled up to the bound
+    match mode with
+    | .after k => return ← ck.runUnbounded false b (some k) true
+    | .always k => return ← ck.runUnbounded true b (some k)
+    | .eventually k => return ← ck.runUnbounded false b (some k)
+    | .stepsUntil => throw "kernel: `steps until` doesn't support continuous fuzzy parameters yet"
+    | _ => pure ()
   match mode with
   | .alwaysInf => return ← ck.runUnbounded true b
   | .eventuallyInf => return ← ck.runUnbounded false b
@@ -993,7 +1073,7 @@ def runBranch (ck : Checker) (mode : Temporal) (b : Branch) :
           lo := lo + w * q * d; hi := hi + w * q * d
           if d < 1 && wit.isNone then
             wit := some { step := k, assign := b.assign, config := cfg, degree := d, mass := w * q }
-        | .stuck => hi := hi + w * q
+        | _ => hi := hi + w * q
   | .always k | .eventually k =>
     let isAlways := match mode with | .always _ => true | _ => false
     let unit : Rat := if isAlways then 1 else 0
@@ -1015,11 +1095,11 @@ def runBranch (ck : Checker) (mode : Temporal) (b : Branch) :
       let arrivals := (M.compactList arrivals.toList).toArray
       let degs ← parMapM arrivals fun ((r, _), _) => match r with
         | .ok c' => ck.degrees c'
-        | .stuck => pure []
+        | _ => pure []
       let mut next : Array ((Config × Rat) × Rat) := #[]
       for (((r, acc), w), ds) in arrivals.zip degs do
         match r with
-        | .stuck =>
+        | .stuck | .amb _ =>
           -- The rest of the path is unknown, so `lo` assumes the worst case and `hi` the best.
           if isAlways then
             hi := hi + w * acc
@@ -1030,7 +1110,7 @@ def runBranch (ck : Checker) (mode : Temporal) (b : Branch) :
           for (rd, qd) in ds do
             let m := w * qd
             match rd with
-            | .stuck =>
+            | .stuck | .amb _ =>
               if isAlways then
                 hi := hi + m * acc
               else

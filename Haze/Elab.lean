@@ -426,6 +426,21 @@ def elabDecl : SDecl → ElabM Decl
       let some q := constQ m | err "memberships must be constant numbers"
       pure (← elabLiteral v ty, q)
     pure (.param n ty sup)
+  | .cparam n ty shape args => do
+    unless (← resolveTy ty) == .num do err s!"a continuous fuzzy parameter must be a Num, not {ty}"
+    let qs ← args.mapM fun a => do
+      let some q := constQ a | err s!"the arguments of {shape} must be constant numbers"
+      pure q
+    match shape, qs with
+    | "tri", [a, m, b] => pure (.cparam n (.trap a m m b))
+    | "trap", [a, b, c, d] => pure (.cparam n (.trap a b c d))
+    | "likelihood", [k, t] =>
+      unless k.den == 1 && t.den == 1 && 0 ≤ k do err "likelihood(failures, trials) takes whole numbers"
+      pure (.cparam n (.likelihood k.num.toNat t.num.toNat))
+    | "tri", _ | "trap", _ | "likelihood", _ =>
+      err s!"{shape} takes {match shape with | "tri" => 3 | "trap" => 4 | _ => 2} arguments"
+    | _, _ => err s!"unknown possibility distribution {shape} (expected tri, trap or likelihood)"
+  | .levels n => pure (.levels n)
   | .input n ty e => do
     let ty ← resolveTy ty
     pure (.node n ty (← elabAs e ty) true none)

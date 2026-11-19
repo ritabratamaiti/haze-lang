@@ -65,6 +65,7 @@ def value (env : Env) : Value → Json
   | .bool b => .bool b
   | .num q | .deg q => rat q
   | .tag ty i => .str (env.ctorName ty i)
+  | .ival lo hi _ _ => .arr [rat lo, rat hi]
 
 /-- Encodes an assignment of values to names as a JSON object. -/
 def assignment (env : Env) (a : List (String × Value)) : Json :=
