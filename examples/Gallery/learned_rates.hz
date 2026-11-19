@@ -1,0 +1,43 @@
+-- How many retries does a client need, when the failure rates come from logs and judgment?
+--
+-- Last week's logs show 12 timeouts in 4000 calls, so the timeout rate is learned from those
+-- counts with `likelihood`. A retry that follows a timeout sometimes lands on the same overloaded
+-- replica and times out again. How often is a judgment call: around 30%, at least 10%, at most
+-- 60%, so it is a triangle. Haze checks every value of both rates, weighed by how possible it is.
+
+param timeout : Num ~= likelihood(12, 4000)
+param same_replica : Num ~= tri(0.1, 0.3, 0.6)
+
+enum Phase = Calling | Retrying | Done | GaveUp
+
+system Client(budget : Num) {
+  var phase : Phase := Calling
+  var attempts : Num := 0
+  step {
+    match phase {
+      Calling => {
+        attempts := attempts + 1
+        if flip(timeout) {
+          if attempts >= budget { phase := GaveUp } else { phase := Retrying }
+        } else { phase := Done }
+      }
+      Retrying => {
+        attempts := attempts + 1
+        -- the retry hits the same overloaded replica, or it is a fresh call
+        let failed := if flip(same_replica) then true else flip(timeout)
+        if failed {
+          if attempts >= budget { phase := GaveUp }
+        } else { phase := Done }
+      }
+      _ => skip
+    }
+  }
+}
+
+-- The requirement: 99.9% of requests succeed. Three attempts aren't enough once the
+-- correlated failures are taken into account; five are.
+claim three_attempts : Client(3) |= eventually phase == Done with prob >= 0.999
+claim five_attempts : Client(5) |= eventually phase == Done with prob >= 0.999
+
+-- The budget is never exceeded, whatever the rates are.
+theorem within_budget : Client(5) |= always attempts <= 5

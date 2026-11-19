@@ -39,11 +39,16 @@ Haze differs in a few ways that matter for checking software:
   find bounds, which it then checks exactly.
 - **Rates you only roughly know.** PRISM supports interval Markov chains and MDPs, where a
   transition probability is an interval, and both tools support parametric models, where a
-  probability is a symbol and the result is a function of it. Haze's fuzzy parameters take a
-  different approach: a parameter has a few candidate values, each with a possibility, and the
-  answer is a belief and plausibility pair, with a table of results by value. That's less general
-  than a parametric result, but it gives one answer to compare with a requirement, and it says
-  which estimate moves the result most.
+  probability is a symbol and the result is a function of it, with region checks and bounds over
+  a range of parameter values. Haze's fuzzy parameters take a different approach: a parameter has
+  a possibility for each value, either a few listed values or a whole range such as
+  `tri(0.01, 0.02, 0.05)`, and the answer is a belief and plausibility pair that weighs each value
+  by its possibility. For a range, Haze uses parameter lifting, the technique behind Storm's
+  region checks, to get certified bounds at every possibility level. `likelihood(3, 1000)` builds
+  the distribution from observed counts. We don't know of another released model checker that
+  computes certified belief and plausibility for possibility distributions over a model's
+  parameters. The closest we found is a research version of Storm that approximates triangular
+  fuzzy numbers with a genetic search ([Socha, 2023](https://purl.utwente.nl/essays/95019)).
 - **Counterexamples by default.** When any theorem or probability bound fails, Haze shows a run
   that breaks it, with the parameter values and the state at the step where it breaks. PRISM
   generates counterexample paths for properties without probabilities, such as `A [ G "inv" ]`.

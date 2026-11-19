@@ -143,6 +143,44 @@ on fuzzy parameters, they are the necessity and possibility of possibility theor
 belief and plausibility of Dempster–Shafer theory for the random set formed by combining the
 α-cuts with the probabilistic model.
 
+### Continuous parameters
+
+A continuous parameter (`tri`, `trap` or `likelihood`) has a possibility for every number in an
+interval, and its α-cuts are intervals. The formulas above still define belief and plausibility,
+with the sum replaced by an integral over `α` and the minimum and maximum taken over a range of
+values. Haze computes them in three steps (`Haze.Kernel.Continuous`).
+
+**Levels.** The integral is split at the levels `j / N` for `j = 1, …, N` (`levels N`, 10 by
+default), at the possibilities of the listed parameters, and, for a likelihood, at a few levels
+close to 0. On the band between two levels `n < l`, every α-cut lies inside the cut at `n`. Taking
+the minimum over the cut at `n` can only lower it, so the result is a lower bound on the belief;
+likewise the maximum gives an upper bound on the plausibility. The cuts at `l` bound them from the
+other side, which is the bracket the output reports.
+
+**Bounds over a range.** To bound the result over a range of values, Haze checks the model with
+the parameter's value an interval. Arithmetic on intervals gives intervals that contain every
+possible result. A probability that is an interval from `l` to `h` gives each outcome at least its
+lowest probability, and the remaining `h - l` becomes an *ambiguous* outcome (`Res.amb`), one of a
+set of outcomes without saying which. A comparison that an interval can't decide is ambiguous in
+the same way. Each step of the system then moves, with known probabilities, either to a state or
+to one of a set of states. This is the *parameter lifting* of Quatmann et al.: every occurrence
+of the parameter may take a different value from the range, which allows more behaviors than any
+single value does. The smallest and largest probabilities over all ways of resolving the
+ambiguity are bounds that hold for every value in the range (`Haze.Kernel.Robust`). They're
+computed by policy iteration and then checked against the defining equations in exact arithmetic:
+an upper bound `u` must satisfy `F u ≤ u`, and a lower bound `l` must satisfy `l ≤ F l` once the
+states from which the goal can be avoided forever are set to 0. Bounded properties use the same
+solver on the state space unrolled up to the bound.
+
+**Search.** Checking single values gives results that the minimum can't exceed, and the maximum
+can't fall below. Branch and bound splits the piece of the range with the weakest bound until the
+bound is within a relative tolerance of the best single value, or a budget of 40 interval checks
+is spent. Pieces are split first at the constants of the model, as a single value with the open
+ranges on either side, so that comparisons with those constants are decided. The reported bound
+is the weakest bound over all the pieces, so it is certified even when the search stops early.
+When the result moves monotonically with every occurrence of the parameter, the bound over a range
+is reached at one of its ends and the search ends at once.
+
 ### Fuzzy truth
 
 A property of type `Deg` contributes its degree of truth rather than 0 or 1, so the interval

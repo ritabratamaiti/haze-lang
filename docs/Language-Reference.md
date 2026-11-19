@@ -45,6 +45,13 @@ logic lukasiewicz  -- max(0, a + b - 1) and min(1, a + b)
 explore 5000
 ```
 
+`levels N` sets how many possibility levels Haze uses for continuous fuzzy parameters (see
+[Fuzzy parameters](#fuzzy-parameters)), from that point in the file on. The default is 10.
+
+```haze
+levels 20
+```
+
 ### Enumeration types
 
 An enumeration type lists its possible values. The names of the values must be unique in the
@@ -67,6 +74,24 @@ param loss : Num ~= {0.01: 0.6, 0.02: 1, 0.05: 0.5, 0.1: 0.2}
 The values must be literals of the declared type, none may be listed twice, and at least one
 must have possibility 1 (the parameter must be _normal_, meaning that at least one value is
 fully possible). Anything that depends on a fuzzy parameter has the grade `fuzzy`.
+
+A `Num` parameter can also range over an interval, with a possibility for every value in it:
+
+```haze
+param loss : Num ~= tri(0.01, 0.02, 0.05)        -- 0.02 is fully possible, 0.01 and 0.05 barely
+param latency : Num ~= trap(80, 100, 150, 300)   -- 100 to 150 is fully possible
+param timeouts : Num ~= likelihood(3, 1000)      -- learned from 3 failures in 1000 calls
+```
+
+- `tri(a, m, b)` has possibility 1 at `m`, falling linearly to 0 at `a` and at `b`.
+- `trap(a, b, c, d)` has possibility 1 from `b` to `c`, falling linearly to 0 at `a` and at `d`.
+- `likelihood(k, n)` is the possibility of a probability after `k` failures in `n` trials: the
+  binomial likelihood `p^k (1 - p)^(n - k)`, scaled so that `k / n` has possibility 1.
+
+The arguments must be constant, the corners in increasing order, and `n` at most 100,000.
+Claims and `#prob` take every value in each range into account and give certified bounds (see
+[Fuzzy parameters](Fuzzy-Parameters.md#continuous-parameters)). The other queries use the most
+possible value and say so. An `observe` can't depend on a continuous parameter.
 
 ### Random inputs and derived values
 
@@ -420,6 +445,10 @@ dropping variables the property can't read.
 Unbounded properties explore at most 100,000 states unless `explore` says otherwise.
 Groups of states that can all reach each other are solved exactly when they have at most 120
 states, and with certified bounds when they are larger.
+
+For continuous fuzzy parameters, the search over each range of values spends at most 40 interval
+checks on each bound. If that isn't enough to narrow a range down, the result says so, and the
+bound stays certified but is more cautious.
 
 Checking uses every processor core. The parameter assignments of a query are checked in
 parallel, large frontiers and breadth-first levels are expanded in parallel, and when a frontier

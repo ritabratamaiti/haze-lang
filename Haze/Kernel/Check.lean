@@ -357,8 +357,8 @@ def addDecl (env : Env) : Decl → CheckM Env
       unless a ≤ b && b ≤ c && c ≤ d do
         throw s!"kernel: the corners of {n} must be in increasing order"
     | .likelihood k t =>
-      unless k ≤ t && 0 < t do
-        throw s!"kernel: likelihood of {n} needs 0 < trials and failures ≤ trials"
+      unless k ≤ t && 0 < t && t ≤ 100000 do
+        throw s!"kernel: likelihood of {n} needs 0 < trials ≤ 100000 and failures ≤ trials"
     pure (env.addGlobal { name := n, ty := .num, grade := .fuzzyG, kind := .cparam shape })
   | .levels n => do
     unless 0 < n && n ≤ 1000 do throw "kernel: levels must be between 1 and 1000"

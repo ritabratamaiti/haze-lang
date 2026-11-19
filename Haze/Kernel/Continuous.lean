@@ -45,18 +45,21 @@ ends, and the search finishes at once.
 
 namespace Haze
 
-/-- Checks whether `p^k (1 - p)^(n - k)` is at most `α` times its largest value, at `p = k / n`. -/
-def likelihoodAtMost (k n : Nat) (p α : Rat) : Bool :=
-  let ph : Rat := (k : Rat) / n
-  p ^ k * (1 - p) ^ (n - k) ≤ α * (ph ^ k * (1 - ph) ^ (n - k))
-
 /-- The binomial log-likelihood `k log p + (n - k) log (1 - p)`, in floating point. -/
 def logLik (k n : Nat) (p : Float) : Float :=
   (if k == 0 then 0 else k.toFloat * Float.log p) +
   (if k == n then 0 else (n - k).toFloat * Float.log (1 - p))
 
-/-- Values are rounded to multiples of `2^-40`, which keeps exact powers of them manageable. -/
+/-- Values are rounded to multiples of `1 / cutGrid`, which keeps exact powers of them manageable. -/
 def cutGrid : Nat := 2 ^ 40
+
+/--
+Checks whether `p^k (1 - p)^(n - k)`, for `p = m / cutGrid`, is at most `α` times its largest
+value, at `p = k / n`. Both sides are compared as whole numbers.
+-/
+def likelihoodAtMost (k n m : Nat) (α : Rat) : Bool :=
+  let g := cutGrid
+  m ^ k * (g - m) ^ (n - k) * α.den * n ^ n ≤ α.num.toNat * k ^ k * (n - k) ^ (n - k) * g ^ n
 
 /--
 One end of the α-cut of a binomial likelihood: the lower end if `lower`, else the upper one. It
@@ -70,18 +73,17 @@ def likelihoodEnd (k n : Nat) (α : Rat) (lower : Bool) : Rat := Id.run do
   let mut a : Float := if lower then 0 else ph
   let mut b : Float := if lower then ph else 1
   for _ in [0:80] do
-    let m := (a + b) / 2
+    let mid := (a + b) / 2
     -- on the lower side the log-likelihood rises towards `ph`; on the upper side it falls
-    if (logLik k n m < target) == lower then a := m else b := m
+    if (logLik k n mid < target) == lower then a := mid else b := mid
   let g : Rat := (cutGrid : Rat)
-  let mut e : Rat := if lower then mkRat (Kernel.Solve.floatToRat a * g).floor cutGrid
-    else mkRat (Kernel.Solve.floatToRat b * g).ceil cutGrid
-  let mut step : Rat := 1 / g
+  let mut m : Int := if lower then (Kernel.Solve.floatToRat a * g).floor else (Kernel.Solve.floatToRat b * g).ceil
+  let mut step : Int := 1
   for _ in [0:64] do
-    if lower && e ≤ 0 then return 0
-    if !lower && 1 ≤ e then return 1
-    if likelihoodAtMost k n e α then return e
-    e := if lower then e - step else e + step
+    if lower && m ≤ 0 then return 0
+    if !lower && (cutGrid : Int) ≤ m then return 1
+    if likelihoodAtMost k n m.toNat α then return mkRat m cutGrid
+    m := if lower then m - step else m + step
     step := step * 2
   return if lower then 0 else 1
 
@@ -97,6 +99,22 @@ def Shape.cut (sh : Shape) (α : Rat) : Rat × Rat :=
     if α == 0 then (0, 1) else
     if α == 1 then ((k : Rat) / n, (k : Rat) / n) else
     (if k == 0 then 0 else likelihoodEnd k n α true, if k == n then 1 else likelihoodEnd k n α false)
+
+/--
+The possibility of a value, in floating point for a likelihood. It is used only to choose which
+counterexample to show.
+-/
+def Shape.possibility (sh : Shape) (x : Rat) : Rat :=
+  match sh with
+  | .trap a b c d =>
+    if x < a || d < x then 0 else if x < b then (x - a) / (b - a) else if x ≤ c then 1
+    else (d - x) / (d - c)
+  | .likelihood k n =>
+    if x < 0 || 1 < x then 0 else
+    let p := Kernel.Solve.ratToFloat x
+    let ph := k.toFloat / n.toFloat
+    if (k > 0 && p == 0) || (k < n && p == 1) then 0 else
+    Kernel.Solve.floatToRat (Float.exp (logLik k n p - logLik k n ph))
 
 /-- Whether a distribution's support is the whole unit interval, as a likelihood's is. -/
 def Shape.unbounded : Shape → Bool
@@ -267,11 +285,29 @@ structure Result where
   worst : List (String × Value) × Nat
   /-- The point with the highest value found. -/
   bestPt : List (String × Value) × Nat
+  /--
+  Every point checked, with its discrete assignment's index, its values, its possibility and its
+  result.
+  -/
+  points : Array (Nat × List (String × Value) × Rat × Check)
   /-- The number of levels and the number of model checks. -/
   levels : Nat
   checks : Nat
   /-- Every bound met the best value found, so the levels are the only approximation. -/
   closed : Bool
+
+/--
+The most possible point checked whose result breaks a bound: below `q` if `lower`, above it
+otherwise. Among equally possible points, the one that breaks it most.
+-/
+def Result.breaking (r : Result) (lower : Bool) (q : Rat) : Option (List (String × Value) × Nat) :=
+  let bad := r.points.filter fun (_, _, _, c) => if lower then c.lo < q else q < c.hi
+  let better := fun (x y : Nat × List (String × Value) × Rat × Check) =>
+    x.2.2.1 > y.2.2.1 || (x.2.2.1 == y.2.2.1 &&
+      (if lower then x.2.2.2.lo < y.2.2.2.lo else x.2.2.2.hi > y.2.2.2.hi))
+  (bad.foldl (fun (acc : Option _) x => match acc with
+    | some y => if better x y then some x else some y
+    | none => some x) none).map fun (d, a, _, _) => (a, d)
 
 /--
 Checks a property with continuous fuzzy parameters `ps` and `nLevels` levels. `build` gives the
@@ -292,7 +328,10 @@ def run (ps : Array CParam) (nLevels : Nat) (budget : Nat) (cuts : Array Rat)
   let levels := if levels.contains top then levels else levels ++ [top]
   let bands := levels.zip (0 :: levels)   -- (l, n): the band from n up to l
   let widths := ps.map fun p => let (l, h) := p.shape.cut 0; h - l
-  let boxAt := fun (α : Rat) => ps.map fun p => let (l, h) := p.shape.cut α; range l h
+  -- a likelihood's cut takes exact powers to check, so each cut is computed once
+  let cutOf := fun (α : Rat) => ps.map fun p => let (l, h) := p.shape.cut α; range l h
+  let table : List (Rat × Box) := ((0 : Rat) :: levels).eraseDups.map fun α => (α, cutOf α)
+  let boxAt := fun (α : Rat) => (table.lookup α).getD (cutOf α)
   -- one task per band and discrete assignment in it
   let tasks : Array ((Rat × Rat) × Nat) := (bands.toArray.flatMap fun (l, n) =>
     (Array.range bs0.size).filterMap fun d => if bs0[d]!.poss ≥ l then some ((l, n), d) else none)
@@ -341,7 +380,10 @@ def run (ps : Array CParam) (nLevels : Nat) (budget : Nat) (cuts : Array Rat)
   let coreRes := (Array.range bs0.size).toList.filterMap fun d =>
     (points.find? fun (d', p, _) => d' == d && p == core).map fun (_, _, c) =>
       ((bs0[d]!.assign.filter fun (x, _) => !ps.any (·.name == x)) ++ Box.values core ps, bs0[d]!.poss, c)
-  return { rows := rows.toList, bottoms := bottoms.toList, core := coreRes, outer, inner := { bel := bel / top, pl := pl / top },
+  let pointsOut := points.map fun (d, p, c) =>
+    let π := (ps.zip p).foldl (fun m (cp, r) => qmin m (cp.shape.possibility r.lo)) bs0[d]!.poss
+    (d, Box.values p ps, π, c)
+  return { rows := rows.toList, bottoms := bottoms.toList, core := coreRes, points := pointsOut, outer, inner := { bel := bel / top, pl := pl / top },
            worst := (Box.values pw ps, dw), bestPt := (Box.values pb ps, db),
            levels := levels.length, checks, closed }
 

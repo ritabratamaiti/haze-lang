@@ -93,6 +93,7 @@ const EXAMPLES = [
   ["examples/quorum_replication.hz", "Software", "Quorum replication", "Reads see the latest write when R + W > N, and can be stale when R = 1."],
   ["examples/circuit_breaker.hz", "Software", "Circuit breaker", "A circuit breaker's invariants, how fast it trips, and how much load it sheds."],
   ["examples/canary_rollout.hz", "Software", "Canary rollout", "Whether a defective build can reach all traffic during a staged rollout."],
+  ["examples/Gallery/learned_rates.hz", "Software", "Retry budgets from logs", "How many retries a client needs when one failure rate is learned from logs and another is a rough guess."],
   ["examples/incident_triage.hz", "Operations", "Incident triage", "The likely root cause of an incident, given which alerts fired."],
   ["examples/Conformance/payments/payments.hz", "Testing", "A specification for real code", "The model a Python client is tested against, with tests ranked by probability."],
   ["examples/Tutorial/JobWorker.hz", "Tutorial", "Tutorial: a job worker", "The language step by step, from one random value to a full system."],

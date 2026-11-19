@@ -522,8 +522,13 @@ def doClaim (d : DeclStx) (name : String) (isThm : Bool) (spec : PropSpec) (boun
       match ← runContinuous spec cps keep with
       | .error e => pure (.error e)
       | .ok r =>
-        let low ← branchAt keep r.worst
-        let high ← branchAt keep r.bestPt
+        -- show a counterexample at the most possible values that break the bound
+        let low ← branchAt keep (match bound with
+          | .ge q => (r.breaking true q).getD r.worst
+          | _ => (r.breaking true 1).getD r.worst)
+        let high ← branchAt keep (match bound with
+          | .le q => (r.breaking false q).getD r.bestPt
+          | _ => r.bestPt)
         let wit := match runSpec env s.opts.fuel low spec s.opts.states with
           | .ok (_, w) => w
           | .error _ => none

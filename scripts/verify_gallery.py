@@ -377,6 +377,38 @@ check(b, "theorem guard_8_ships_only_good", *interval([(pi, 1 - joint(u, 8, True
 results.append((all(joint(u, 12, True) == 0 for _, u in units), "production test: a 12 mV guard band never ships a bad part", "0"))
 check(b, "#prob in_spec and not passes(r1, 12)", *interval([(pi, sum(pe for e, pe in spread if not bad(e)) - joint(u, 12, False)) for pi, u in units]))
 
+# ---- learned rates -----------------------------------------------------------
+# A client gives up after `budget` attempts. The first fails with probability t, and each retry
+# with f = s + (1 - s) t, so it succeeds with 1 - t f^(budget - 1), which falls as t or s rises.
+# The worst and best values over each possibility level are then at the ends of the ranges.
+# The likelihood's cuts are found here by bisection in floating point, independently of Haze.
+b = blocks("examples/Gallery/learned_rates.hz")
+def lik_cut(k, n, a):
+    if a == 0: return (0.0, 1.0)
+    ll = lambda p: (k * math.log(p) if k else 0) + ((n - k) * math.log(1 - p) if k < n else 0)
+    top, ph = ll(k / n), k / n
+    def solve(lo, hi, rising):
+        for _ in range(200):
+            m = (lo + hi) / 2
+            if (ll(m) < top + math.log(a)) == rising: lo = m
+            else: hi = m
+        return (lo + hi) / 2
+    return (solve(0.0, ph, True) if k else 0.0, solve(ph, 1.0, False) if k < n else 1.0)
+def tri_cut(a, m, c, al): return (a + al * (m - a), c - al * (c - m))
+done = lambda t, s, budget: 1 - t * (s + (1 - s) * t) ** (budget - 1)
+levels = sorted({j / 10 for j in range(1, 11)} | {1e-6, 1e-4, 1e-3, 1e-2})
+for budget, name in ((3, "three_attempts"), (5, "five_attempts")):
+    bel = pl = 0.0
+    for l, n in zip(levels, [0.0] + levels[:-1]):
+        (t0, t1), (s0, s1) = lik_cut(12, 4000, n), tri_cut(0.1, 0.3, 0.6, n)
+        bel += (l - n) * done(t1, s1, budget)
+        pl += (l - n) * done(t0, s0, budget)
+    check(b, f"claim {name}", bel, pl, name=f"learned rates: belief and plausibility with {budget} attempts")
+    core = [l.split(":")[-1] for l in b.get(f"claim {name}", []) if "at the most possible values" in l]
+    results.append((any(abs(x - done(0.003, 0.3, budget)) <= 6e-7 for c in core for x in nums(c)),
+                    f"learned rates: {budget} attempts at the most possible rates", f"{done(0.003, 0.3, budget):.6f}"))
+results.append(("theorem accepted" in "\n".join(b.get("theorem within_budget", [])), "learned rates: the budget is never exceeded", "1"))
+
 passed = sum(r[0] for r in results)
 for ok, name, exp in results:
     print("PASS" if ok else "FAIL", name, "|", exp)

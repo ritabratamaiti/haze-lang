@@ -27,7 +27,9 @@ or over runs of any length. When a guarantee can fail, Haze shows you a run wher
 Some numbers aren't known well enough to be probabilities. If all you know is that packet loss
 is "around 2%, maybe worse", you can write that, and Haze answers with a range, from the
 *belief* (how strongly what you know guarantees the property) to the *plausibility* (how strongly
-it allows it).
+it allows it). The estimate can be a few values, a whole range such as `tri(0.01, 0.02, 0.05)`,
+or counts from your logs, such as `likelihood(3, 1000)`. For a range, Haze checks every value in
+it, with bounds that are certified in exact arithmetic.
 
 Haze is at version 0.1 and experimental, so the language may still change. It checks
 discrete-time models by enumerating their states, and it has no nondeterminism or continuous time

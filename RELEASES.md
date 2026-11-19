@@ -3,6 +3,20 @@
 Haze doesn't promise backwards compatibility between versions yet. When a release breaks
 existing models, its notes will say so.
 
+## Unreleased
+
+### Continuous fuzzy parameters
+
+A `Num` parameter can now range over an interval: `tri(a, m, b)`, `trap(a, b, c, d)`, or
+`likelihood(k, n)`, the possibility of a failure rate after `k` failures in `n` trials. Claims
+and `#prob` take every value in the range into account. Haze checks the model with the parameter
+standing for a whole range at once, which gives bounds that hold for every value in it, and
+narrows the ranges by branch and bound until the bounds meet the results at single values. The
+bounds are checked in exact arithmetic, and the belief and plausibility are reported on the
+cautious side, with a note giving the other side. `levels N` sets the number of possibility
+levels. The other queries use the most possible values and say so. Observations can't depend on
+a continuous parameter yet.
+
 ## v0.1.0 (November 17, 2026)
 
 This is the first version of Haze.
