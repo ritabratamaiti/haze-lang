@@ -240,6 +240,12 @@ def search (check : Box → Except String Check) (box : Box) (widths cuts : Arra
     truncated := truncated || c.truncated
     exact := exact && c.exact
   let c0 ← check box
+  -- a bound over a box can't be beaten by a value inside it; if it is, something is wrong, and
+  -- reporting it is better than reporting a wrong result
+  let consistent := fun (bc pc : Check) => bnd bc ≤ sign * (if minimize then pc.lo else pc.hi)
+  for (p, c) in points do
+    if Box.within p box && !consistent c0 c then
+      throw "kernel: a bound over a range of values is broken by a value in it; please report this"
   maxStates := max maxStates c0.maxStates
   truncated := truncated || c0.truncated
   let mut leaves : Array (Box × Rat) := #[(box, bnd c0)]
@@ -258,6 +264,8 @@ def search (check : Box → Except String Check) (box : Box) (widths cuts : Arra
       maxStates := max maxStates ck.maxStates
       truncated := truncated || ck.truncated
       let cp ← check (Box.center k)
+      if !consistent ck cp then
+        throw "kernel: a bound over a range of values is broken by a value in it; please report this"
       points := points.push (Box.center k, cp)
       best := some (match best with | some b' => qmin b' (inc cp) | none => inc cp)
       kids := kids.push (k, bnd ck)

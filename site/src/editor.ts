@@ -9,10 +9,10 @@ import { tags as t } from "@lezer/highlight";
 import type { Record_ } from "./engine";
 
 const KEYWORDS = new Set(("logic enum param input def observe system var step claim theorem with prob if then else let in " +
-  "forall exists match and or not implies is very assert skip always eventually after given explore steps until").split(" "));
+  "forall exists match and or not implies is very assert skip always eventually after given explore levels steps until").split(" "));
 const ATOMS = new Set(["true", "false", "crashed"]);
 const TYPES = new Set(["Num", "Bool", "Deg"]);
-const BUILTINS = new Set(("flip bernoulli uniform binomial tri trap ramp_up ramp_down abs floor min max deg num").split(" "));
+const BUILTINS = new Set(("flip bernoulli uniform binomial tri trap likelihood ramp_up ramp_down abs floor min max deg num").split(" "));
 
 /** A simple tokenizer for Haze, which is all the highlighting needs. */
 export const hazeLanguage = StreamLanguage.define<{ comment: number }>({

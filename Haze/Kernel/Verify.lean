@@ -780,10 +780,12 @@ def runUnbounded (ck : Checker) (isAlways : Bool) (b : Branch) (horizon : Option
   seen := seen.insert 1
   for ds in degs do
     for (r, q) in ds do
-      if let .ok d := r then
+      -- the ends of an ambiguous degree are thresholds too, so that every value it can take lies
+      -- at a threshold or is counted as unknown at the threshold above it
+      let vals := match r with | .ok d => [d] | .amb ds => ds | .stuck => []
+      for d in vals do
         if d > 0 && q > 0 && !seen.contains d then seen := seen.insert d; ths := ths.push d
   let thresholds := ths.qsort (· < ·)
-  let all := Array.replicate n true
   let sols ← parMapM' thresholds fun θ => do
     let split := splitDegrees degs (if isAlways then (· < θ) else (θ ≤ ·))
     -- the lower bound resolves ambiguities against hitting, and the upper bound in favor of it

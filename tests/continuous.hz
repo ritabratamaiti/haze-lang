@@ -56,6 +56,13 @@ system Cmp {
 theorem cmp_cases : Cmp |= after[1] (w <= 0.6 implies x == 2)
 #prob Cmp |= after[1] x == 2
 
+-- a degree of truth that depends on the parameter: it ranges over [0.25, 0.75]
+system Tick { var x : Num := 0  step { x := x + 1 } }
+claim deg_low : Tick |= eventually deg(w) with prob <= 0.1
+#prob Tick |= after[1] deg(w)
+def both : Deg := forall i in 1..2, deg(w)
+#prob both
+
 -- queries that use the most possible values
 #eval ok_mix
 #expect Retry |= steps until phase == Done

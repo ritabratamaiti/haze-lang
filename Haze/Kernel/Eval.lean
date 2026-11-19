@@ -572,7 +572,10 @@ partial def eval (c : ECtx) : Expr → M Value
         match prev, v with
         | .bool p, .bool q => pure (.bool (if all then p && q else p || q))
         | .deg p, .deg q => pure (.deg (if all then qmin p q else qmax p q))
-        | _, _ => M.fail "runtime: ill-typed quantifier body"
+        | p, q =>
+          -- a degree that depends on an interval: min or max of the bounds
+          if isIval p || isIval q then evalPrimIval (if all then .tand .godel else .tor .godel) [p, q]
+          else M.fail "runtime: ill-typed quantifier body"
     acc
   | .matchE s arms dflt => do
     match ← eval c s with

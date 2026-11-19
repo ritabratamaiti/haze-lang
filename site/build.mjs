@@ -140,10 +140,10 @@ const DOC_SECTIONS = [
 const DOCS = DOC_SECTIONS.flatMap(([section, pages]) => pages.map(([id, label, path, summary]) => ({ id, label, path, summary, section })));
 
 const KEYWORDS = new Set(("logic enum param input def observe system var step claim theorem with prob if then else let in " +
-  "forall exists match and or not implies is very assert skip always eventually after given explore steps until").split(" "));
+  "forall exists match and or not implies is very assert skip always eventually after given explore levels steps until").split(" "));
 const ATOMS = new Set(["true", "false", "crashed"]);
 const TYPES = new Set(["Num", "Bool", "Deg"]);
-const BUILTINS = new Set("flip bernoulli uniform binomial tri trap ramp_up ramp_down abs floor min max deg num".split(" "));
+const BUILTINS = new Set("flip bernoulli uniform binomial tri trap likelihood ramp_up ramp_down abs floor min max deg num".split(" "));
 /** Static highlighting for Haze code on the docs pages, with the editor's colors. */
 function highlightHaze(code) {
   const re = /(\/-[\s\S]*?-\/|--[^\n]*)|(#[a-z]+)|(\b\d+(?:\.\d+)?\b)|([A-Za-z_][\w']*)|([\s\S])/g;

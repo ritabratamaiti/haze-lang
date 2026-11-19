@@ -89,19 +89,48 @@ tests/continuous.hz:57:1: info: #prob Cmp |= after[1] x == 2
     π ≥ 0.9  w in [0.385, 0.615]   0 to 1
     π ≥ 0.5  w in [0.325, 0.675]   0 to 1
     all values  w in [0.25, 0.75]  0 to 1
-tests/continuous.hz:60:1: info: #eval uses the most possible values of continuous fuzzy parameters: w = 0.5
-tests/continuous.hz:60:1: info: #eval ok_mix
+tests/continuous.hz:61:1: error: claim deg_low
+  belief 0.3175 · plausibility 0.6825 · graded
+  grade fuzzy · 10 possibility levels · 60 checks · 1 reachable states
+  10 possibility levels: the exact belief is at most 0.3425, the exact plausibility at least 0.6575 (more with `levels N`)
+  at the most possible values, w = 0.5: 0.5
+  bound fails: plausibility 0.6825 > 0.1
+  by possibility level (lowest to highest over the values at least that possible):
+    π ≥ 0.9  w in [0.385, 0.615]   0.385 to 0.615
+    π ≥ 0.5  w in [0.325, 0.675]   0.325 to 0.675
+    all values  w in [0.25, 0.75]  0.25 to 0.75
+  a run where it happens, at step 0 (path mass 1):
+    parameters: w = 0.5
+    state: 
+tests/continuous.hz:62:1: info: #prob Tick |= after[1] deg(w)
+  belief 0.3175 · plausibility 0.6825
+  10 possibility levels: the exact belief is at most 0.3425, the exact plausibility at least 0.6575 (more with `levels N`)
+  at the most possible values, w = 0.5: 0.5
+  by possibility level (lowest to highest over the values at least that possible):
+    π ≥ 0.9  w in [0.385, 0.615]   0.385 to 0.615
+    π ≥ 0.5  w in [0.325, 0.675]   0.325 to 0.675
+    all values  w in [0.25, 0.75]  0.25 to 0.75
+tests/continuous.hz:64:1: info: #prob both
+  belief 0.3175 · plausibility 0.6825
+  10 possibility levels: the exact belief is at most 0.3425, the exact plausibility at least 0.6575 (more with `levels N`)
+  at the most possible values, w = 0.5: 0.5
+  by possibility level (lowest to highest over the values at least that possible):
+    π ≥ 0.9  w in [0.385, 0.615]   0.385 to 0.615
+    π ≥ 0.5  w in [0.325, 0.675]   0.325 to 0.675
+    all values  w in [0.25, 0.75]  0.25 to 0.75
+tests/continuous.hz:67:1: info: #eval uses the most possible values of continuous fuzzy parameters: w = 0.5
+tests/continuous.hz:67:1: info: #eval ok_mix
   when w = 0.5, q = 0.1 (π 1):
     false  ↦ 0.55
     true   ↦ 0.45
   when w = 0.5, q = 0.3 (π 0.4):
     false  ↦ 0.65
     true   ↦ 0.35
-tests/continuous.hz:61:1: info: #expect uses the most possible values of continuous fuzzy parameters: p = 0.02
-tests/continuous.hz:61:1: info: #expect Retry |= steps until phase == Done
+tests/continuous.hz:68:1: info: #expect uses the most possible values of continuous fuzzy parameters: p = 0.02
+tests/continuous.hz:68:1: info: #expect Retry |= steps until phase == Done
   expected steps ∞
   with positive probability the property never holds, so the expectation is infinite
-tests/continuous.hz:64:1: info: #prob Learned |= after[1] ok
+tests/continuous.hz:71:1: info: #prob Learned |= after[1] ok
   belief ≈0.964561 · plausibility ≈0.994385
   8 possibility levels: the exact belief is at most ≈0.975012, the exact plausibility at least ≈0.99099 (more with `levels N`)
   at the most possible values, r = 0.015: 0.985
@@ -109,10 +138,10 @@ tests/continuous.hz:64:1: info: #prob Learned |= after[1] ok
     π ≥ 0.75  r in [≈0.009379, ≈0.022476]  ≈0.977524 to ≈0.990621
     π ≥ 0.5  r in [≈0.006999, ≈0.027452]   ≈0.972548 to ≈0.993001
     all values  r in [0, 1]                0 to 1
-tests/continuous.hz:67:1: error: a continuous fuzzy parameter must be a Num, not Bool
-tests/continuous.hz:68:1: error: tri takes 3 arguments
-tests/continuous.hz:69:1: error: kernel: the corners of bad3 must be in increasing order
-tests/continuous.hz:70:1: error: kernel: likelihood of bad4 needs 0 < trials ≤ 100000 and failures ≤ trials
-tests/continuous.hz:71:1: error: unknown possibility distribution gauss (expected tri, trap or likelihood)
-tests/continuous.hz:72:1: error: kernel: levels must be between 1 and 1000
-tests/continuous.hz:73:1: error: an observation can't depend on the continuous fuzzy parameter p yet; give it a list of values, or use likelihood(failures, trials) for counts
+tests/continuous.hz:74:1: error: a continuous fuzzy parameter must be a Num, not Bool
+tests/continuous.hz:75:1: error: tri takes 3 arguments
+tests/continuous.hz:76:1: error: kernel: the corners of bad3 must be in increasing order
+tests/continuous.hz:77:1: error: kernel: likelihood of bad4 needs 0 < trials ≤ 100000 and failures ≤ trials
+tests/continuous.hz:78:1: error: unknown possibility distribution gauss (expected tri, trap or likelihood)
+tests/continuous.hz:79:1: error: kernel: levels must be between 1 and 1000
+tests/continuous.hz:80:1: error: an observation can't depend on the continuous fuzzy parameter p yet; give it a list of values, or use likelihood(failures, trials) for counts
