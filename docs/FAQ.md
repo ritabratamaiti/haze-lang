@@ -2,17 +2,19 @@
 
 ## Is Haze ready to use?
 
-Haze is at version 0.1 and experimental. The checker is tested against hand-computed results and
-independent calculations, but the language may still change in ways that break existing models,
-and there's no editor support yet. It's a good fit for checking a design or a protocol before
-or alongside writing the code, and not yet something to build a product on.
+Haze is at version 0.1. The checker is tested against hand-computed results, independent
+calculations, and PRISM and Storm on PRISM's own example models. The language may still change
+between versions, and the release notes say when a change breaks existing models. Haze fits well
+when you're checking a design or a protocol, before or alongside writing the code.
 
 ## Should I use Haze or PRISM?
 
-For large models, nondeterminism, continuous time, rewards or full temporal logics, use PRISM or
-Storm. Haze is for small models of software where you want exact answers, rough rates, readable
-counterexamples or generated tests. [How Haze compares](Comparison.md) goes through the
-differences.
+They answer different questions. Haze checks discrete-time models of software with exact
+answers, rates given as ranges or learned from counts with certified belief and plausibility,
+counterexamples for every failed bound, and tests ranked by probability. PRISM and Storm cover
+more kinds of model, such as Markov decision processes and continuous time, and richer temporal
+logics, with symbolic engines for very large state spaces. [How Haze compares](Comparison.md)
+goes through the differences.
 
 ## Why fuzzy parameters and not a prior distribution?
 

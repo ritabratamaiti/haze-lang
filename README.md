@@ -14,7 +14,7 @@
 [![Launch Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/ritabratamaiti/haze-lang/main?labpath=notebooks%2Ftry_haze.ipynb)
 [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/ritabratamaiti/haze-lang)
 
-Haze is a small language for checking software that has to cope with things going wrong some
+Haze is a language for checking software that has to cope with things going wrong some
 of the time. You write a model of a system, such as a payment client that retries failed
 requests, together with the parts you don't control: messages that get lost, services that go
 down, rates you only have a rough idea of. Then you state what the system should guarantee,
@@ -31,11 +31,10 @@ it allows it). The estimate can be a few values, a whole range such as `tri(0.01
 or counts from your logs, such as `likelihood(3, 1000)`. For a range, Haze checks every value in
 it, with bounds that are certified in exact arithmetic.
 
-Haze is at version 0.1 and experimental, so the language may still change. It checks
-discrete-time models by enumerating their states, and it has no nondeterminism or continuous time
-yet. For large models, [PRISM](https://www.prismmodelchecker.org/) and
-[Storm](https://www.stormchecker.org/) are better choices; [How Haze compares](docs/Comparison.md)
-goes into the differences.
+Haze is at version 0.1, and the language may still change. It checks discrete-time Markov chains
+by enumerating their states. [How Haze compares](docs/Comparison.md) sets it beside
+[PRISM](https://www.prismmodelchecker.org/), [Storm](https://www.stormchecker.org/), Lean and
+probabilistic programming.
 
 Haze is written in [Lean 4](https://lean-lang.org/) and borrows its design. Your program is
 translated into a small core language, and a separate kernel checks every declaration again

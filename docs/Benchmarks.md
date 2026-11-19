@@ -71,9 +71,6 @@ so its answers are accurate to about that, as designed; `-epsilon` or `-exact` g
 Storm prints ten significant digits, which accounts for its differences of around 10⁻¹⁰. PRISM's
 `-exact` engine doesn't support step-bounded properties such as `F<=10`.
 
-These models are small. For models with tens of thousands of states or more, PRISM and Storm are
-the better tools; [How Haze compares](Comparison.md) explains why.
-
 ## Reproducing
 
 On Linux, with Java for PRISM and Docker for Storm:

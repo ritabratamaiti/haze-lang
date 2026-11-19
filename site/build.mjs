@@ -230,7 +230,7 @@ function footer(root) {
     <p>Haze is source-available under the <a href="${GITHUB}/blob/main/LICENSE.md">Functional Source License</a> (FSL-1.1-ALv2):
     free to use for anything, including at work, except offering it as a competing product or service.
     Each release becomes Apache-2.0 two years after it ships.</p>
-    <p>v0.1, experimental: the language may still change. © 2026 Ritabrata Maiti</p>
+    <p>v0.1: the language may still change. © 2026 Ritabrata Maiti</p>
   </div>
   <div><h4>Learn</h4><ul>
     <li><a href="${root}tour/">Tour</a></li><li><a href="${root}play/">Playground</a></li>
@@ -271,7 +271,7 @@ const home = `
       <img class="hero-logo" src="images/logo-dark.svg" alt="Haze">
     </picture>
     <h1>Check software that <span class="glow">fails some of the time</span>.</h1>
-    <p class="lede">Haze is a small language for modeling systems that can fail, like a client that
+    <p class="lede">Haze is a language for modeling systems that can fail, like a client that
     retries when a message is lost. You describe the system and what it should guarantee, and Haze
     computes how likely each guarantee is to hold, with exact fractions rather than simulation. When
     one can fail, Haze shows you a run where it does.</p>
@@ -280,7 +280,7 @@ const home = `
       <a class="btn big" href="tour/">Take the tour</a>
       <a class="btn big" href="#install">Install</a>
     </div>
-    <p class="muted small">Version 0.1. Haze is experimental, and the language may still change.</p>
+    <p class="muted small">Version 0.1. The language may still change.</p>
   </div>
   <div class="hero-card">
     <canvas id="hero-canvas" aria-label="Payments flowing through a retry protocol. Red particles are customers charged twice."></canvas>
@@ -311,7 +311,7 @@ const home = `
   <h2>What Haze does</h2>
   <div class="features">
     ${feature("exact", "Exact answers", "Probabilities are computed as fractions, not estimated by simulation. That includes runs with no length limit: a game of craps can go on for any number of rolls, and the shooter wins with probability exactly 244/495.", "forever")}
-    ${feature("rough", "Rates you only roughly know", "If you only know that the loss rate is around 2% and might be 10%, you can write that. The answer is then a range: how strongly what you know guarantees the property, and how strongly it allows it.", "rough-numbers")}
+    ${feature("rough", "Rates you only roughly know", "Write a rate as a few values, a range such as <code>tri(0.01, 0.02, 0.05)</code>, or counts from your logs with <code>likelihood(3, 1000)</code>. Haze checks every value in the range and answers with certified bounds: how strongly what you know guarantees the property, and how strongly it allows it.", "rough-numbers")}
     ${feature("cex", "Counterexamples", "A theorem has to hold on every run that can happen. When it doesn't, Haze shows the parameter values, the state and the step where it breaks.", "retry-bug")}
     ${feature("tests", "Tests from a model", "<code>#tests</code> lists a model's most likely runs as test cases and says how much of the probability they cover. For behavior that fails by design some of the time, it sizes a statistical test with a known false-alarm rate.", "tests")}
   </div>
@@ -333,17 +333,17 @@ const home = `
 
 <section><div class="wrap">
   <h2>How Haze compares</h2>
-  <p class="lede">Haze is new and small. For large models or nondeterminism, use PRISM or Storm, and
-  for properties that must hold at every size, use Lean. Haze is for small models of real software
-  when you want exact answers, rough rates or generated tests.</p>
+  <p class="lede">Haze checks models of software exactly, with rates given as ranges or learned
+  from counts, counterexamples and generated tests. PRISM and Storm cover more kinds of model, and
+  Lean proves properties at every size.</p>
   <div class="table-scroll"><table class="compare">
     <thead><tr><th></th><th class="haze">Haze</th><th>PRISM, Storm</th><th>Lean</th><th>Probabilistic programming (Stan, PyMC)</th></tr></thead>
     <tbody>
       <tr><td>Answers</td><td class="haze">Exact probabilities and expectations (certified bounds for large unbounded problems), proofs over every run of a finite model, counterexamples, generated tests</td><td>Probabilities, expectations and rewards for temporal logics (PCTL, CSL)</td><td>Proofs that hold for every input and size</td><td>Posterior distributions by inference</td></tr>
-      <tr><td>Rates you only roughly know</td><td class="haze">Fuzzy parameters give a belief–plausibility range</td><td>Parametric and interval models</td><td>Whatever you formalize and prove yourself</td><td>Priors over parameters</td></tr>
+      <tr><td>Rates you only roughly know</td><td class="haze">Fuzzy parameters as listed values, ranges or counts from logs, with certified belief and plausibility</td><td>Parametric and interval models</td><td>Whatever you formalize and prove yourself</td><td>Priors over parameters</td></tr>
       <tr><td>Arithmetic</td><td class="haze">Exact fractions; floating point only proposes bounds that are then checked exactly</td><td>Floating point by default, with exact modes</td><td>Exact</td><td>Sampling or approximation</td></tr>
-      <tr><td>Models</td><td class="haze">Discrete-time Markov chains; no nondeterminism or continuous time yet</td><td>DTMCs, MDPs, CTMCs, games and more</td><td>Any mathematics</td><td>Statistical models, often continuous</td></tr>
-      <tr><td>Scale</td><td class="haze">Explicit states: up to 2 million configurations per step, and 100,000 states by default for unbounded properties</td><td>Much larger, with symbolic engines</td><td>Unbounded, with effort</td><td>Large data sets</td></tr>
+      <tr><td>Models</td><td class="haze">Discrete-time Markov chains</td><td>DTMCs, MDPs, CTMCs, games and more</td><td>Any mathematics</td><td>Statistical models, often continuous</td></tr>
+      <tr><td>Scale</td><td class="haze">Explicit states: up to 2 million configurations per step, and 100,000 states by default for unbounded properties</td><td>Symbolic engines for very large state spaces</td><td>Unbounded, with effort</td><td>Large data sets</td></tr>
       <tr><td>Effort</td><td class="haze">Write a model; checking is automatic</td><td>Write a model; checking is automatic</td><td>Write the proofs</td><td>Write a model; tune inference</td></tr>
     </tbody>
   </table></div>
@@ -379,7 +379,7 @@ mkdirSync(join(DIST, "assets"), { recursive: true });
 const page = (dir, html) => { mkdirSync(join(DIST, dir), { recursive: true }); writeFileSync(join(DIST, dir, "index.html"), html); };
 
 page("", layout({ root: "./", path: "", canonical: "", title: "Haze: check software that fails some of the time", script: "home",
-  description: "Haze is a small language for checking software that fails some of the time. It computes exact probabilities, shows counterexamples and generates tests, and you can try it in your browser.",
+  description: "Haze is a language for checking software that fails some of the time. It computes exact probabilities, handles rates known only roughly or learned from logs, shows counterexamples and generates tests, and you can try it in your browser.",
   body: home, data: { presets: PRESETS, hero: HERO, features } }));
 page("play", layout({ root: "../", path: "play/", canonical: "play/", title: "Playground · Haze", script: "play", wide: true,
   description: "Write and check Haze models in your browser.",
