@@ -44,14 +44,17 @@ Haze differs in a few ways that matter for checking software:
   answer is a belief and plausibility pair, with a table of results by value. That's less general
   than a parametric result, but it gives one answer to compare with a requirement, and it says
   which estimate moves the result most.
-- **Counterexamples for probabilistic properties.** When a theorem or a probability bound fails,
-  Haze shows a run that breaks it, with the parameter values and the state at the step where it
-  breaks. PRISM generates counterexample paths for properties without probabilities, such as
-  `A [ G "inv" ]`.
+- **Counterexamples by default.** When any theorem or probability bound fails, Haze shows a run
+  that breaks it, with the parameter values and the state at the step where it breaks. PRISM
+  generates counterexample paths for properties without probabilities, such as `A [ G "inv" ]`.
+  Storm can generate counterexamples for probability bounds on reachability, either as a minimal
+  set of model commands or as the most probable paths that exceed the bound, when you ask for one.
 - **Tests from the model.** `#tests` lists a model's runs in order of probability as test cases,
-  reports how much of the probability they cover, and sizes a statistical test with a known
-  false-alarm rate. [Testing real code](../examples/Conformance/README.md) uses these to test a
-  Python client against its model.
+  with the random decisions made at each step, reports how much of the probability they cover,
+  and sizes a statistical test with a known false-alarm rate. Storm's most-probable-paths
+  counterexamples are related, but they aren't aimed at testing an implementation.
+  [Testing real code](../examples/Conformance/README.md) uses these to test a Python client
+  against its model.
 - **The language.** A Haze step is written like code, with assignments, `if`, `match`, local
   variables, functions and `assert`. PRISM's language, which Storm also reads, describes modules
   as guarded commands, which is more general but further from the code being modeled.
