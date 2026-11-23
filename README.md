@@ -211,6 +211,7 @@ explores (the default is 100,000), and `--json` prints the results as JSON for o
 - [Website](https://haze-lang.pages.dev/), with the playground, a tour and the gallery
 - [Installation](docs/Installation.md) and [your first model](docs/Getting-Started.md)
 - [Reading results](docs/Reading-Results.md)
+- [Coding agents](docs/Agents.md): skills and hooks for Claude Code, Copilot, Codex and Cursor
 - [Language reference](docs/Language-Reference.md) and [command line and JSON](docs/Command-Line.md)
 - [How Haze compares](docs/Comparison.md) with PRISM, Storm, Lean and probabilistic programming,
   and [checking Haze against PRISM and Storm](docs/Benchmarks.md)

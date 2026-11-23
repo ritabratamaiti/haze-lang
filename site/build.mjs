@@ -129,7 +129,8 @@ const DOC_SECTIONS = [
   ["Guides", [
     ["fuzzy", "Fuzzy parameters", "docs/Fuzzy-Parameters.md", "Rates you only roughly know: choosing possibilities, and how belief and plausibility are computed."],
     ["testing", "Testing real code", "examples/Conformance/README.md", "A model as the specification of a Python client, with tests ranked by probability."],
-    ["ci", "Haze in CI and scripts", "docs/CI.md", "Exit status, the GitHub Action, Docker, and reading JSON results from a program."]]],
+    ["ci", "Haze in CI and scripts", "docs/CI.md", "Exit status, the GitHub Action, Docker, and reading JSON results from a program."],
+    ["agents", "Coding agents", "docs/Agents.md", "Skills and hooks that teach Claude Code, Copilot, Codex and Cursor to write, check and test with Haze models."]]],
   ["Reference", [
     ["reference", "Language reference", "docs/Language-Reference.md", "Every declaration, statement, expression, type and query in the language."],
     ["cli", "Command line and JSON", "docs/Command-Line.md", "The haze command's options and exit status, and the fields of its JSON records."]]],

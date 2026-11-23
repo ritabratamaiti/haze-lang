@@ -5,6 +5,15 @@ existing models, its notes will say so.
 
 ## Unreleased
 
+### Coding agents
+
+`haze agent install` teaches coding agents to use Haze. It installs three skills (writing a
+model, checking it and reporting the result, and turning it into tests) for Claude Code and
+GitHub Copilot CLI, or a section of `AGENTS.md` for Codex, OpenCode and Cursor, and hooks that
+check a model when an agent edits it and remind the agent when it edits code linked to one. A
+comment containing `haze: models/name.hz` links code to its model, and `haze agent links --check`
+checks every linked model. See [Coding agents](docs/Agents.md).
+
 ### Continuous fuzzy parameters
 
 A `Num` parameter can now range over an interval: `tri(a, m, b)`, `trap(a, b, c, d)`, or

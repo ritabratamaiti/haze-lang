@@ -12,6 +12,10 @@ default is 1000), `--states N` sets the default for `explore`, `--version` print
 status is 0 if every declaration was accepted and 1 otherwise, which makes `haze` easy to run in
 continuous integration.
 
+`haze agent` sets up coding agents to use Haze: `install`, `uninstall` and `status` manage the
+skills and hooks, `links` lists the `haze:` comments that link code to models (`--check` also
+checks the models), and `hook` is what the hooks run. [Coding agents](Agents.md) describes them.
+
 ## JSON output
 
 With `--json`, each message is printed as a JSON object on its own line. Every record has the
