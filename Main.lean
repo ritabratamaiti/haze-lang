@@ -4,13 +4,15 @@ Released under the Functional Source License 1.1 (FSL-1.1-ALv2) as described in 
 Authors: Ritabrata Maiti
 -/
 import Haze.Frontend
+import Haze.Agent
 
 /-!
 # Command-Line Interface
 
 `haze [--fuel N] [--states N] [--json] FILE.hz...` checks Haze source files and prints their messages, or one
 JSON record per message with `--json`. The exit status is 1 if any declaration was rejected and 2
-if the arguments are invalid or a file can't be read.
+if the arguments are invalid or a file can't be read. `haze agent …` sets up coding agents to use
+Haze (see `Haze.Agent`).
 -/
 
 /-- The version of Haze, which `haze --version` prints. -/
@@ -19,6 +21,7 @@ def version : String := "0.1.0"
 /-- The help text of the command-line interface. -/
 def usage : String :=
   "usage: haze [--fuel N] [--states N] [--json] FILE.hz...\n" ++
+  "       haze agent install|uninstall|status|links|hook ...\n" ++
   "       haze --version\n" ++
   "Checks Haze programs: graded types, exact probabilities, fuzzy [belief, plausibility].\n" ++
   "  --fuel N    bound on nested function calls (default 1000)\n" ++
@@ -26,6 +29,7 @@ def usage : String :=
   "  --json      print one JSON record per message"
 
 def main (args : List String) : IO UInt32 := do
+  if let "agent" :: rest := args then return ← Haze.Agent.main rest version
   let mut opts : Haze.Frontend.Options := {}
   let mut files := #[]
   let mut json := false
