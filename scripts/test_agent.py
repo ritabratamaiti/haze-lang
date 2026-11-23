@@ -155,7 +155,7 @@ with tempfile.TemporaryDirectory() as d:
     check(code == 0, "uninstall exits 0")
     check(not (repo / ".claude" / "skills" / "haze-model").exists(), "uninstall removes the skills")
     settings = json.loads((repo / ".claude" / "settings.json").read_text(encoding="utf-8"))
-    check(settings == theirs, "uninstall leaves the user's settings exactly as they were")
+    check(settings == theirs, "settings.json holds the same JSON after uninstall")
     check((repo / "AGENTS.md").read_text(encoding="utf-8") == "# Our rules\n\nUse tabs.\n", "uninstall restores AGENTS.md")
 
 passed = sum(ok for ok, _ in results)

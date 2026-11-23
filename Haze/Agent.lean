@@ -42,7 +42,7 @@ structure Skill where
   name : String
   template : String
 
-/-- The bundled skills. Their names are part of the install layout, so renaming one is breaking. -/
+/-- The bundled skills, installed under these directory names. -/
 def skills : List Skill := [
   ⟨"haze-model", include_str "../agents/skills/haze-model/SKILL.md"⟩,
   ⟨"haze-check", include_str "../agents/skills/haze-check/SKILL.md"⟩,
