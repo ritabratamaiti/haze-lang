@@ -2,8 +2,8 @@
 
 Haze models of open-source libraries where the code and the docs disagree. Each finding was
 reproduced on the library's latest release before it was reported upstream. Every model lists, in
-its opening comment, the source lines it describes. Where the proposed fix is a code change, the
-model includes it too, and with it the checks pass.
+its opening comment, the source lines it describes. When the fix belongs in the code rather than
+the docs, the model includes it too, and with it the checks pass.
 
 | model | library | what doesn't hold | report |
 |---|---|---|---|
