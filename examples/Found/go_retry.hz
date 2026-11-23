@@ -1,0 +1,59 @@
+-- sethvargo/go-retry v0.5.0 (commit d1f41d0): retry.Do with
+-- WithMaxRetries(max, WithCappedDuration(cap, NewFibonacci(1s))). Times are in seconds.
+--
+-- One step is one failed attempt, worst case, followed by Do's call to Next:
+--   retry.go#L61-L75            Do runs f with no wait first; after a retryable error it calls
+--                               b.Next(), and stop = true ends the loop
+--   backoff.go#L125-L128        WithMaxRetries: stop once attempt >= max, else attempt++
+--   backoff.go#L150-L152        WithCappedDuration: val = min(val, cap)
+--   backoff_fibonacci.go#L36    state starts at {0, base}
+--   backoff_fibonacci.go#L44-L51  next = s0 + s1, store {s1, next}, return next
+-- The overflow branch (#L46-L48) only fires once a wait would pass MaxInt64 ns, about
+-- 292 years, so it is left out.
+--
+-- docs = true models the documented sequence instead (doc comment #L24, README#L101):
+-- return s1, then advance, which gives 1, 1, 2, 3, 5.
+-- cap = 1000 is larger than any wait below, so it means no cap.
+
+system Retry(docs : Bool, max_retries : Num, cap : Num) {
+  var s0 : Num := 0
+  var s1 : Num := 1
+  var attempts : Num := 0
+  var retries : Num := 0
+  var stopped : Bool := false
+  var last_wait : Num := 0
+  var total_wait : Num := 0
+  step {
+    if not stopped {
+      attempts := attempts + 1
+      if retries < max_retries {
+        retries := retries + 1
+        let next := s0 + s1
+        let val := if docs then s1 else next
+        s0 := s1
+        s1 := next
+        last_wait := min(val, cap)
+        total_wait := total_wait + last_wait
+      } else {
+        stopped := true
+      }
+    }
+  }
+}
+
+-- README#L142-L144: "Stop after 4 retries, when the 5th attempt has failed.
+-- In this example, the worst case elapsed time would be 1s + 1s + 2s + 3s = 7s."
+theorem readme_stops_after_5th_attempt : Retry(false, 4, 1000) |= after[5] (stopped and attempts == 5)
+theorem readme_worst_case_7s : Retry(false, 4, 1000) |= after[5] total_wait == 7
+theorem readme_worst_case_7s_docs : Retry(true, 4, 1000) |= after[5] total_wait == 7
+#eval Retry(false, 4, 1000) |= after[5] total_wait
+
+-- Doc comment and README#L101: the second wait repeats the first.
+theorem second_wait_is_1s : Retry(false, 10, 1000) |= after[2] last_wait == 1
+
+-- README#L154-L155, WithCappedDuration(2s, ...): "1s, 1s, 2s, 2s, 2s, 2s..."
+theorem capped_second_wait_is_1s : Retry(false, 10, 2) |= after[2] last_wait == 1
+
+-- Ten retries: total sleep, documented and actual.
+#eval Retry(true, 10, 1000) |= after[11] total_wait
+#eval Retry(false, 10, 1000) |= after[11] total_wait

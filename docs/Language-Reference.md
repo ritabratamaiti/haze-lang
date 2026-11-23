@@ -421,10 +421,10 @@ Unbounded properties explore at most 100,000 states unless `explore` says otherw
 Groups of states that can all reach each other are solved exactly when they have at most 120
 states, and with certified bounds when they are larger.
 
-Checking uses every processor core. The parameter assignments of a query are checked in
-parallel, large frontiers and breadth-first levels are expanded in parallel, and when a frontier
-is small, a step's own random choices are split across cores. Results don't depend on the
-number of cores.
+Checking spreads its work across processor cores where it can. The parameter assignments of a
+query are checked in parallel, large frontiers and breadth-first levels are expanded in parallel,
+and when a frontier is small, a step's own random choices are split across cores. Results don't
+depend on the number of cores.
 
 Two reductions keep this manageable. Each query builds only the inputs and parameters that it,
 or an earlier observation, can read, so unrelated inputs don't multiply the number of worlds. And

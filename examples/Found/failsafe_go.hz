@@ -1,0 +1,138 @@
+-- failsafe-go circuit breaker (v0.9.8): what happens to results of calls that are still
+-- running when the breaker changes state.
+--
+-- Configuration from the bug report:
+--   NewBuilder().WithFailureThreshold(1).WithSuccessThreshold(2).WithDelay(d)
+--
+-- What the code does (circuitbreaker/circuitstates.go, circuitbreaker.go):
+--   * Closed: every call gets a permit. One failure opens the breaker.
+--   * Open: calls are rejected until the delay has passed. The first call after that moves the
+--     breaker to HalfOpen and takes a permit there (openState.tryAcquirePermit).
+--   * HalfOpen: permittedExecutions starts at successThresholdingCapacity = 2, and each admitted
+--     call takes one. Every result, from whichever call, is recorded in the current state, and
+--     then checkThresholdAndReleasePermit runs: 2 successes close the breaker, any failure
+--     (failures > 2 - 2) opens it, otherwise permittedExecutions++.
+--   * A call does not remember the state it took its permit from.
+--
+-- The model counts calls instead of naming them:
+--   trial  = running calls that took a permit from the current half-open period
+--   others = all other running calls: admitted while closed, or in an earlier half-open period
+-- When the breaker leaves HalfOpen, its trial calls become `others`.
+--
+-- Each step, one of six events happens. The probabilities only make every event possible at
+-- every step; a theorem must hold on every reachable interleaving.
+
+enum State = Closed | Open | HalfOpen
+enum Event = Start | DelayElapsed | OtherOk | OtherFail | TrialOk | TrialFail
+
+def capacity : Num := 2   -- WithSuccessThreshold(2)
+def callers : Num := 3    -- calls in flight at once; 4 to 8 give the same answers
+
+-- fixed = false is failsafe-go v0.9.8.
+-- fixed = true remembers where each call took its permit (a generation number, as gobreaker
+-- does) and ignores a result in HalfOpen unless the call is one of this period's trials.
+system Breaker(fixed : Bool) {
+  var st : State := Closed
+  var delay_done : Bool := false
+  var permits : Num := 0         -- halfOpenState.permittedExecutions
+  var successes : Num := 0       -- SuccessCount() of the half-open stats
+  var trial : Num := 0
+  var others : Num := 0
+
+  -- Bookkeeping for the claims; the breaker doesn't have these.
+  var trial_successes : Num := 0     -- successes of this half-open period's own trials
+  var closed_early : Bool := false   -- closed with fewer than 2 trial successes
+  var reopened_by_other : Bool := false
+
+  step {
+    let event := {Start: 1/6, DelayElapsed: 1/6, OtherOk: 1/6, OtherFail: 1/6, TrialOk: 1/6, TrialFail: 1/6}
+    match event {
+      Start => {
+        if trial + others < callers {
+          match st {
+            Closed => { others := others + 1 }
+            Open => {
+              if delay_done {
+                -- newHalfOpenState, then tryAcquirePermit in the new state
+                st := HalfOpen
+                permits := capacity - 1
+                trial := 1
+                successes := 0
+                trial_successes := 0
+              }
+            }
+            HalfOpen => {
+              if permits > 0 { permits := permits - 1; trial := trial + 1 }
+            }
+          }
+        }
+      }
+      DelayElapsed => { if st == Open { delay_done := true } }
+      OtherOk => {
+        if others > 0 {
+          others := others - 1
+          -- Closed: recorded, no transition. Open: checkThresholdAndReleasePermit does nothing.
+          if st == HalfOpen and not fixed {
+            successes := successes + 1
+            if successes >= 2 {
+              st := Closed; others := others + trial; trial := 0
+              if trial_successes < 2 { closed_early := true }
+            } else {
+              permits := permits + 1
+            }
+          }
+        }
+      }
+      OtherFail => {
+        if others > 0 {
+          others := others - 1
+          match st {
+            Closed => { st := Open; delay_done := false }
+            HalfOpen => {
+              if not fixed {
+                st := Open; delay_done := false; others := others + trial; trial := 0
+                reopened_by_other := true
+              }
+            }
+            Open => skip
+          }
+        }
+      }
+      TrialOk => {
+        if trial > 0 {
+          trial := trial - 1
+          successes := successes + 1
+          trial_successes := trial_successes + 1
+          if successes >= 2 {
+            st := Closed; others := others + trial; trial := 0
+            if trial_successes < 2 { closed_early := true }
+          } else {
+            permits := permits + 1
+          }
+        }
+      }
+      TrialFail => {
+        if trial > 0 {
+          trial := trial - 1
+          st := Open; delay_done := false; others := others + trial; trial := 0
+        }
+      }
+    }
+  }
+}
+
+-- "In the HalfOpenState a configurable number of trial executions will be allowed"
+theorem trials_within_capacity : Breaker(false) |= always trial <= capacity
+-- WithSuccessThreshold(2): 2 successful executions in HalfOpen close the circuit
+theorem closes_on_own_trials : Breaker(false) |= always not closed_early
+-- the trial executions decide whether the breaker opens again
+theorem reopens_on_own_trials : Breaker(false) |= always not reopened_by_other
+
+theorem trials_within_capacity_fixed : Breaker(true) |= always trial <= capacity
+theorem closes_on_own_trials_fixed : Breaker(true) |= always not closed_early
+theorem reopens_on_own_trials_fixed : Breaker(true) |= always not reopened_by_other
+
+-- The fixed model still does its job: it reaches 2 running trials, and it closes and re-opens.
+#prob Breaker(true) |= eventually (st == HalfOpen and trial == capacity)
+#prob Breaker(true) |= eventually (st == Closed and trial_successes == 2)
+#prob Breaker(true) |= eventually (st == Open and trial_successes == 1)

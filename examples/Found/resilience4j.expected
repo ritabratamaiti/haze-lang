@@ -1,0 +1,20 @@
+examples/Found/resilience4j.hz:103:1: error: theorem half_open_permit_limit
+  probability 0 · fails with certainty
+  grade prob · 1 parameter assignment(s) · 12 reachable states
+  theorem rejected: belief is 0, not 1
+  counterexample at step 7 (path mass ≈4.76837e-7 (=1/2097152), degree 0):
+    state: fix_release = false, fix_record = false, st = HalfOpen, old = 0, trial = 2, permits = 0
+examples/Found/resilience4j.hz:104:1: info: theorem half_open_permit_limit_fixed
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · 9 reachable states
+  theorem accepted
+examples/Found/resilience4j.hz:107:1: error: theorem half_open_decided_by_its_calls
+  probability 0 · fails with certainty
+  grade prob · 1 parameter assignment(s) · 24 reachable states
+  theorem rejected: belief is 0, not 1
+  counterexample at step 5 (path mass ≈3.05176e-5 (=1/32768), degree 0):
+    state: fix_release = false, fix_record = false, st = Closed, old = 0, trial = 0, permits = 0, decided_by_old = true
+examples/Found/resilience4j.hz:108:1: info: theorem half_open_decided_by_its_calls_fixed
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · 9 reachable states
+  theorem accepted
