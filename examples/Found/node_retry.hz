@@ -1,0 +1,112 @@
+-- Two models of tim-kos/node-retry (npm `retry` 0.13.1, master 11efd6e).
+-- Line numbers refer to lib/retry_operation.js and lib/retry.js at that commit;
+-- the published 0.13.1 package has the same lib/ files.
+
+-- Part A: maxRetryTime
+--
+-- README.md:110  "maxRetryTime: The maximum time (in milliseconds) that the retried
+--                 operation is allowed to run."
+-- retry_operation.js:114     _operationStart is set in attempt(), just before the first fn call
+-- retry_operation.js:51-56   retry(err) stops if now - _operationStart >= maxRetryTime
+-- retry_operation.js:60-68   otherwise it shifts the next timeout, and stops if none are left
+-- retry_operation.js:72-86   then it starts the next attempt after the whole timeout
+--
+-- Options {retries: 5, factor: 2, minTimeout: 100, maxRetryTime: 1000}, so
+-- retry.timeouts() is [100, 200, 400, 800, 1600].
+-- An attempt runs for 0 ms (fast) or for 0, 50, 100 or 150 ms (slow) before it fails.
+-- The theorems are about every run, so the weights of those durations don't matter.
+
+enum Phase = Running | Waiting | Done
+
+def max_retry_time : Num := 1000
+def timeout(i : Num) : Num :=
+  if i == 0 then 100 else if i == 1 then 200 else if i == 2 then 400
+  else if i == 3 then 800 else 1600
+
+-- capped = false is the released code. capped = true is the suggested fix: wait at most
+-- the time that is left, min(timeout, maxRetryTime - elapsed).
+system Operation(capped : Bool, slow : Bool) {
+  var phase : Phase := Running
+  var clock : Num := 0        -- ms since _operationStart
+  var used : Num := 0         -- timeouts shifted so far
+  var last_start : Num := 0   -- when the latest attempt started
+  step {
+    match phase {
+      Running => {
+        let run_ms := 50 * uniform(0, 3)
+        clock := clock + (if slow then run_ms else 0)
+        phase := Waiting
+      }
+      Waiting => {
+        if clock >= max_retry_time or used >= 5 { phase := Done }
+        else {
+          let wait := if capped then min(timeout(used), max_retry_time - clock) else timeout(used)
+          clock := clock + wait
+          used := used + 1
+          last_start := clock
+          phase := Running
+        }
+      }
+      _ => skip
+    }
+  }
+}
+
+-- "No attempt starts after maxRetryTime." Six attempts take at most 12 steps.
+theorem starts_within_limit : Operation(false, false) |= always[12] last_start <= max_retry_time
+theorem starts_within_limit_slow : Operation(false, true) |= always[12] last_start <= max_retry_time
+theorem starts_within_limit_capped : Operation(true, false) |= always[12] last_start <= max_retry_time
+theorem starts_within_limit_capped_slow : Operation(true, true) |= always[12] last_start <= max_retry_time
+#eval Operation(false, false) |= after[12] last_start
+#eval Operation(true, false) |= after[12] last_start
+
+-- Part B: randomize and the sort
+--
+-- README.md:123   "randomize: Randomizes the timeouts by multiplying with a factor between 1 to 2."
+-- README.md:125-129  "The formula used to calculate the individual timeouts is:
+--                     Math.min(random * minTimeout * Math.pow(factor, attempt), maxTimeout)"
+-- retry.js:33-35  timeouts() calls createTimeout(i, opts) for i = 0 .. retries - 1
+-- retry.js:50-55  createTimeout: Math.min(Math.round((Math.random() + 1) * minTimeout * factor^i), maxTimeout)
+-- retry.js:41-44  then the whole array is sorted ascending, and retry k waits timeouts[k]
+--
+-- draw(base) is Math.round((Math.random() + 1) * base) for a whole number base.
+-- Math.random() is cut into 2 * base cells of width 1 / (2 * base). Math.round is constant
+-- on each cell, so draw has exactly the distribution of the real rounded value
+-- (treating Math.random() as uniform on [0, 1)). maxTimeout is Infinity here.
+def draw(base : Num) : Num := base + floor((uniform(0, 2 * base - 1) + 1) / 2)
+
+-- factor 1 (constant delay with jitter), retries 10, minTimeout 1000.
+-- After the sort, the first retry waits the smallest of the ten draws, so it is
+-- under 1100 ms as soon as any draw is.
+system Factor1 {
+  var i : Num := 0
+  var first_short : Bool := false     -- timeouts[0] < 1100 after the sort
+  var formula_short : Bool := false   -- the attempt-0 draw < 1100, what the README formula gives retry 0
+  step {
+    if i < 10 {
+      let short := draw(1000) < 1100
+      if i == 0 { formula_short := short }
+      first_short := first_short or short
+      i := i + 1
+    }
+  }
+}
+
+#prob Factor1 |= after[10] formula_short
+#prob Factor1 |= after[10] first_short
+theorem first_follows_formula : Factor1 |= after[10] first_short == formula_short
+
+-- factor 1.5, retries 2, minTimeout 1000: the ranges [1000, 2000] and [1500, 3000] overlap.
+system Factor15 {
+  var i : Num := 0
+  var t0 : Num := 0       -- createTimeout(0)
+  var first : Num := 0    -- timeouts[0] after the sort, what retry 0 waits
+  step {
+    if i == 0 { t0 := draw(1000) }
+    else if i == 1 { first := min(t0, draw(1500)) }
+    i := i + 1
+  }
+}
+
+theorem retry0_follows_formula : Factor15 |= after[2] first == t0
+#prob Factor15 |= after[2] first < t0

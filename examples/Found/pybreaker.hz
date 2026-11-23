@@ -1,0 +1,135 @@
+-- pybreaker 1.4.1: half-open with `with breaker.calling():` and guarded generator functions
+--
+-- What the code does (src/pybreaker/__init__.py, identical in v1.4.1 and on main at 2b0b965):
+--   CircuitBreaker.call                 250-251  holds self._lock while self.state.call(...) runs
+--   CircuitBreaker.calling              253-264  `yield from self.call(_wrapper)`, _wrapper is a generator
+--   CircuitBreakerState.call            721-722  if func returned a generator, return
+--                                                self.generator_call(ret) at once: the lock is
+--                                                released before the guarded block runs
+--   CircuitBreakerState.generator_call  758-768  on completion calls self._handle_success() or
+--                                                self._handle_error(): `self` is the state object
+--                                                that was current when the block started
+--   CircuitClosedState.on_failure       807-815  open() once fail_counter >= fail_max
+--   CircuitOpenState.before_call        846-852  under the lock: CircuitBreakerError until
+--                                                reset_timeout has passed since opened_at, then
+--                                                half_open() and run the call in half-open
+--   CircuitHalfOpenState.on_failure     884-890  open() unconditionally
+--   CircuitHalfOpenState.on_success     892-897  close() once success_counter >= success_threshold
+--   CircuitBreaker.open / close         281-302  open() sets opened_at = now; neither checks the
+--                                                current state
+--
+-- Configuration of the repro: fail_max = 1, success_threshold = 1 (the default).
+--
+-- Abstractions:
+--   * Time is one flag: timeout_ok means reset_timeout has passed since the last open().
+--     Elapse sets it at any moment while the breaker is open; open() clears it.
+--   * A running guarded block is counted by the period it started in. A period ends at every
+--     open(), close() or half_open(). Blocks of the current period are c (closed) and h
+--     (half-open); blocks of an earlier period are oc and oh. In the shipped code a block's
+--     result does not depend on the period, only on the state object it captured; the split
+--     is there so the properties and the fix can talk about it.
+--   * At most 3 blocks run at once (3 threads), so the state space is finite and the theorems
+--     below are checked over every run of any length.
+--   * Each step picks one event uniformly. Theorems need belief 1, so the probabilities only
+--     decide which interleavings exist, and every interleaving does. Over an unbounded run
+--     every interleaving eventually happens, so a rejected theorem reports probability 0.
+--     That number comes from the made-up scheduler and says nothing about real traffic.
+--
+-- Variants:
+--   Locked    breaker.call(): the lock is held for the whole call, so a block can start only
+--             when none is running.
+--   Unlocked  breaker.calling() and guarded generators, as shipped.
+--   Fixed     the change suggested in the issue: half-open admits one block until it ends, and
+--             a block whose period has ended does not change the breaker state.
+
+enum Mode = Closed | Open | HalfOpen
+enum Variant = Locked | Unlocked | Fixed
+enum Act = Nothing | OpenIt | CloseIt
+enum Ev = Enter | Elapse | ClosedOk | ClosedFail | HalfOk | HalfFail
+        | OldClosedOk | OldClosedFail | OldHalfOk | OldHalfFail
+
+system Breaker(v : Variant) {
+  var st : Mode := Closed
+  var timeout_ok : Bool := false
+  var c : Num := 0
+  var h : Num := 0
+  var oc : Num := 0
+  var oh : Num := 0
+  var early_close : Bool := false   -- left open before another reset_timeout had passed
+
+  step {
+    let ev := {Enter: 0.1, Elapse: 0.1, ClosedOk: 0.1, ClosedFail: 0.1, HalfOk: 0.1,
+               HalfFail: 0.1, OldClosedOk: 0.1, OldClosedFail: 0.1, OldHalfOk: 0.1,
+               OldHalfFail: 0.1}
+    let running := c + h + oc + oh
+    let can_enter := running < 3 and (v != Locked or running == 0)
+
+    -- What the captured state object does when the block ends. Closed successes do nothing
+    -- (only reset_counter, which fail_max = 1 makes irrelevant).
+    let act := match ev {
+      ClosedFail => if c > 0 then OpenIt else Nothing,
+      HalfOk => if h > 0 then CloseIt else Nothing,
+      HalfFail => if h > 0 then OpenIt else Nothing,
+      OldClosedFail => if oc > 0 and v != Fixed then OpenIt else Nothing,
+      OldHalfOk => if oh > 0 and v != Fixed then CloseIt else Nothing,
+      OldHalfFail => if oh > 0 and v != Fixed then OpenIt else Nothing,
+      _ => Nothing
+    }
+
+    match ev {
+      Enter => {
+        if can_enter {
+          match st {
+            Closed => { c := c + 1 }
+            Open => {
+              -- CircuitOpenState.before_call: half_open(), then the call runs in half-open
+              if timeout_ok { st := HalfOpen; oc := oc + c; oh := oh + h; c := 0; h := 1 }
+            }
+            HalfOpen => { if v != Fixed or h == 0 { h := h + 1 } }
+          }
+        }
+      }
+      Elapse => { if st == Open { timeout_ok := true } }
+      ClosedOk => { if c > 0 { c := c - 1 } }
+      ClosedFail => { if c > 0 { c := c - 1 } }
+      HalfOk => { if h > 0 { h := h - 1 } }
+      HalfFail => { if h > 0 { h := h - 1 } }
+      OldClosedOk => { if oc > 0 { oc := oc - 1 } }
+      OldClosedFail => { if oc > 0 { oc := oc - 1 } }
+      OldHalfOk => { if oh > 0 { oh := oh - 1 } }
+      OldHalfFail => { if oh > 0 { oh := oh - 1 } }
+    }
+
+    match act {
+      OpenIt => { st := Open; timeout_ok := false; oc := oc + c; oh := oh + h; c := 0; h := 0 }
+      CloseIt => {
+        if st == Open and not timeout_ok { early_close := true }
+        st := Closed; oc := oc + c; oh := oh + h; c := 0; h := 0
+      }
+      Nothing => skip
+    }
+  }
+}
+
+-- README: "After 60 seconds, the circuit breaker will allow the next call to update_customer
+-- pass through." At most one block of a half-open period runs.
+theorem one_trial_call : Breaker(Locked) |= always h <= 1
+theorem one_trial_calling : Breaker(Unlocked) |= always h <= 1
+theorem one_trial_fixed : Breaker(Fixed) |= always h <= 1
+
+-- README: "if it fails, however, the circuit is opened again until another timeout elapses."
+-- The breaker never leaves open before reset_timeout has passed again.
+theorem stays_open_call : Breaker(Locked) |= always not early_close
+theorem stays_open_calling : Breaker(Unlocked) |= always not early_close
+theorem stays_open_fixed : Breaker(Fixed) |= always not early_close
+
+-- The two rejected theorems have these shortest counterexamples. Haze prints only the state
+-- at the failing step; these are the runs that reach it (each replayed step by step in Haze
+-- and against pybreaker 1.4.1):
+--   one_trial_calling, step 5:  Enter (closed), ClosedFail (open), Elapse, Enter (half-open,
+--     h = 1), Enter (h = 2).
+--   stays_open_calling, step 7: the same five steps, then HalfFail (B's trial fails: open,
+--     timeout_ok = false, A moves to oh), then OldHalfOk (A succeeds: close() while open).
+--     This is the run in the issue. Another 7-step run: Enter, Enter, ClosedFail, Elapse,
+--     Enter (half-open), OldClosedFail (a block from the closed period fails late and
+--     reopens), OldHalfOk (the trial succeeds and closes).

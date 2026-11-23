@@ -89,6 +89,24 @@ system Chain {
 #expect Chain |= after[2] t
 #prob Chain |= after[2] t == 2
 
+-- Variables outside the cone of influence that a conditional or a local value still reads. The
+-- property reads only `a`; `trial` and `b` must not be evaluated once their assignments are gone.
+system Sliced {
+  var a : Num := 0
+  var trial : Num := 0
+  var b : Bool := false
+  step {
+    let ev := flip(0.5)
+    let next := trial + 1
+    if ev { trial := next } else { b := not b }
+    if trial >= 3 { trial := 3 }
+    if a == 0 { a := 1 } else { if b { skip } else { skip } }
+  }
+}
+theorem sliced_num : Sliced |= always[3] a <= 1
+theorem sliced_bool : Sliced |= always[3] not b
+#prob Sliced |= after[3] trial == 3
+
 -- When an upper bound fails, the example is a run where the event happens, taken from a
 -- parameter assignment that breaks the bound.
 param q : Num ~= {0.1: 1, 0.6: 0.5}

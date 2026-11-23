@@ -450,10 +450,10 @@ For continuous fuzzy parameters, the search over each range of values spends at 
 checks on each bound. If that isn't enough to narrow a range down, the result says so, and the
 bound stays certified but is more cautious.
 
-Checking uses every processor core. The parameter assignments of a query are checked in
-parallel, large frontiers and breadth-first levels are expanded in parallel, and when a frontier
-is small, a step's own random choices are split across cores. Results don't depend on the
-number of cores.
+Checking spreads its work across processor cores where it can. The parameter assignments of a
+query are checked in parallel, large frontiers and breadth-first levels are expanded in parallel,
+and when a frontier is small, a step's own random choices are split across cores. Results don't
+depend on the number of cores.
 
 Two reductions keep this manageable. Each query builds only the inputs and parameters that it,
 or an earlier observation, can read, so unrelated inputs don't multiply the number of worlds. And

@@ -1,0 +1,22 @@
+examples/Found/bloom_filters.hz:46:1: info: theorem all_slices_iff_same_hashes
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · ≤1296 states/step
+  theorem accepted
+examples/Found/bloom_filters.hz:49:1: info: #prob forall i in 0..k - 1, index(qa, qb, i) == index(a1, b1, i)
+  probability 0.027778 (=1/36)
+examples/Found/bloom_filters.hz:53:1: info: theorem shared_hashes_always_hit
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · ≤46656 states/step
+  theorem accepted
+examples/Found/bloom_filters.hz:55:1: info: #prob (qa == a1 and qb == b1) or (qa == a2 and qb == b2)
+  probability 0.054784 (=71/1296)
+examples/Found/bloom_filters.hz:64:1: info: claim fixed_meets_textbook_rate
+  probability ≈0.008717 · graded
+  grade prob · 1 parameter assignment(s) · ≤2 states/step
+  bound holds: plausibility ≤ ≈0.008717
+examples/Found/bloom_filters.hz:65:1: error: claim shipped_meets_textbook_rate
+  probability 0.056327 (=73/1296) · graded
+  grade prob · 1 parameter assignment(s) · ≤46656 states/step
+  bound fails: plausibility 0.056327 (=73/1296) > ≈0.008717
+  a world where it happens (probability ≈2.14335e-5 (=1/46656)):
+    inputs: a1 = 0, b1 = 0, a2 = 0, b2 = 0, qa = 0, qb = 0

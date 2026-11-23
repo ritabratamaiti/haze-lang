@@ -1,0 +1,116 @@
+-- resilience4j CircuitBreaker 2.4.0 (CircuitBreakerStateMachine): HALF_OPEN permits and
+-- calls that were permitted before the breaker went HALF_OPEN.
+--
+-- Config, as in the JUnit tests: COUNT_BASED window 2, minimumNumberOfCalls 1,
+-- failureRateThreshold 50, permittedNumberOfCallsInHalfOpenState 1,
+-- ignoreExceptions(BusinessException). With it, any recorded failure opens a CLOSED breaker,
+-- and in HALF_OPEN the first recorded result decides (success -> CLOSED, failure -> OPEN).
+--
+-- What the code does (CircuitBreakerStateMachine.java at aa9aacb):
+--   * An ignored exception calls releasePermission() (handleThrowable, L206-L212), which goes
+--     to the state that is current when the call ends: stateReference.get() (L180-L182).
+--     HalfOpenState.releasePermission() increments permittedNumberOfCalls (L1156-L1158); in
+--     CLOSED and OPEN it does nothing. A cancelled decorateFuture call releases the same way
+--     (CircuitBreaker.java L1088-L1090), so the *Ignored events cover that path too.
+--   * A success or recorded failure goes to the metrics of the state that is current when
+--     the call ends (L213-L228).
+--
+-- State:
+--   old     calls still running that did not get their permit from the current HALF_OPEN
+--           state (permitted while CLOSED, or by an earlier HALF_OPEN state)
+--   trial   calls still running that got their permit from the current HALF_OPEN state
+--   permits HalfOpenState.permittedNumberOfCalls
+--
+-- Each step one event happens, chosen by the scheduler. An event whose precondition is false
+-- does nothing. The theorems quantify over every order of events, so the probabilities only
+-- serve to enumerate the runs.
+--
+-- The two parameters describe possible fixes:
+--   fix_release  an ignored exception releases the permit only on the state that gave it out
+--   fix_record   a result counts toward the HALF_OPEN decision only if HALF_OPEN gave out the permit
+
+enum Breaker = Closed | Open | HalfOpen
+enum Ev = Start | OldOk | OldFail | OldIgnored | TrialOk | TrialFail | TrialIgnored | WaitElapsed
+
+system R4jCB(fix_release : Bool, fix_record : Bool) {
+  var st : Breaker := Closed
+  var old : Num := 0
+  var trial : Num := 0
+  var permits : Num := 0
+  var decided_by_old : Bool := false
+  step {
+    let ev := {Start: 1/8, OldOk: 1/8, OldFail: 1/8, OldIgnored: 1/8,
+               TrialOk: 1/8, TrialFail: 1/8, TrialIgnored: 1/8, WaitElapsed: 1/8}
+    match ev {
+      -- tryAcquirePermission: CLOSED always permits (at most 2 calls in flight, to keep the
+      -- model finite), OPEN rejects, HALF_OPEN takes a permit if there is one.
+      Start => {
+        match st {
+          Closed => { if old < 2 { old := old + 1 } }
+          HalfOpen => { if permits > 0 { permits := permits - 1; trial := trial + 1 } }
+          _ => skip
+        }
+      }
+      -- waitDurationInOpenState elapsed: a new HalfOpenState with
+      -- permittedNumberOfCalls = permittedNumberOfCallsInHalfOpenState.
+      WaitElapsed => { if st == Open { st := HalfOpen; permits := 1 } }
+      -- An earlier call succeeds. CLOSED and OPEN: recorded, no transition.
+      -- HALF_OPEN: the first recorded result decides.
+      OldOk => {
+        if old > 0 {
+          old := old - 1
+          if st == HalfOpen and not fix_record {
+            st := Closed; old := old + trial; trial := 0; permits := 0; decided_by_old := true
+          }
+        }
+      }
+      -- An earlier call fails. CLOSED: opens. OPEN: recorded, no transition.
+      OldFail => {
+        if old > 0 {
+          old := old - 1
+          match st {
+            Closed => { st := Open }
+            HalfOpen => {
+              if not fix_record {
+                st := Open; old := old + trial; trial := 0; permits := 0; decided_by_old := true
+              }
+            }
+            _ => skip
+          }
+        }
+      }
+      -- An earlier call ends with an ignored exception: releasePermission() on the current state.
+      OldIgnored => {
+        if old > 0 {
+          old := old - 1
+          if st == HalfOpen and not fix_release { permits := permits + 1 }
+        }
+      }
+      -- A test call ends. Calls still running when HALF_OPEN is left become "old".
+      TrialOk => {
+        if trial > 0 { trial := trial - 1; st := Closed; old := old + trial; trial := 0; permits := 0 }
+      }
+      TrialFail => {
+        if trial > 0 { trial := trial - 1; st := Open; old := old + trial; trial := 0; permits := 0 }
+      }
+      TrialIgnored => { if trial > 0 { trial := trial - 1; permits := permits + 1 } }
+    }
+  }
+}
+
+-- Docs: HALF_OPEN "permits a configurable number of calls ... Further calls are rejected with
+-- a CallNotPermittedException, until all permitted calls have completed."
+theorem half_open_permit_limit : R4jCB(false, false) |= always trial <= 1
+theorem half_open_permit_limit_fixed : R4jCB(true, false) |= always trial <= 1
+
+-- The question part: is HALF_OPEN decided only by the calls it permitted?
+theorem half_open_decided_by_its_calls : R4jCB(false, false) |= always not decided_by_old
+theorem half_open_decided_by_its_calls_fixed : R4jCB(true, true) |= always not decided_by_old
+
+-- Shortest counterexamples (event per step):
+--   permit limit, 7 steps: Start (A), Start (B), OldFail (B), WaitElapsed, Start (test call C),
+--                 OldIgnored (A), Start (E): C and E both running. This is the first JUnit test.
+--                 (A ending before C starts, then two Starts, is the other 7-step run.)
+--   decided by its calls: Start (A), Start (B), OldFail (B), WaitElapsed, OldOk (A): the breaker
+--                 closes on A's result without any test call. The second JUnit test is this run
+--                 with a test call C started before A ends.

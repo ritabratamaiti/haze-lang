@@ -193,7 +193,7 @@ function renderDoc(src, path) {
 }
 
 // ---- pages -------------------------------------------------------------------------------
-const NAV = [["play/", "Playground"], ["tour/", "Tour"], ["gallery/", "Gallery"], ["docs/", "Docs"]];
+const NAV = [["play/", "Playground"], ["tour/", "Tour"], ["gallery/", "Gallery"], ["docs/", "Docs"], ["blog/", "Blog"]];
 function layout({ root, path, title, description, body, script, data, wide, canonical }) {
   const nav = NAV.map(([href, label]) => `<a href="${root}${href}"${path.startsWith(href) ? ' class="active" aria-current="page"' : ""}>${label}</a>`).join("");
   return `<!doctype html>
@@ -210,6 +210,7 @@ ${canonical !== undefined ? `<link rel="canonical" href="${SITE_URL}${canonical}
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="${root}images/icon-dark.svg" type="image/svg+xml">
 <link rel="stylesheet" href="${root}assets/styles.css">
+<link rel="alternate" type="application/rss+xml" title="Haze blog" href="${SITE_URL}feed.xml">
 </head>
 <body class="${wide ? "play-page" : ""}">
 <header class="nav"><div class="wrap">
@@ -241,6 +242,7 @@ function footer(root) {
     <li><a href="${root}docs/reference/">Language reference</a></li><li><a href="${root}docs/faq/">FAQ</a></li></ul></div>
   <div><h4>Project</h4><ul>
     <li><a href="${GITHUB}">GitHub</a></li><li><a href="${GITHUB}/releases">Releases</a></li>
+    <li><a href="${root}blog/">Blog</a></li>
     <li><a href="${GITHUB}/blob/main/CONTRIBUTING.md">Contributing</a></li><li><a href="${GITHUB}/issues">Issues</a></li></ul></div>
 </div></footer>`;
 }
@@ -426,6 +428,62 @@ page("docs", layout({ root: "../", path: "docs/", canonical: "docs/", title: "Do
   ${DOC_SECTIONS.map(([section, pages]) => `<section><h2>${section}</h2><div class="doc-cards">${pages.map(([id]) => { const d = rendered.find((x) => x.id === id); return `<a class="doc-card" href="${id}/"><strong>${esc(d.label)}</strong><span>${esc(d.summary)}</span></a>`; }).join("")}</div></section>`).join("")}
   </div>` }));
 
+// ---- blog --------------------------------------------------------------------------------
+// Each post is site/content/blog/SLUG.md: a front matter block (title, date, author, summary and
+// optionally an order for posts on the same day), then the post in Markdown, starting with `# Title`.
+function frontMatter(src, file) {
+  const m = src.match(/^---\n([\s\S]*?)\n---\n/);
+  if (!m) throw new Error(`${file}: a blog post must start with a front matter block`);
+  const meta = {};
+  for (const line of m[1].split("\n")) {
+    const kv = line.match(/^(\w+):\s*(.*)$/);
+    if (kv) meta[kv[1]] = kv[2];
+  }
+  for (const k of ["title", "date", "author", "summary"]) if (!meta[k]) throw new Error(`${file}: missing ${k}`);
+  return { meta, body: src.slice(m[0].length) };
+}
+const BLOG_DIR = join(SITE, "content", "blog");
+const dayMonthYear = (d) => new Date(`${d}T12:00:00Z`).toLocaleDateString("en-GB", { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" });
+const POSTS = (existsSync(BLOG_DIR) ? readdirSync(BLOG_DIR).filter((f) => f.endsWith(".md")) : []).map((f) => {
+  const { meta, body } = frontMatter(read(join(BLOG_DIR, f)), f);
+  return { slug: f.replace(/\.md$/, ""), file: `site/content/blog/${f}`, ...meta, ...renderDoc(body, `site/content/blog/${f}`) };
+}).sort((a, b) => b.date.localeCompare(a.date) || (Number(a.order ?? 0) - Number(b.order ?? 0)));
+
+// Posts use the documentation layout: the list of posts on the left, the post in the middle and its
+// sections on the right.
+function blogNav(root, current) {
+  return `<div class="docs-section"><h4>Blog</h4>` +
+    POSTS.map((q) => `<a href="${root}blog/${q.slug}/"${q.slug === current ? ' class="active" aria-current="page"' : ""}>${esc(q.title)}</a>`).join("") + "</div>" +
+    `<div class="docs-section"><h4>Haze</h4><a href="${root}docs/">Documentation</a><a href="${root}play/">Playground</a><a href="${GITHUB}/tree/main/examples/Found">Models from these posts</a></div>`;
+}
+for (const [i, p] of POSTS.entries()) {
+  const root = "../../";
+  const newer = POSTS[i - 1], older = POSTS[i + 1];
+  const toc = p.headings.length > 1 ? `<aside class="doc-toc" aria-label="On this page"><h4>On this page</h4>${p.headings.map(([hid, t]) => `<a href="#${hid}">${esc(t)}</a>`).join("")}</aside>` : "<aside class=\"doc-toc\"></aside>";
+  const foot = `<nav class="doc-pager" aria-label="Older and newer posts">
+    ${older ? `<a href="${root}blog/${older.slug}/"><span>Older</span>${esc(older.title)}</a>` : "<span></span>"}
+    ${newer ? `<a class="next" href="${root}blog/${newer.slug}/"><span>Newer</span>${esc(newer.title)}</a>` : "<span></span>"}</nav>
+    <p class="doc-meta"><a href="${GITHUB}/edit/main/${p.file}">Edit this post on GitHub</a></p>`;
+  page(`blog/${p.slug}`, layout({ root, path: "blog/", canonical: `blog/${p.slug}/`, title: `${p.title} · Haze`, script: "docs", description: p.summary,
+    body: `<div class="wrap docs"><nav class="docs-nav" aria-label="Posts">${blogNav(root, p.slug)}</nav>
+<article class="prose"><div class="eyebrow">Blog</div><h1>${esc(p.title)}</h1>
+<p class="post-meta">${esc(p.author)}, ${dayMonthYear(p.date)}</p>
+<p class="lede">${esc(p.summary)}</p>
+${p.html.replaceAll("@ROOT@", root)}${foot}</article>${toc}</div>` }));
+}
+page("blog", layout({ root: "../", path: "blog/", canonical: "blog/", title: "Blog · Haze", script: "docs",
+  description: "Write-ups of bugs found with Haze in open-source libraries, and notes on how the models work.",
+  body: `<div class="wrap docs-home"><h1>Blog</h1>
+  <p class="lede">Write-ups of bugs found with Haze in open-source libraries, and notes on how the models work. There's also an <a href="${SITE_URL}feed.xml">RSS feed</a>.</p>
+  <ol class="post-index">${POSTS.map((p) => `<li><time datetime="${p.date}">${p.date}</time><div><a href="${p.slug}/">${esc(p.title)}</a><p>${esc(p.summary)}</p></div></li>`).join("")}</ol>
+  </div>` }));const xml = (s) => esc(s).replace(/'/g, "&apos;");
+writeFileSync(join(DIST, "feed.xml"), `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel>
+<title>Haze blog</title><link>${SITE_URL}blog/</link><description>Notes from building Haze, a language for checking software that fails some of the time.</description>
+<language>en</language><atom:link href="${SITE_URL}feed.xml" rel="self" type="application/rss+xml"/>
+${POSTS.map((p) => `<item><title>${xml(p.title)}</title><link>${SITE_URL}blog/${p.slug}/</link><guid>${SITE_URL}blog/${p.slug}/</guid><pubDate>${new Date(`${p.date}T12:00:00Z`).toUTCString()}</pubDate><description>${xml(p.summary)}</description></item>`).join("\n")}
+</channel></rss>
+`);
 cpSync(join(SITE, "styles.css"), join(DIST, "assets", "styles.css"));
 mkdirSync(join(DIST, "images"), { recursive: true });
 for (const f of ["icon-dark.svg", "icon-light.svg", "logo-dark.svg", "logo-light.svg", "logo-dark.png", "social-preview.png"]) cpSync(join(REPO, "docs", "images", f), join(DIST, "images", f));
@@ -436,7 +494,7 @@ writeFileSync(join(DIST, ".nojekyll"), "");
 writeFileSync(join(DIST, "404.html"), layout({ root: "/", path: "", title: "Page not found · Haze", script: "docs",
   description: "This page doesn't exist.",
   body: `<div class="wrap" style="padding:80px 0"><h1>Page not found</h1><p class="lede">There's no page at this address. Try the <a href="/">home page</a>, the <a href="/docs/">documentation</a> or the <a href="/play/">playground</a>.</p></div>` }));
-const pages = ["", "play/", "tour/", "gallery/", "docs/", ...DOCS.map((d) => `docs/${d.id}/`)];
+const pages = ["", "play/", "tour/", "gallery/", "docs/", ...DOCS.map((d) => `docs/${d.id}/`), "blog/", ...POSTS.map((p) => `blog/${p.slug}/`)];
 writeFileSync(join(DIST, "sitemap.xml"), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${pages.map((u) => `  <url><loc>${SITE_URL}${u}</loc></url>`).join("\n")}\n</urlset>\n`);
 writeFileSync(join(DIST, "robots.txt"), `User-agent: *\nAllow: /\nSitemap: ${SITE_URL}sitemap.xml\n`);
 
@@ -451,7 +509,7 @@ await build({
 });
 rmSync(tmp, { recursive: true, force: true });
 const size = (d) => readdirSync(d, { withFileTypes: true }).reduce((n, e) => n + (e.isDirectory() ? size(join(d, e.name)) : readFileSync(join(d, e.name)).length), 0);
-console.log(`built site/dist (${(size(DIST) / 1e6).toFixed(1)} MB): ${PRESETS.length} presets, ${TOUR.length} tour chapters, ${GALLERY.length} examples, ${DOCS.length} docs`);
+console.log(`built site/dist (${(size(DIST) / 1e6).toFixed(1)} MB): ${PRESETS.length} presets, ${TOUR.length} tour chapters, ${GALLERY.length} examples, ${DOCS.length} docs, ${POSTS.length} posts`);
 
 // ---- serve -------------------------------------------------------------------------------
 if (process.argv.includes("--serve")) {

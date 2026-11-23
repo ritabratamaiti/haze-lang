@@ -1,0 +1,28 @@
+examples/Found/pybreaker.hz:116:1: info: theorem one_trial_call
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · 7 reachable states
+  theorem accepted
+examples/Found/pybreaker.hz:117:1: error: theorem one_trial_calling
+  probability 0 · fails with certainty
+  grade prob · 1 parameter assignment(s) · 50 reachable states
+  theorem rejected: belief is 0, not 1
+  counterexample at step 5 (path mass 0.00001, degree 0):
+    state: v = Unlocked, st = HalfOpen, timeout_ok = true, c = 0, h = 2, oc = 0, oh = 0
+examples/Found/pybreaker.hz:118:1: info: theorem one_trial_fixed
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · 22 reachable states
+  theorem accepted
+examples/Found/pybreaker.hz:122:1: info: theorem stays_open_call
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · 7 reachable states
+  theorem accepted
+examples/Found/pybreaker.hz:123:1: error: theorem stays_open_calling
+  probability 0 · fails with certainty
+  grade prob · 1 parameter assignment(s) · 92 reachable states
+  theorem rejected: belief is 0, not 1
+  counterexample at step 7 (path mass ≈1e-7 (=1/10000000), degree 0):
+    state: v = Unlocked, st = Closed, timeout_ok = false, c = 0, h = 0, oc = 0, oh = 0, early_close = true
+examples/Found/pybreaker.hz:124:1: info: theorem stays_open_fixed
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · 22 reachable states
+  theorem accepted

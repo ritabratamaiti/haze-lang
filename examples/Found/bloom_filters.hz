@@ -1,0 +1,65 @@
+-- bloom-filters (npm), PartitionedBloomFilter: why the false positive rate has a floor.
+--
+-- What the code does. Line numbers are for master at e2882ef (src/) and for the published
+-- 3.0.4 build (dist/); the logic is the same in both.
+--
+--   add / has        partitioned-bloom-filter.ts:127-164     dist/bloom/partitioned-bloom-filter.js:200-226
+--     indexes = getIndexes(element, m, k, seed); slice i checks or sets bit indexes[i].
+--   getIndexes       hashing.ts:45-60                        dist/hashing/hashing.js:104-114
+--     (a, b) = hashTwice(element, seed); indexes[i] = doubleHashing(i, a, b, m) for i < k.
+--     Hashes once, no de-duplication, no retry loop (that is getDistinctIndexes, not used here).
+--   hashTwice        hashing.ts:87-95                        dist/hashing/hashing.js:139-147
+--     a = xxh64(element, seed + 1), b = xxh64(element, seed + 2). One seed for all slices.
+--     3.0.4 keeps the low 32 bits (xxhashjs UINT64.toNumber); master keeps all 64 as a BigInt.
+--   doubleHashing    hashing.ts:23-33                        dist/hashing/hashing.js:48-50
+--     3.0.4:  (a + i*b + floor((i^3 - i) / 6)) mod m
+--     master: (a + i*b + i^3 - floor(i / 6)) mod m
+--     Either way the last term c(i) depends only on the slice number i.
+--   create(n, P)     partitioned-bloom-filter.ts:61-73       dist/bloom/partitioned-bloom-filter.js:67-82,136-141
+--     k = ceil(log2(1/P)) slices of m = ceil(n * ln(1/P) / ln(2)^2 / k) bits.
+--
+-- Abstraction. a and b are only ever used modulo m, so a key is modelled by its two residues,
+-- each uniform on 0..m-1 (32 or 64 hash bits against m in the thousands). The real slice sizes
+-- are even (1370, 1438, 14096), so the model uses an even m. m = 6 and k = 4 keep it small.
+
+def m : Num := 6
+def k : Num := 4
+
+def mod_m(x : Num) : Num := x - m * floor(x / m)
+def c(i : Num) : Num := floor((i * i * i - i) / 6)
+def index(a : Num, b : Num, i : Num) : Num := mod_m(a + i * b + c(i))
+
+-- Two stored keys and one query that was never added.
+input a1 : Num ~ uniform(0, m - 1)
+input b1 : Num ~ uniform(0, m - 1)
+input a2 : Num ~ uniform(0, m - 1)
+input b2 : Num ~ uniform(0, m - 1)
+input qa : Num ~ uniform(0, m - 1)
+input qb : Num ~ uniform(0, m - 1)
+
+-- has(query) is true when, in every slice, a stored key set the query's bit.
+def hit(i : Num) : Bool := let q := index(qa, qb, i) in q == index(a1, b1, i) or q == index(a2, b2, i)
+def fp_shipped() : Bool := forall i in 0..k - 1, hit(i)
+
+-- 1. The mechanism. A query lands on a stored key's bit in every slice exactly when its two
+--    hash residues equal that key's: slices 0 and 1 already force it, and c(i) cancels.
+theorem all_slices_iff_same_hashes :
+  (forall i in 0..k - 1, index(qa, qb, i) == index(a1, b1, i)) == (qa == a1 and qb == b1)
+
+#prob forall i in 0..k - 1, index(qa, qb, i) == index(a1, b1, i)   -- 1/m^2, not (1/m)^k
+
+-- 2. So every query that shares both residues with a stored key is a false positive, however
+--    many slices there are, and P(false positive) >= 1 - (1 - 1/m^2)^n.
+theorem shared_hashes_always_hit : (qa == a1 and qb == b1) implies fp_shipped()
+
+#prob (qa == a1 and qb == b1) or (qa == a2 and qb == b2)
+
+-- 3. The fix: give each slice its own hash (a per-slice seed, say). Each key then gets a fresh
+--    uniform index in every slice, and the slices are independent.
+def fresh_index() : Num := uniform(0, m - 1)
+def hit_fixed() : Bool := let q := fresh_index() in q == fresh_index() or q == fresh_index()
+def fp_fixed : Bool := forall i in 0..k - 1, hit_fixed()
+
+-- 4. What create() promises: the textbook rate (1 - (1 - 1/m)^n)^k, here (11/36)^4.
+claim fixed_meets_textbook_rate : fp_fixed with prob <= 14641/1679616
+claim shipped_meets_textbook_rate : fp_shipped() with prob <= 14641/1679616

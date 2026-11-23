@@ -1,0 +1,32 @@
+examples/Found/go_retry.hz:46:1: info: theorem readme_stops_after_5th_attempt
+  probability 1 · proved
+  grade crisp · 1 parameter assignment(s) · ≤1 states/step
+  theorem accepted
+examples/Found/go_retry.hz:47:1: error: theorem readme_worst_case_7s
+  probability 0 · refuted
+  grade crisp · 1 parameter assignment(s) · ≤1 states/step
+  theorem rejected: belief is 0, not 1
+  counterexample at step 5 (path mass 1, degree 0):
+    state: docs = false, max_retries = 4, cap = 1000, s0 = 3, s1 = 5, retries = 4, stopped = true, last_wait = 5, total_wait = 11
+examples/Found/go_retry.hz:48:1: info: theorem readme_worst_case_7s_docs
+  probability 1 · proved
+  grade crisp · 1 parameter assignment(s) · ≤1 states/step
+  theorem accepted
+examples/Found/go_retry.hz:49:1: info: #eval Retry(false, 4, 1000) |= after[5] total_wait
+  11
+examples/Found/go_retry.hz:52:1: error: theorem second_wait_is_1s
+  probability 0 · refuted
+  grade crisp · 1 parameter assignment(s) · ≤1 states/step
+  theorem rejected: belief is 0, not 1
+  counterexample at step 2 (path mass 1, degree 0):
+    state: docs = false, max_retries = 10, cap = 1000, s0 = 1, s1 = 2, retries = 2, stopped = false, last_wait = 2
+examples/Found/go_retry.hz:55:1: error: theorem capped_second_wait_is_1s
+  probability 0 · refuted
+  grade crisp · 1 parameter assignment(s) · ≤1 states/step
+  theorem rejected: belief is 0, not 1
+  counterexample at step 2 (path mass 1, degree 0):
+    state: docs = false, max_retries = 10, cap = 2, s0 = 1, s1 = 2, retries = 2, stopped = false, last_wait = 2
+examples/Found/go_retry.hz:58:1: info: #eval Retry(true, 10, 1000) |= after[11] total_wait
+  143
+examples/Found/go_retry.hz:59:1: info: #eval Retry(false, 10, 1000) |= after[11] total_wait
+  231
