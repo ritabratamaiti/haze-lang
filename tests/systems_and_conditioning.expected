@@ -37,7 +37,19 @@ tests/systems_and_conditioning.hz:89:1: info: #expect Chain |= after[2] t
   expectation 1.25
 tests/systems_and_conditioning.hz:90:1: info: #prob Chain |= after[2] t == 2
   probability 0.25
-tests/systems_and_conditioning.hz:99:1: error: claim rarely_two
+tests/systems_and_conditioning.hz:106:1: info: theorem sliced_num
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · ≤1 states/step
+  theorem accepted
+tests/systems_and_conditioning.hz:107:1: error: theorem sliced_bool
+  probability 0.125 · graded
+  grade prob · 1 parameter assignment(s) · ≤1 states/step
+  theorem rejected: belief is 0.125, not 1
+  counterexample at step 1 (path mass 0.5, degree 0):
+    state: b = true
+tests/systems_and_conditioning.hz:108:1: info: #prob Sliced |= after[3] trial == 3
+  probability 0.125
+tests/systems_and_conditioning.hz:117:1: error: claim rarely_two
   belief 0.01 · plausibility 0.185 · graded
   grade prob+fuzzy · 2 parameter assignment(s) · ≤3 states/step
   bound fails: plausibility 0.185 > 0.1
@@ -47,7 +59,7 @@ tests/systems_and_conditioning.hz:99:1: error: claim rarely_two
   a run where it happens, at step 2 (path mass 0.36):
     parameters: q = 0.6
     state: heads = 2
-tests/systems_and_conditioning.hz:106:1: info: #prob both
+tests/systems_and_conditioning.hz:124:1: info: #prob both
   belief 0.07 · plausibility 0.14
   by fuzzy parameter (π = possibility), 9 assignments:
     lowest          a1 = 0.1, a2 = 0.4  π 0.5     0.04

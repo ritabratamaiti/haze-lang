@@ -385,19 +385,38 @@ def coneOfInfluence (si : SysInfo) (body : Expr) : Array Bool := Id.run do
         work := deps[i]! ++ work
   return seen
 
+/-- Whether running `st` can matter to a property: it assigns, asserts or calls a function. -/
+partial def hasEffect : Stmt → Bool
+  | .skip => false
+  | .assign .. | .assert _ => true
+  | .seq a b => hasEffect a || hasEffect b
+  | .ite c a b | .choose c a b => hasCall c || hasEffect a || hasEffect b
+  | .matchS s arms d => hasCall s || arms.any (hasEffect ·.2) || hasEffect d
+  | .letS v b _ => hasCall v || hasEffect b
+
 /--
 Removes assignments to the state variables that `relevant` doesn't mark. Those variables then keep
-their initial values, which nothing reads.
+a placeholder value, so nothing may read them: conditionals left with no effect are removed, and a
+local variable computed from them gets a constant instead. Nothing that remains can use that local,
+since anything that did would put those variables in the cone of influence.
 -/
-partial def sliceStep (relevant : Array Bool) : Stmt → Stmt
-  | .assign i e => if relevant[i]?.getD true then .assign i e else .skip
-  | .seq a b => .seq (sliceStep relevant a) (sliceStep relevant b)
-  | .ite c a b => .ite c (sliceStep relevant a) (sliceStep relevant b)
-  | .choose c a b => .choose c (sliceStep relevant a) (sliceStep relevant b)
-  | .matchS sc arms d =>
-    .matchS sc (arms.map fun (k, b) => (k, sliceStep relevant b)) (sliceStep relevant d)
-  | .letS v b n => .letS v (sliceStep relevant b) n
-  | st => st
+partial def sliceStep (relevant : Array Bool) : Stmt → Stmt :=
+  go []
+where
+  go (locals : List (List Nat)) (st : Stmt) : Stmt :=
+    let prune (st : Stmt) : Stmt := if hasEffect st then st else .skip
+    match st with
+    | .assign i e => if relevant[i]?.getD true then .assign i e else .skip
+    | .seq a b => .seq (go locals a) (go locals b)
+    | .ite c a b => prune (.ite c (go locals a) (go locals b))
+    | .choose c a b => prune (.choose c (go locals a) (go locals b))
+    | .matchS sc arms d => prune (.matchS sc (arms.map fun (k, b) => (k, go locals b)) (go locals d))
+    | .letS v b n =>
+      let d := exprVars locals v
+      let b := go (d :: locals) b
+      let v := if !hasCall v && d.any (!relevant[·]?.getD true) then .lit (.bool false) else v
+      prune (.letS v b n)
+    | st => st
 
 /--
 Replaces the value of every irrelevant global variable in each world by `Res.stuck`, and merges
