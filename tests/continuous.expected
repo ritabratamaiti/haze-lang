@@ -24,7 +24,7 @@ tests/continuous.hz:26:1: info: #prob Retry |= after[1] phase == Done given trie
     all values  p in [0.01, 0.05]  0.95 to 0.99
 tests/continuous.hz:27:1: info: claim retry_ok
   belief ≈0.999943 · plausibility ≈0.999997 · graded
-  grade prob+fuzzy · 10 possibility levels · 80 checks · 7 reachable states
+  grade prob+fuzzy · 10 possibility levels · 83 checks · 7 reachable states
   10 possibility levels: the exact belief is at most ≈0.999955, the exact plausibility at least ≈0.999996 (more with `levels N`)
   at the most possible values, p = 0.02: 0.999992
   bound holds: belief ≥ 0.9999
@@ -34,7 +34,7 @@ tests/continuous.hz:27:1: info: claim retry_ok
     all values  p in [0.01, 0.05]  0.999875 to 0.999999
 tests/continuous.hz:28:1: error: claim retry_tight
   belief ≈0.999943 · plausibility ≈0.999997 · graded
-  grade prob+fuzzy · 10 possibility levels · 80 checks · 7 reachable states
+  grade prob+fuzzy · 10 possibility levels · 83 checks · 7 reachable states
   10 possibility levels: the exact belief is at most ≈0.999955, the exact plausibility at least ≈0.999996 (more with `levels N`)
   at the most possible values, p = 0.02: 0.999992
   bound fails: belief ≈0.999943 < 0.99995
@@ -66,15 +66,16 @@ tests/continuous.hz:49:1: info: #prob ok_mix
   belief 0.26395 · plausibility 0.61425
   10 possibility levels: the exact belief is at most 0.29145, the exact plausibility at least 0.59175 (more with `levels N`)
   at the most possible values, q = 0.1, w = 0.5: 0.45
-  at the most possible values, q = 0.3, w = 0.5: 0.35
   by possibility level (lowest to highest over the values at least that possible):
-    π ≥ 0.9  q = 0.1, w in [0.385, 0.615]   0.3465 to 0.5535
-    π ≥ 0.5  q = 0.1, w in [0.325, 0.675]   0.2925 to 0.6075
-    all values  q = 0.1, w in [0.25, 0.75]  0.225 to 0.675
-    all values  q = 0.3, w in [0.25, 0.75]  0.175 to 0.525
+    π ≥ 0.9  w in [0.385, 0.615]   0.3465 to 0.5535
+    π ≥ 0.5  w in [0.325, 0.675]   0.2925 to 0.6075
+    all values  w in [0.25, 0.75]  0.175 to 0.675
+  what moves the result most (each parameter varied alone, the others at their most possible values):
+    w: 0.25 → 0.675, 0.5 → 0.45, 0.75 → 0.225  (range 0.45)
+    q: 0.1 → 0.45, 0.3 → 0.35  (range 0.1)
 tests/continuous.hz:56:1: info: theorem cmp_cases
   probability 1 · holds with certainty
-  grade fuzzy · 10 possibility levels · 90 checks · ≤3 states/step
+  grade fuzzy · 10 possibility levels · 93 checks · ≤3 states/step
   at the most possible values, w = 0.5: 1
   theorem accepted
   by possibility level (lowest to highest over the values at least that possible):
@@ -91,7 +92,7 @@ tests/continuous.hz:57:1: info: #prob Cmp |= after[1] x == 2
     all values  w in [0.25, 0.75]  0 to 1
 tests/continuous.hz:61:1: error: claim deg_low
   belief 0.3175 · plausibility 0.6825 · graded
-  grade fuzzy · 10 possibility levels · 60 checks · 1 reachable states
+  grade fuzzy · 10 possibility levels · 63 checks · 1 reachable states
   10 possibility levels: the exact belief is at most 0.3425, the exact plausibility at least 0.6575 (more with `levels N`)
   at the most possible values, w = 0.5: 0.5
   bound fails: plausibility 0.6825 > 0.1

@@ -58,6 +58,7 @@ function check(src, { native = false } = {}) {
 
 // ---- content -----------------------------------------------------------------------------
 const PRESETS = [
+  ["proof-checkers", "Five proof checkers", "If an AI gamed the checkers with a false proof, how likely is it to get past Lean's kernel, lean4lean, nanoda, con-leche and con-ron? The checkers that share code share bugs, and Haze shows which assumption matters most."],
   ["retry-bug", "Retry bug: a double charge", "A payment client retries when a message is lost. Haze rejects \"never charged twice\" and shows the run where it happens."],
   ["rough-numbers", "Rough numbers", "The loss rate is only known roughly, so the model lists the values it might have. The answer is a range: how strongly what you know guarantees the property, and how strongly it allows it."],
   ["forever", "Runs of any length: craps", "The game can last any number of rolls, and Haze still gets the exact answer: 244/495."],
@@ -93,6 +94,7 @@ const EXAMPLES = [
   ["examples/quorum_replication.hz", "Software", "Quorum replication", "Reads see the latest write when R + W > N, and can be stale when R = 1."],
   ["examples/circuit_breaker.hz", "Software", "Circuit breaker", "A circuit breaker's invariants, how fast it trips, and how much load it sheds."],
   ["examples/canary_rollout.hz", "Software", "Canary rollout", "Whether a defective build can reach all traffic during a staged rollout."],
+  ["examples/Gallery/proof_checkers.hz", "Formal verification", "Trusting a proof checked by five kernels", "How likely a false proof is to pass several Lean proof checkers, when ports share bugs and one kernel is formally verified."],
   ["examples/Gallery/learned_rates.hz", "Software", "Retry budgets from logs", "How many retries a client needs when one failure rate is learned from logs and another is a rough guess."],
   ["examples/incident_triage.hz", "Operations", "Incident triage", "The likely root cause of an incident, given which alerts fired."],
   ["examples/Conformance/payments/payments.hz", "Testing", "A specification for real code", "The model a Python client is tested against, with tests ranked by probability."],

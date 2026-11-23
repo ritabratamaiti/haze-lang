@@ -181,7 +181,9 @@ make 256 combinations, and each one is a separate model check, run in parallel a
 processor's cores.
 
 Continuous parameters don't add combinations. They are searched together, one range of values per
-level.
+level. When there is more than one parameter, the output also ranks them by how much the
+result moves when each one is varied alone over its range, with the others at their most possible
+values. [`proof_checkers.hz`](../examples/Gallery/proof_checkers.hz) is an example.
 
 With more than six combinations, the output shows a summary and ranks the parameters by how much
 each one moves the result on its own (see [Reading results](Reading-Results.md#results-by-parameter-value)).

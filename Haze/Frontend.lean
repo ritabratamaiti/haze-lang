@@ -469,14 +469,17 @@ def continuousNotes (env : Env) (r : Continuous.Result) : List String :=
      s!"the exact plausibility at least {fmtQ (qmin r.outer.pl r.inner.pl)} (more with `levels N`)"]
   let search := if r.closed then [] else
     ["some ranges of parameter values weren't narrowed down fully, so those bounds are cautious"]
-  let core := r.core.map fun (a, _, c) => s!"at the most possible values, {fmtAssignIn env a}: {fmtRange c.lo c.hi}"
+  let top := r.core.foldl (fun m (_, π, _) => qmax m π) 0
+  let core := (r.core.filter (·.2.1 == top)).take 1 |>.map fun (a, _, c) =>
+    s!"at the most possible values, {fmtAssignIn env a}: {fmtRange c.lo c.hi}"
   bracket ++ search ++ core
 
 /--
 The results by possibility level: over the values at least that possible, the lowest and highest
-result. Shows the narrowest and widest cut and one in the middle.
+result, combined over the listed parameters' values. Shows the narrowest and widest cut and one in
+the middle, and then how much the result moves when each parameter is varied alone.
 -/
-def continuousTable (env : Env) (r : Continuous.Result) : List String := Id.run do
+def continuousTable (r : Continuous.Result) (cps : Array Continuous.CParam) : List String := Id.run do
   let rows := r.bottoms.zip r.rows
   let levels := (r.bottoms.eraseDups.mergeSort fun a b => b ≤ a)
   let some hiL := levels.head? | return []
@@ -484,12 +487,23 @@ def continuousTable (env : Env) (r : Continuous.Result) : List String := Id.run 
   let mid := levels.foldl (fun b l => if (l - 1/2).abs < (b - 1/2).abs then l else b) hiL
   let shown := [hiL, mid, loL].eraseDups
   let label := fun (n : Rat) => if n == 0 then "all values" else s!"π ≥ {fmtQ n}"
-  let picked := rows.filter fun (n, _) => shown.contains n
-  let picked := picked.mergeSort fun a b => b.1 ≤ a.1
-  let w := picked.foldl (fun m (n, x) => max m ((label n).length + 2 + (fmtAssignIn env x.assign).length)) 0
-  return "by possibility level (lowest to highest over the values at least that possible):" ::
-    (picked.take 12).map fun (n, x) =>
-      s!"  {padRight s!"{label n}  {fmtAssignIn env x.assign}" w}  {fmtRange x.lo x.hi}"
+  let lines := shown.filterMap fun n =>
+    let here := rows.filter (·.1 == n)
+    match here with
+    | [] => none
+    | (_, x0) :: _ =>
+      let lo := here.foldl (fun m (_, x) => qmin m x.lo) x0.lo
+      let hi := here.foldl (fun m (_, x) => qmax m x.hi) x0.hi
+      let ranges := ", ".intercalate (cps.toList.filterMap fun c =>
+        (x0.assign.lookup c.name).map fun v => s!"{c.name} {match v with | .ival .. => s!"in {fmtValue {} v}" | _ => s!"= {fmtValue {} v}"}")
+      some (s!"{label n}  {ranges}", fmtRange lo hi)
+  let w := lines.foldl (fun m (a, _) => max m a.length) 0
+  let moving := r.effects.filter (·.2.2 != 0)
+  let effects := if moving.length ≤ 1 then [] else
+    "what moves the result most (each parameter varied alone, the others at their most possible values):" ::
+      moving.map fun (n, desc, width) => s!"  {n}: {desc}  (range {Continuous.brief width})"
+  return ("by possibility level (lowest to highest over the values at least that possible):" ::
+    lines.map fun (a, b) => s!"  {padRight a w}  {b}") ++ effects
 
 /--
 Checks a claim or theorem and reports the result. If it is rejected, the report includes a
@@ -533,7 +547,7 @@ def doClaim (d : DeclStx) (name : String) (isThm : Bool) (spec : PropSpec) (boun
           | .ok (_, w) => w
           | .error _ => none
         pure (.ok (r.rows, wit, r.outer, low, high,
-          continuousNotes env r ++ solverNotes r.rows s.opts.states, continuousTable env r,
+          continuousNotes env r ++ solverNotes r.rows s.opts.states, continuousTable r cps,
           s!"{r.levels} possibility levels · {r.checks} checks"))
   match outcome with
   | .error e => emit d.pos "error" e
@@ -710,7 +724,7 @@ def doQuery (d : DeclStx) (k : QueryKind) (spec : PropSpec) : FM Unit := do
       | .error e => emit d.pos "error" e
       | .ok r =>
         emit d.pos "info" s!"{d.text}{indent ([fmtInterval r.outer] ++ continuousNotes env r ++
-            solverNotes r.rows s.opts.states ++ continuousTable env r)}"
+            solverNotes r.rows s.opts.states ++ continuousTable r cps)}"
           ([("kind", .str "prob"), ("query", .str d.text)] ++ jsonInterval r.outer ++
             [("exact_belief_at_most", Json.rat (qmax r.outer.bel r.inner.bel)),
              ("exact_plausibility_at_least", Json.rat (qmin r.outer.pl r.inner.pl)),

@@ -1,0 +1,98 @@
+-- How likely is a false proof to get past five proof checkers?
+--
+-- On November 20, 2026, Levent Alpöge released a proof of the Riemann Hypothesis as a Lean
+-- library of 17 million lines, written with Claude. The Lean and Mathlib communities checked it
+-- and certified it (https://leanprover-community.github.io/blog/posts/riemann-hypothesis/). The
+-- export was accepted by Lean's own kernel, by lean4lean, by nanoda, by con-leche and by con-ron
+-- (https://math.mit.edu/~drew/grh/).
+--
+-- Those checkers aren't independent in the same way:
+--
+-- * lean4lean handles inductive types with a port of Lean's kernel, and it shared the kernel bug
+--   found in July 2026. That bug came to light through an AI-assisted "disproof" of the Collatz
+--   conjecture that also exploited a second, unrelated bug in an older nanoda, so a single proof
+--   term fooled two kernels at once
+--   (https://leodemoura.github.io/blog/2026-8-1-postmortem-for-kernel-soundness-bug-14576/).
+-- * nanoda is an independent kernel written in Rust.
+-- * con-leche comes with a formal proof, relative to set theory, that it can't accept a false
+--   proof. con-ron is its Rust port.
+--
+-- The question here: if a proof were wrong, and the AI that wrote it had searched for a way to
+-- get it past the checkers, how likely is it that every checker accepts it? This is not the
+-- chance that the Riemann Hypothesis proof is wrong. The numbers below are judgment calls,
+-- written as ranges, and the model shows how they combine and which one matters most.
+
+-- An unchecked kernel has an exploitable soundness bug at the time of checking. In 2026 Lean's
+-- kernel had the July bug, and an AI-assisted review then found six more, all now fixed.
+param p_bug : Num ~= tri(0.05, 0.25, 0.6)
+-- A formally verified kernel has a bug that its proof doesn't cover, such as a gap between what
+-- was proved and the code that runs.
+param p_gap : Num ~= tri(0.001, 0.01, 0.05)
+-- A determined search finds a proof term that exploits a bug, when there is one.
+param find : Num ~= tri(0.1, 0.5, 0.9)
+-- Each extra bug the same proof term has to exploit at once multiplies that chance by this.
+param harder : Num ~= {0.05: 0.5, 0.2: 1, 0.5: 0.4}
+-- A port inherits the bug of the kernel it was ported from.
+param share : Num ~= {0.5: 0.4, 0.9: 1, 1: 0.6}
+
+enum Checker = LeanKernel | Lean4Lean | Nanoda | ConLeche | ConRon | Done
+
+-- x to the power n, for the at most five bugs a proof term can need
+def pw(x : Num, n : Num) : Num :=
+  if n <= 0 then 1 else if n == 1 then x else if n == 2 then x * x else if n == 3 then x * x * x else x * x * x * x
+
+-- Runs the first `checkers` checkers in turn. `bugs` counts the separate bugs a proof term needs
+-- to fool every checker so far; a port that inherits a bug needs no new one.
+system Pipeline(checkers : Num) {
+  var at : Checker := LeanKernel
+  var passed : Num := 0
+  var fooled : Bool := true
+  var bugs : Num := 0
+  var exploited : Bool := false
+  var tried : Bool := false
+  step {
+    if passed >= checkers or not fooled { at := Done }
+    match at {
+      LeanKernel => {
+        if flip(p_bug) { bugs := bugs + 1 } else { fooled := false }
+        passed := passed + 1
+        at := Lean4Lean
+      }
+      Lean4Lean => {
+        if not flip(share) { if flip(p_bug) { bugs := bugs + 1 } else { fooled := false } }
+        passed := passed + 1
+        at := Nanoda
+      }
+      Nanoda => {
+        if flip(p_bug) { bugs := bugs + 1 } else { fooled := false }
+        passed := passed + 1
+        at := ConLeche
+      }
+      ConLeche => {
+        if flip(p_gap) { bugs := bugs + 1 } else { fooled := false }
+        passed := passed + 1
+        at := ConRon
+      }
+      ConRon => {
+        if not flip(share) { if flip(p_gap) { bugs := bugs + 1 } else { fooled := false } }
+        passed := passed + 1
+        at := Done
+      }
+      Done => {
+        if fooled and not tried { exploited := flip(find * pw(harder, bugs - 1)) }
+        tried := true
+      }
+    }
+  }
+}
+
+-- Lean's kernel alone, then each checker added in turn.
+#prob Pipeline(1) |= eventually exploited
+#prob Pipeline(2) |= eventually exploited
+#prob Pipeline(3) |= eventually exploited
+#prob Pipeline(4) |= eventually exploited
+#prob Pipeline(5) |= eventually exploited
+
+-- One kernel isn't enough to keep the risk under 1%, even on the hopeful side; five are.
+claim one_kernel : Pipeline(1) |= eventually exploited with prob <= 0.01
+claim five_kernels : Pipeline(5) |= eventually exploited with prob <= 0.01

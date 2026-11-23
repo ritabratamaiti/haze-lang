@@ -1,6 +1,6 @@
 examples/Gallery/learned_rates.hz:39:1: error: claim three_attempts
   belief ≈0.998931 · plausibility ≈0.999911 · graded
-  grade prob+fuzzy · 14 possibility levels · 168 checks · 7 reachable states
+  grade prob+fuzzy · 14 possibility levels · 174 checks · 7 reachable states
   14 possibility levels: the exact belief is at most ≈0.999134, the exact plausibility at least ≈0.999885 (more with `levels N`)
   at the most possible values, timeout = 0.003, same_replica = 0.3: ≈0.999726
   bound fails: belief ≈0.998931 < 0.999
@@ -8,12 +8,15 @@ examples/Gallery/learned_rates.hz:39:1: error: claim three_attempts
     π ≥ 0.9  timeout in [≈0.00262, ≈0.003415], same_replica in [0.28, 0.33]  ≈0.999623 to ≈0.999792
     π ≥ 0.5  timeout in [≈0.002093, ≈0.004136], same_replica in [0.2, 0.45]  ≈0.999154 to ≈0.999915
     all values  timeout in [0, 1], same_replica in [0.1, 0.6]                0 to 1
+  what moves the result most (each parameter varied alone, the others at their most possible values):
+    same_replica: 0.1 → ≈0.999968, 0.3 → ≈0.999726, 0.6 → ≈0.998916  (range ≈0.001053)
+    timeout: ≈0.001077 → ≈0.999903, 0.003 → ≈0.999726, ≈0.006435 → ≈0.999403  (range ≈4.99172e-4)
   counterexample at step 3 (path mass ≈9.96922e-4, never reached on this path):
     parameters: timeout = ≈0.004327, same_replica = 0.48
     state: budget = 3, phase = GaveUp, attempts = 3
 examples/Gallery/learned_rates.hz:40:1: info: claim five_attempts
   belief ≈0.999712 · plausibility ≈0.999995 · graded
-  grade prob+fuzzy · 14 possibility levels · 168 checks · 11 reachable states
+  grade prob+fuzzy · 14 possibility levels · 174 checks · 11 reachable states
   14 possibility levels: the exact belief is at most ≈0.999793, the exact plausibility at least ≈0.999993 (more with `levels N`)
   at the most possible values, timeout = 0.003, same_replica = 0.3: ≈0.999975
   bound holds: belief ≥ 0.999
@@ -21,9 +24,12 @@ examples/Gallery/learned_rates.hz:40:1: info: claim five_attempts
     π ≥ 0.9  timeout in [≈0.00262, ≈0.003415], same_replica in [0.28, 0.33]  ≈0.999958 to ≈0.999983
     π ≥ 0.5  timeout in [≈0.002093, ≈0.004136], same_replica in [0.2, 0.45]  ≈0.999827 to ≈0.999997
     all values  timeout in [0, 1], same_replica in [0.1, 0.6]                0 to 1
+  what moves the result most (each parameter varied alone, the others at their most possible values):
+    same_replica: 0.1 → ≈1, 0.3 → ≈0.999975, 0.6 → ≈0.999608  (range ≈3.91586e-4)
+    timeout: ≈0.001077 → ≈0.999991, 0.003 → ≈0.999975, ≈0.006435 → ≈0.999945  (range ≈4.65058e-5)
 examples/Gallery/learned_rates.hz:43:1: info: theorem within_budget
   probability 1 · holds with certainty
-  grade prob+fuzzy · 14 possibility levels · 168 checks · 11 reachable states
+  grade prob+fuzzy · 14 possibility levels · 174 checks · 11 reachable states
   at the most possible values, timeout = 0.003, same_replica = 0.3: 1
   theorem accepted
   by possibility level (lowest to highest over the values at least that possible):

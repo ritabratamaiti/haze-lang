@@ -409,6 +409,45 @@ for budget, name in ((3, "three_attempts"), (5, "five_attempts")):
                     f"learned rates: {budget} attempts at the most possible rates", f"{done(0.003, 0.3, budget):.6f}"))
 results.append(("theorem accepted" in "\n".join(b.get("theorem within_budget", [])), "learned rates: the budget is never exceeded", "1"))
 
+# ---- proof checkers ----------------------------------------------------------
+# The chance that one proof term gets past the first `level` checkers, by enumerating which
+# checkers have a bug, in closed form. It rises with p_bug, p_gap and find, so over each
+# possibility level the lowest value is at the low corner and the highest at the high corner.
+# Compared with Haze's JSON output as exact fractions.
+import json
+def fooled_prob(level, p, g, fd, h, s):
+    paths = [(F(1), 0)]                      # (probability, bugs needed so far)
+    def add(paths, bug, shared=None):
+        out = []
+        for q, n in paths:
+            if shared is not None:
+                out.append((q * shared, n))
+                q = q * (1 - shared)
+            out.append((q * bug, n + 1))
+        return out
+    paths = add(paths, p)
+    if level >= 2: paths = add(paths, p, s)
+    if level >= 3: paths = add(paths, p)
+    if level >= 4: paths = add(paths, g)
+    if level >= 5: paths = add(paths, g, s)
+    return sum(q * fd * h ** (n - 1) for q, n in paths)
+out = subprocess.run([HAZE, "--json", str(ROOT / "examples/Gallery/proof_checkers.hz")], capture_output=True, text=True, encoding="utf-8").stdout
+probs = [json.loads(l) for l in out.splitlines() if '"kind":"prob"' in l.replace(" ", "")]
+tri3 = lambda a, m, c, al: (a + al * (m - a), c - al * (c - m))
+harders = {F(1, 20): F(1, 2), F(1, 5): F(1), F(1, 2): F(2, 5)}
+shares = {F(1, 2): F(2, 5), F(9, 10): F(1), F(1): F(3, 5)}
+lv = [F(j, 10) for j in range(1, 11)]
+for level in range(1, 6):
+    bel = pl = F(0)
+    for l, n in zip(lv, [F(0)] + lv[:-1]):
+        (p0, p1), (g0, g1), (f0, f1) = tri3(F(1, 20), F(1, 4), F(3, 5), n), tri3(F(1, 1000), F(1, 100), F(1, 20), n), tri3(F(1, 10), F(1, 2), F(9, 10), n)
+        combos = [(h, s) for h, ph in harders.items() for s, ps in shares.items() if min(ph, ps) >= l]
+        bel += (l - n) * min(fooled_prob(level, p0, g0, f0, h, s) for h, s in combos)
+        pl += (l - n) * max(fooled_prob(level, p1, g1, f1, h, s) for h, s in combos)
+    r = probs[level - 1] if level <= len(probs) else {}
+    ok = F(r.get("belief", "-1")) == bel and F(r.get("plausibility", "-1")) == pl
+    results.append((ok, f"proof checkers: belief and plausibility with {level} checker(s), exactly", f"{float(bel):.6g}, {float(pl):.6g}"))
+
 passed = sum(r[0] for r in results)
 for ok, name, exp in results:
     print("PASS" if ok else "FAIL", name, "|", exp)

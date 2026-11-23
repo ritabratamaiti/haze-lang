@@ -276,6 +276,9 @@ def search (check : Box → Except String Check) (box : Box) (widths cuts : Arra
   return { bound := sign * low, best := sign * b, points, maxStates, truncated, exact,
            closed := b - tolerance (sign * b) ≤ low }
 
+/-- A number as `fmtQ` writes it, without the exact fraction. -/
+def brief (q : Rat) : String := ((fmtQ q).splitOn " (=").headD ""
+
 /-- The result of checking a property with continuous fuzzy parameters. -/
 structure Result where
   /-- One row per level and discrete assignment: the bounds over the cut at the level below. -/
@@ -298,6 +301,12 @@ structure Result where
   result.
   -/
   points : Array (Nat × List (String × Value) × Rat × Check)
+  /--
+  How much the result moves when each parameter is varied alone over the values it can take,
+  with the others at their most possible values: the parameter, a description of the values and
+  results, and the width of the range of results.
+  -/
+  effects : List (String × String × Rat)
   /-- The number of levels and the number of model checks. -/
   levels : Nat
   checks : Nat
@@ -388,12 +397,45 @@ def run (ps : Array CParam) (nLevels : Nat) (budget : Nat) (cuts : Array Rat)
   let coreRes := (Array.range bs0.size).toList.filterMap fun d =>
     (points.find? fun (d', p, _) => d' == d && p == core).map fun (_, _, c) =>
       ((bs0[d]!.assign.filter fun (x, _) => !ps.any (·.name == x)) ++ Box.values core ps, bs0[d]!.poss, c)
+  -- each parameter varied alone, the others at their most possible values
+  let dCore := (Array.range bs0.size).foldl (fun b d => if bs0[d]!.poss > bs0[b]!.poss then d else b) 0
+  let discreteOf := fun (d : Nat) => bs0[d]!.assign.filter fun (x, _) => !ps.any (·.name == x)
+  let mid := fun (c : Check) => (c.lo + c.hi) / 2
+  let coreVal := (coreRes.find? fun (a, _, _) => a == discreteOf dCore ++ Box.values core ps).map (mid ·.2.2)
+  let mut effects : Array (String × String × Rat) := #[]
+  for i in [0:ps.size] do
+    let p := ps[i]!
+    -- for a likelihood, whose values run from 0 to 1, the values with possibility at least 1/100
+    let r := if p.shape.unbounded then (boxAt ((levels.find? (· ≥ 1/100)).getD top))[i]!
+      else range (p.shape.cut 0).1 (p.shape.cut 0).2
+    let mut vals : Array (Rat × Rat) := #[]
+    for x in [r.lo, p.shape.core, r.hi] do
+      let c ← checkAt dCore (core.set! i (range x x))
+      vals := vals.push (x, mid c)
+    let lo := vals.foldl (fun m v => qmin m v.2) vals[0]!.2
+    let hi := vals.foldl (fun m v => qmax m v.2) vals[0]!.2
+    let desc := ", ".intercalate (vals.toList.map fun (x, v) => s!"{brief x} → {brief v}")
+    effects := effects.push (p.name, desc, hi - lo)
+  for (n, v0) in discreteOf dCore do
+    let others := (discreteOf dCore).filter (·.1 != n)
+    let ds := (Array.range bs0.size).filter fun d => others.all fun (m, w) => (discreteOf d).lookup m == some w
+    let vals := ds.filterMap fun d =>
+      ((discreteOf d).lookup n).bind fun v =>
+        (coreRes.find? fun (a, _, _) => a == discreteOf d ++ Box.values core ps).map fun (_, _, c) => (v, mid c)
+    if vals.size ≤ 1 then continue
+    let lo := vals.foldl (fun m v => qmin m v.2) vals[0]!.2
+    let hi := vals.foldl (fun m v => qmax m v.2) vals[0]!.2
+    let _ := v0
+    effects := effects.push (n, ", ".intercalate (vals.toList.map fun (v, x) =>
+      s!"{match v with | .num q | .deg q => brief q | v => reprStr v} → {brief x}"), hi - lo)
+  let _ := coreVal
+  let ranked := effects.toList.mergeSort fun a b => b.2.2 ≤ a.2.2
   let pointsOut := points.map fun (d, p, c) =>
     let π := (ps.zip p).foldl (fun m (cp, r) => qmin m (cp.shape.possibility r.lo)) bs0[d]!.poss
     (d, Box.values p ps, π, c)
   return { rows := rows.toList, bottoms := bottoms.toList, core := coreRes, points := pointsOut, outer, inner := { bel := bel / top, pl := pl / top },
            worst := (Box.values pw ps, dw), bestPt := (Box.values pb ps, db),
-           levels := levels.length, checks, closed }
+           effects := ranked, levels := levels.length, checks := checks + 3 * ps.size, closed }
 
 end Kernel.Continuous
 end Haze
