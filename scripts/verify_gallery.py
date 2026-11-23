@@ -410,43 +410,75 @@ for budget, name in ((3, "three_attempts"), (5, "five_attempts")):
 results.append(("theorem accepted" in "\n".join(b.get("theorem within_budget", [])), "learned rates: the budget is never exceeded", "1"))
 
 # ---- proof checkers ----------------------------------------------------------
-# The chance that one proof term gets past the first `level` checkers, by enumerating which
-# checkers have a bug, in closed form. It rises with p_bug, p_gap and find, so over each
-# possibility level the lowest value is at the low corner and the highest at the high corner.
-# Compared with Haze's JSON output as exact fractions.
+# The chance that one proof term gets past the switched-on checkers, by enumerating every
+# combination of bugs, inherited bugs and overruled rejections with exact fractions.
 import json
-def fooled_prob(level, p, g, fd, h, s):
-    paths = [(F(1), 0)]                      # (probability, bugs needed so far)
-    def add(paths, bug, shared=None):
+def fooled_prob(on, d, p, g, fd, h, s):
+    lean, l4l, nan, leche, ron = on
+    paths = [(F(1), 0, None, None)]          # (probability, bugs needed, lean_bug, leche_bug)
+    def indep(paths, run, bug, slot):
         out = []
-        for q, n in paths:
-            if shared is not None:
-                out.append((q * shared, n))
-                q = q * (1 - shared)
-            out.append((q * bug, n + 1))
+        for q, n, lb, cb in paths:
+            for has, w in ((True, bug), (False, 1 - bug)):
+                lb2, cb2 = (has, cb) if slot == "lean" else (lb, has) if slot == "leche" else (lb, cb)
+                if not run: out.append((q * w, n, lb2, cb2)); continue
+                if has: out.append((q * w, n + 1, lb2, cb2))
+                else: out.append((q * w * d, n, lb2, cb2))
         return out
-    paths = add(paths, p)
-    if level >= 2: paths = add(paths, p, s)
-    if level >= 3: paths = add(paths, p)
-    if level >= 4: paths = add(paths, g)
-    if level >= 5: paths = add(paths, g, s)
-    return sum(q * fd * h ** (n - 1) for q, n in paths)
+    def port(paths, run, orig_ran, bug, slot):
+        if not run: return paths
+        out = []
+        for q, n, lb, cb in paths:
+            ob = lb if slot == "lean" else cb
+            # inherits the original's bug, or behaves like it when the original has none
+            if ob: out.append((q * s, n if orig_ran else n + 1, lb, cb))
+            else: out.append((q * s * d, n, lb, cb))
+            out.append((q * (1 - s) * bug, n + 1, lb, cb))
+            out.append((q * (1 - s) * (1 - bug) * d, n, lb, cb))
+        return out
+    paths = indep(paths, lean, p, "lean")
+    paths = port(paths, l4l, lean, p, "lean")
+    paths = indep(paths, nan, p, "nanoda")
+    paths = indep(paths, leche, g, "leche")
+    paths = port(paths, ron, leche, g, "leche")
+    return sum(q * fd * (h ** (n - 1) if n >= 1 else 1) for q, n, _, _ in paths)
 out = subprocess.run([HAZE, "--json", str(ROOT / "examples/Gallery/proof_checkers.hz")], capture_output=True, text=True, encoding="utf-8").stdout
-probs = [json.loads(l) for l in out.splitlines() if '"kind":"prob"' in l.replace(" ", "")]
+recs = [json.loads(l) for l in out.splitlines() if l.strip()]
+recs = [r for r in recs if r.get("kind") in ("prob", "claim")]
 tri3 = lambda a, m, c, al: (a + al * (m - a), c - al * (c - m))
 harders = {F(1, 20): F(1, 2), F(1, 5): F(1), F(1, 2): F(2, 5)}
 shares = {F(1, 2): F(2, 5), F(9, 10): F(1), F(1): F(3, 5)}
 lv = [F(j, 10) for j in range(1, 11)]
-for level in range(1, 6):
-    bel = pl = F(0)
-    for l, n in zip(lv, [F(0)] + lv[:-1]):
-        (p0, p1), (g0, g1), (f0, f1) = tri3(F(1, 20), F(1, 4), F(3, 5), n), tri3(F(1, 1000), F(1, 100), F(1, 20), n), tri3(F(1, 10), F(1, 2), F(9, 10), n)
-        combos = [(h, s) for h, ph in harders.items() for s, ps in shares.items() if min(ph, ps) >= l]
-        bel += (l - n) * min(fooled_prob(level, p0, g0, f0, h, s) for h, s in combos)
-        pl += (l - n) * max(fooled_prob(level, p1, g1, f1, h, s) for h, s in combos)
-    r = probs[level - 1] if level <= len(probs) else {}
-    ok = F(r.get("belief", "-1")) == bel and F(r.get("plausibility", "-1")) == pl
-    results.append((ok, f"proof checkers: belief and plausibility with {level} checker(s), exactly", f"{float(bel):.6g}, {float(pl):.6g}"))
+T, Fa = True, False
+cases = [((T, Fa, Fa, Fa, Fa), F(0), "Lean's kernel alone"), ((T, Fa, T, T, Fa), F(0), "the three that share no code"),
+         ((T, T, T, T, T), F(0), "all five"), ((T, T, T, T, T), F(1, 4), "all five, one rejection in four overruled")]
+for i, (on, d, label) in enumerate(cases):
+    r = recs[i] if i < len(recs) else {}
+    core = fooled_prob(on, d, F(1, 4), F(1, 100), F(1, 2), F(1, 5), F(9, 10))
+    hb, hp = F(r.get("belief", "-1")), F(r.get("plausibility", "-1"))
+    if d == 0:
+        # every rate pushes the chance up, so the extremes over a level are at its corners
+        bel = pl = F(0)
+        for l, n in zip(lv, [F(0)] + lv[:-1]):
+            (p0, p1), (g0, g1), (f0, f1) = tri3(F(1, 20), F(1, 4), F(3, 5), n), tri3(F(1, 1000), F(1, 100), F(1, 20), n), tri3(F(1, 10), F(1, 2), F(9, 10), n)
+            combos = [(h, s) for h, ph in harders.items() for s, ps in shares.items() if min(ph, ps) >= l]
+            bel += (l - n) * min(fooled_prob(on, d, p0, g0, f0, h, s) for h, s in combos)
+            pl += (l - n) * max(fooled_prob(on, d, p1, g1, f1, h, s) for h, s in combos)
+        results.append((hb == bel and hp == pl, f"proof checkers, {label}: belief and plausibility, exactly", f"{float(bel):.6g}, {float(pl):.6g}"))
+    else:
+        # not monotone in every rate, so check that Haze's certified bounds contain a grid of values
+        bel = pl = 0.0
+        for l, n in zip(lv, [F(0)] + lv[:-1]):
+            (p0, p1), (g0, g1), (f0, f1) = tri3(F(1, 20), F(1, 4), F(3, 5), n), tri3(F(1, 1000), F(1, 100), F(1, 20), n), tri3(F(1, 10), F(1, 2), F(9, 10), n)
+            combos = [(h, s) for h, ph in harders.items() for s, ps in shares.items() if min(ph, ps) >= l]
+            grid = lambda a, b: [a + (b - a) * k / 6 for k in range(7)]
+            vals = [float(fooled_prob(on, d, p, g, f, h, s)) for p in grid(p0, p1) for g in (g0, g1) for f in (f0, f1) for h, s in combos]
+            bel += float(l - n) * min(vals); pl += float(l - n) * max(vals)
+        results.append((float(hb) <= bel + 1e-12 and float(hp) >= pl - 1e-12, f"proof checkers, {label}: bounds contain every value on a grid", f"{bel:.6g}, {pl:.6g}"))
+    key = r.get("query") or f"claim {r.get('name', '')}"
+    text = "\n".join(blocks("examples/Gallery/proof_checkers.hz").get(key, []))
+    results.append((any(abs(x - float(core)) <= max(6e-7, float(core) * 1e-5) for x in nums(text.split("by possibility")[0].split("at the most possible values")[-1].split("\n")[0].split(":")[-1])),
+                    f"proof checkers, {label}: at the most possible values", f"{float(core):.6g}"))
 
 passed = sum(r[0] for r in results)
 for ok, name, exp in results:

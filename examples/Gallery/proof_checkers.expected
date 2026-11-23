@@ -1,4 +1,4 @@
-examples/Gallery/proof_checkers.hz:90:1: info: #prob Pipeline(1) |= eventually exploited
+examples/Gallery/proof_checkers.hz:114:1: info: #prob Checks(true, false, false, false, false, 0) |= eventually exploited
   belief 0.0458 · plausibility 0.33015
   10 possibility levels: the exact belief is at most 0.0578, the exact plausibility at least 0.28865 (more with `levels N`)
   at the most possible values, harder = 0.2, share = 0.9, p_bug = 0.25, p_gap = 0.01, find = 0.5: 0.125
@@ -9,82 +9,25 @@ examples/Gallery/proof_checkers.hz:90:1: info: #prob Pipeline(1) |= eventually e
   what moves the result most (each parameter varied alone, the others at their most possible values):
     p_bug: 0.05 → 0.025, 0.25 → 0.125, 0.6 → 0.3  (range 0.275)
     find: 0.1 → 0.025, 0.5 → 0.125, 0.9 → 0.225  (range 0.2)
-examples/Gallery/proof_checkers.hz:91:1: info: #prob Pipeline(2) |= eventually exploited
-  belief ≈0.039173 · plausibility ≈0.322544
-  10 possibility levels: the exact belief is at most ≈0.050235, the exact plausibility at least ≈0.279856 (more with `levels N`)
-  at the most possible values, harder = 0.2, share = 0.9, p_bug = 0.25, p_gap = 0.01, find = 0.5: 0.113125
+examples/Gallery/proof_checkers.hz:118:1: info: #prob Checks(true, false, true, true, false, 0) |= eventually exploited
+  belief ≈2.30281e-6 · plausibility ≈0.001205
+  10 possibility levels: the exact belief is at most ≈3.48238e-6, the exact plausibility at least ≈8.13271e-4 (more with `levels N`)
+  at the most possible values, harder = 0.2, share = 0.9, p_bug = 0.25, p_gap = 0.01, find = 0.5: ≈1.25e-5 (=1/80000)
   by possibility level (lowest to highest over the values at least that possible):
-    π ≥ 0.9  p_bug in [0.23, 0.285], p_gap in [0.0091, 0.014], find in [0.46, 0.54]  ≈0.095707 to ≈0.139387
-    π ≥ 0.5  p_bug in [0.15, 0.425], p_gap in [0.0055, 0.03], find in [0.3, 0.7]     0.040635 to 0.2975
-    all values  p_bug in [0.05, 0.6], p_gap in [0.001, 0.05], find in [0.1, 0.9]     ≈0.002506 to 0.54
+    π ≥ 0.9  p_bug in [0.23, 0.285], p_gap in [0.0091, 0.014], find in [0.46, 0.54]  ≈8.85758e-6 (=1107197/125000000000) to ≈2.45624e-5 (=614061/25000000000)
+    π ≥ 0.5  p_bug in [0.15, 0.425], p_gap in [0.0055, 0.03], find in [0.3, 0.7]     ≈1.485e-6 (=297/200000000) to ≈1.51725e-4 (=6069/40000000)
+    all values  p_bug in [0.05, 0.6], p_gap in [0.001, 0.05], find in [0.1, 0.9]     ≈6.25e-10 (=1/1600000000) to 0.00405
   what moves the result most (each parameter varied alone, the others at their most possible values):
-    p_bug: 0.05 → 0.022525, 0.25 → 0.113125, 0.6 → 0.2736  (range 0.251075)
-    find: 0.1 → 0.022625, 0.5 → 0.113125, 0.9 → 0.203625  (range 0.181)
-    share: 0.5 → 0.065625, 0.9 → 0.113125, 1 → 0.125  (range 0.059375)
-    harder: 0.05 → 0.112656, 0.2 → 0.113125, 0.5 → 0.114063  (range 0.001406)
-examples/Gallery/proof_checkers.hz:92:1: info: #prob Pipeline(3) |= eventually exploited
-  belief ≈0.001355 · plausibility ≈0.061771
-  10 possibility levels: the exact belief is at most ≈0.00192, the exact plausibility at least ≈0.046137 (more with `levels N`)
-  at the most possible values, harder = 0.2, share = 0.9, p_bug = 0.25, p_gap = 0.01, find = 0.5: 0.005656 (=181/32000)
-  by possibility level (lowest to highest over the values at least that possible):
-    π ≥ 0.9  p_bug in [0.23, 0.285], p_gap in [0.0091, 0.014], find in [0.46, 0.54]  ≈0.004403 to ≈0.007945
-    π ≥ 0.5  p_bug in [0.15, 0.425], p_gap in [0.0055, 0.03], find in [0.3, 0.7]     ≈0.001219 to 0.025288 (=2023/80000)
-    all values  p_bug in [0.05, 0.6], p_gap in [0.001, 0.05], find in [0.1, 0.9]     ≈6.26563e-6 (=401/64000000) to 0.162
-  what moves the result most (each parameter varied alone, the others at their most possible values):
-    p_bug: 0.05 → ≈2.2525e-4, 0.25 → 0.005656, 0.6 → 0.032832  (range ≈0.032607)
-    harder: 0.05 → ≈0.001408, 0.2 → 0.005656, 0.5 → 0.014258  (range ≈0.01285)
-    find: 0.1 → ≈0.001131, 0.5 → 0.005656, 0.9 → ≈0.010181  (range 0.00905)
-    share: 0.5 → 0.003281, 0.9 → 0.005656, 1 → 0.00625  (range 0.002969)
-examples/Gallery/proof_checkers.hz:93:1: info: #prob Pipeline(4) |= eventually exploited
-  belief ≈2.08045e-6 · plausibility ≈0.001202
-  10 possibility levels: the exact belief is at most ≈3.14798e-6, the exact plausibility at least ≈8.10919e-4 (more with `levels N`)
-  at the most possible values, harder = 0.2, share = 0.9, p_bug = 0.25, p_gap = 0.01, find = 0.5: ≈1.13125e-5 (=181/16000000)
-  by possibility level (lowest to highest over the values at least that possible):
-    π ≥ 0.9  p_bug in [0.23, 0.285], p_gap in [0.0091, 0.014], find in [0.46, 0.54]  ≈8.01256e-6 to ≈2.22462e-5
-    π ≥ 0.5  p_bug in [0.15, 0.425], p_gap in [0.0055, 0.03], find in [0.3, 0.7]     ≈1.34096e-6 (=268191/200000000000) to ≈1.51725e-4 (=6069/40000000)
-    all values  p_bug in [0.05, 0.6], p_gap in [0.001, 0.05], find in [0.1, 0.9]     ≈3.13281e-10 to 0.00405
-  what moves the result most (each parameter varied alone, the others at their most possible values):
-    harder: 0.05 → ≈7.04102e-7, 0.2 → ≈1.13125e-5, 0.5 → ≈7.12891e-5  (range ≈7.0585e-5)
-    p_bug: 0.05 → ≈4.505e-7, 0.25 → ≈1.13125e-5, 0.6 → ≈6.5664e-5  (range ≈6.52135e-5)
-    p_gap: 0.001 → ≈1.13125e-6, 0.01 → ≈1.13125e-5, 0.05 → ≈5.65625e-5  (range ≈5.54313e-5)
-    find: 0.1 → ≈2.2625e-6, 0.5 → ≈1.13125e-5, 0.9 → ≈2.03625e-5  (range ≈1.81e-5)
-    share: 0.5 → ≈6.5625e-6, 0.9 → ≈1.13125e-5, 1 → ≈1.25e-5  (range ≈5.9375e-6)
-examples/Gallery/proof_checkers.hz:94:1: info: #prob Pipeline(5) |= eventually exploited
-  belief ≈1.87196e-6 · plausibility ≈0.0012
-  10 possibility levels: the exact belief is at most ≈2.83296e-6, the exact plausibility at least ≈8.08634e-4 (more with `levels N`)
-  at the most possible values, harder = 0.2, share = 0.9, p_bug = 0.25, p_gap = 0.01, find = 0.5: ≈1.01835e-5 (=814681/80000000000)
-  by possibility level (lowest to highest over the values at least that possible):
-    π ≥ 0.9  p_bug in [0.23, 0.285], p_gap in [0.0091, 0.014], find in [0.46, 0.54]  ≈7.21277e-6 to ≈2.00278e-5
-    π ≥ 0.5  p_bug in [0.15, 0.425], p_gap in [0.0055, 0.03], find in [0.3, 0.7]     ≈1.20701e-6 to ≈1.51725e-4 (=6069/40000000)
-    all values  p_bug in [0.05, 0.6], p_gap in [0.001, 0.05], find in [0.1, 0.9]     ≈1.56648e-10 to 0.00405
-  what moves the result most (each parameter varied alone, the others at their most possible values):
-    harder: 0.05 → ≈6.33727e-7, 0.2 → ≈1.01835e-5, 0.5 → ≈6.41958e-5  (range ≈6.35621e-5)
-    p_bug: 0.05 → ≈4.0554e-7, 0.25 → ≈1.01835e-5, 0.6 → ≈5.91107e-5  (range ≈5.87052e-5)
-    p_gap: 0.001 → ≈1.01815e-6, 0.01 → ≈1.01835e-5, 0.05 → ≈5.09628e-5  (range ≈4.99447e-5)
-    find: 0.1 → ≈2.0367e-6, 0.5 → ≈1.01835e-5, 0.9 → ≈1.83303e-5  (range ≈1.62936e-5)
-    share: 0.5 → ≈3.28781e-6, 0.9 → ≈1.01835e-5, 1 → ≈1.25e-5  (range ≈9.21219e-6)
-examples/Gallery/proof_checkers.hz:97:1: error: claim one_kernel
-  belief 0.0458 · plausibility 0.33015 · graded
-  grade prob+fuzzy · 10 possibility levels · 929 checks · 6 reachable states
-  10 possibility levels: the exact belief is at most 0.0578, the exact plausibility at least 0.28865 (more with `levels N`)
-  at the most possible values, harder = 0.2, share = 0.9, p_bug = 0.25, p_gap = 0.01, find = 0.5: 0.125
-  bound fails: plausibility 0.33015 > 0.01
-  by possibility level (lowest to highest over the values at least that possible):
-    π ≥ 0.9  p_bug in [0.23, 0.285], p_gap in [0.0091, 0.014], find in [0.46, 0.54]  0.1058 to 0.1539
-    π ≥ 0.5  p_bug in [0.15, 0.425], p_gap in [0.0055, 0.03], find in [0.3, 0.7]     0.045 to 0.2975
-    all values  p_bug in [0.05, 0.6], p_gap in [0.001, 0.05], find in [0.1, 0.9]     0.005 to 0.54
-  what moves the result most (each parameter varied alone, the others at their most possible values):
-    p_bug: 0.05 → 0.025, 0.25 → 0.125, 0.6 → 0.3  (range 0.275)
-    find: 0.1 → 0.025, 0.5 → 0.125, 0.9 → 0.225  (range 0.2)
-  a run where it happens, at step 2 (path mass 0.125):
-    parameters: p_bug = 0.25, p_gap = 0.01, find = 0.5, harder = 0.2, share = 0.9
-    state: checkers = 1, at = Done, passed = 1, fooled = true, bugs = 1, exploited = true, tried = true
-examples/Gallery/proof_checkers.hz:98:1: info: claim five_kernels
+    harder: 0.05 → ≈7.8125e-7, 0.2 → ≈1.25e-5, 0.5 → ≈7.8125e-5  (range ≈7.73438e-5)
+    p_bug: 0.05 → ≈5e-7, 0.25 → ≈1.25e-5, 0.6 → 0.000072  (range ≈7.15e-5)
+    p_gap: 0.001 → ≈1.25e-6, 0.01 → ≈1.25e-5, 0.05 → ≈6.25e-5  (range ≈6.125e-5)
+    find: 0.1 → ≈2.5e-6, 0.5 → ≈1.25e-5, 0.9 → ≈2.25e-5  (range 0.00002)
+examples/Gallery/proof_checkers.hz:124:1: info: claim strict
   belief ≈1.87196e-6 · plausibility ≈0.0012 · graded
-  grade prob+fuzzy · 10 possibility levels · 929 checks · 33 reachable states
+  grade prob+fuzzy · 10 possibility levels · 929 checks · 31 reachable states
   10 possibility levels: the exact belief is at most ≈2.83296e-6, the exact plausibility at least ≈8.08634e-4 (more with `levels N`)
   at the most possible values, harder = 0.2, share = 0.9, p_bug = 0.25, p_gap = 0.01, find = 0.5: ≈1.01835e-5 (=814681/80000000000)
-  bound holds: plausibility ≤ 0.01
+  bound holds: plausibility ≤ 0.002
   by possibility level (lowest to highest over the values at least that possible):
     π ≥ 0.9  p_bug in [0.23, 0.285], p_gap in [0.0091, 0.014], find in [0.46, 0.54]  ≈7.21277e-6 to ≈2.00278e-5
     π ≥ 0.5  p_bug in [0.15, 0.425], p_gap in [0.0055, 0.03], find in [0.3, 0.7]     ≈1.20701e-6 to ≈1.51725e-4 (=6069/40000000)
@@ -95,3 +38,23 @@ examples/Gallery/proof_checkers.hz:98:1: info: claim five_kernels
     p_gap: 0.001 → ≈1.01815e-6, 0.01 → ≈1.01835e-5, 0.05 → ≈5.09628e-5  (range ≈4.99447e-5)
     find: 0.1 → ≈2.0367e-6, 0.5 → ≈1.01835e-5, 0.9 → ≈1.83303e-5  (range ≈1.62936e-5)
     share: 0.5 → ≈3.28781e-6, 0.9 → ≈1.01835e-5, 1 → ≈1.25e-5  (range ≈9.21219e-6)
+examples/Gallery/proof_checkers.hz:125:1: error: claim lenient
+  belief ≈9.70868e-4 · plausibility ≈0.009153 · graded
+  grade prob+fuzzy · 10 possibility levels · 4589 checks · 110 reachable states
+  10 possibility levels: the exact belief is at most ≈0.00121, the exact plausibility at least ≈0.007743 (more with `levels N`)
+  some ranges of parameter values weren't narrowed down fully, so those bounds are cautious
+  at the most possible values, harder = 0.2, share = 0.9, p_bug = 0.25, p_gap = 0.01, find = 0.5: ≈0.002452
+  bound fails: plausibility ≈0.009153 > 0.002
+  by possibility level (lowest to highest over the values at least that possible):
+    π ≥ 0.9  p_bug in [0.23, 0.285], p_gap in [0.0091, 0.014], find in [0.46, 0.54]  ≈0.002117 to ≈0.002945
+    π ≥ 0.5  p_bug in [0.15, 0.425], p_gap in [0.0055, 0.03], find in [0.3, 0.7]     ≈0.001015 to ≈0.00567
+    all values  p_bug in [0.05, 0.6], p_gap in [0.001, 0.05], find in [0.1, 0.9]     ≈1.58497e-4 to ≈0.019674
+  what moves the result most (each parameter varied alone, the others at their most possible values):
+    find: 0.1 → ≈4.90446e-4, 0.5 → ≈0.002452, 0.9 → ≈0.004414  (range ≈0.003924)
+    p_bug: 0.05 → ≈9.68297e-4, 0.25 → ≈0.002452, 0.6 → ≈0.004452  (range ≈0.003484)
+    harder: 0.05 → ≈0.002123, 0.2 → ≈0.002452, 0.5 → ≈0.003156  (range ≈0.001033)
+    share: 0.5 → ≈0.001923, 0.9 → ≈0.002452, 1 → ≈0.002586  (range ≈6.63658e-4)
+    p_gap: 0.001 → ≈0.002381, 0.01 → ≈0.002452, 0.05 → ≈0.002766  (range ≈3.84965e-4)
+  a run where it happens, at step 6 (path mass ≈1.06202e-5 (=543753/51200000000)):
+    parameters: p_bug = 0.25, p_gap = 0.01, find = 0.5, harder = 0.2, share = 0.9
+    state: lean = true, l4l = true, nanoda = true, leche = true, ron = true, overrule = 0.25, at = Done, fooled = true, bugs = 3, lean_bug = true, leche_bug = true, exploited = true, tried = true
