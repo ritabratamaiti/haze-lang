@@ -1,0 +1,20 @@
+examples/Found/backon.hz:73:1: error: theorem jitter_range_is_current_delay
+  probability 0 · fails with certainty
+  grade prob · 1 parameter assignment(s) · ≤1 states/step
+  theorem rejected: belief is 0, not 1
+  counterexample at step 3 (path mass 1, degree 0):
+    state: fixed = false, attempts = 3, cur = 2, prev = 1, base = 2, range = 1
+examples/Found/backon.hz:74:1: info: theorem jitter_range_is_current_delay_fixed
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · ≤1 states/step
+  theorem accepted
+examples/Found/backon.hz:77:1: info: #eval Fib(false) |= after[10] base
+  55
+examples/Found/backon.hz:82:1: info: #prob Fib(false) |= after[3] cell >= 1
+  probability 0
+examples/Found/backon.hz:83:1: info: #prob Fib(true) |= after[3] cell >= 1
+  probability 0.5
+examples/Found/backon.hz:84:1: info: #prob Fib(false) |= after[10] cell >= 1
+  probability 0
+examples/Found/backon.hz:85:1: info: #prob Fib(true) |= after[10] cell >= 1
+  probability 0.981818 (=54/55)

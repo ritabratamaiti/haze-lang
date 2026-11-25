@@ -1,0 +1,48 @@
+examples/Found/cockatiel.hz:104:1: error: theorem queued_call_not_rejected
+  probability 0.939815 (=203/216) · graded
+  grade prob · 1 parameter assignment(s) · 76 reachable states
+  theorem rejected: belief is 0.939815 (=203/216), not 1
+  counterexample at step 4 (path mass 0.012346 (=1/81), degree 0):
+    state: handoff = false, max_arrivals = 3, running = 2, queued = 2, pending = 0, arrivals = 2, queued_rejected = true
+examples/Found/cockatiel.hz:108:1: error: theorem no_overtaking
+  probability 0.33912 (=293/864) · graded
+  grade prob · 1 parameter assignment(s) · 82 reachable states
+  theorem rejected: belief is 0.33912 (=293/864), not 1
+  counterexample at step 2 (path mass 0.111111 (=1/9), degree 0):
+    state: handoff = false, max_arrivals = 3, running = 2, queued = 1, pending = 1, arrivals = 1, overtaken = true
+examples/Found/cockatiel.hz:110:1: info: theorem queued_call_not_rejected_fix
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · 44 reachable states
+  theorem accepted
+examples/Found/cockatiel.hz:111:1: info: theorem no_overtaking_fix
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · 44 reachable states
+  theorem accepted
+examples/Found/cockatiel.hz:114:1: error: theorem queued_call_not_rejected_from_empty
+  probability 0.983732 (=15299/15552) · graded
+  grade prob · 1 parameter assignment(s) · 89 reachable states
+  theorem rejected: belief is 0.983732 (=15299/15552), not 1
+  counterexample at step 8 (path mass ≈1.52416e-4 (=1/6561), degree 0):
+    state: handoff = false, max_arrivals = 7, running = 2, queued = 2, pending = 0, arrivals = 6, queued_rejected = true
+examples/Found/cockatiel.hz:115:1: info: theorem queued_call_not_rejected_from_empty_fix
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · 56 reachable states
+  theorem accepted
+examples/Found/cockatiel.hz:118:1: info: theorem within_limits
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · 68 reachable states
+  theorem accepted
+examples/Found/cockatiel.hz:119:1: info: theorem within_limits_fix
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · 56 reachable states
+  theorem accepted
+examples/Found/cockatiel.hz:121:1: info: theorem fix_reserves_slots
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · 56 reachable states
+  theorem accepted
+examples/Found/cockatiel.hz:125:1: info: #prob Bulkhead(false, 2, 2, 3) |= eventually (queued_rejected and arrivals == 3 and running == 2 and queued == 2)
+  probability 0.054012 (=35/648)
+examples/Found/cockatiel.hz:128:1: info: #prob Bulkhead(true, 0, 0, 7) |= eventually (running == capacity and queued == queue_cap)
+  probability 0.444718 (=27665/62208)
+examples/Found/cockatiel.hz:129:1: info: #prob Bulkhead(true, 2, 2, 3) |= eventually (running == capacity and queued == queue_cap and arrivals == 3)
+  probability 0.489519 (=7613/15552)

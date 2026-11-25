@@ -1,0 +1,66 @@
+-- open-feature/java-sdk-contrib, flagd-core (dev.openfeature.contrib.tools:flagd-core): the `fractional`
+-- shorthand when the targeting key is the empty string.
+--
+-- Checked at flagd-core 3.0.0 (tag commit f462cf4, used by the flagd provider 0.15.0) and at main 4f4742d.
+-- Fractional.java and Operator.java are identical at both commits, so the line numbers below hold for both.
+-- Paths are under tools/flagd-core/src/main/java/dev/openfeature/contrib/tools/flagd/core/.
+--
+-- The promise, from open-feature/flagd#1948 ("Suggested Fix"; closed as completed by the Go change in flagd#1949):
+--   "In all 3 cases (targeting key is null/nil, missing, or ""), we want to return null and fall back to the
+--    default variant."
+-- flagd's Go evaluator does this (core/pkg/evaluator/fractional.go:173-175 at 66d0faf), and so do the JS, Python
+-- and .NET flagd cores.
+--
+-- Model element -> source:
+--   key            targeting/Operator.java:66 copies ctx.getTargetingKey() into the rule data, and
+--                  Operator.java:92-95 (FlagProperties) keeps any String, so "" reaches Fractional as "".
+--   java_rejects   targeting/Fractional.java:57 and :72, `properties.getTargetingKey() == null`, the only check
+--                  before bucketBy = [flagKey, targetingKey] (:61 and :77).
+--   spec_rejects   the promise above. outcome(true) applies it, which is the proposed fix
+--                  (`getTargetingKey() == null || getTargetingKey().isEmpty()` at :57 and :72).
+--   Default        Fractional returns null and FlagdCore.java:230-236 (232-238 on main) serves the flag's
+--                  defaultVariant with reason DEFAULT; any other result has reason TARGETING_MATCH.
+--   On / Off       flag `new-checkout`, targeting {"fractional": [["on", 10], ["off", 90]]}:
+--                  bucket = (murmur3_x86_32(cbor([flagKey, key])) * 100) >>> 32 (Fractional.java:118-127, :174-175),
+--                  and "on" owns buckets 0..9 (:177-184).
+--   empty_bucket   3: murmur3_x86_32(cbor(["new-checkout", ""])) = 0x09b353e8 and (0x09b353e8 * 100) >>> 32 = 3,
+--                  computed independently and matching the real run, where Java serves "on" to the empty key.
+--
+-- Abstractions, and why the conclusions survive them:
+--   * A named user's bucket is uniform on 0..99. The real bucket is a 32-bit MurmurHash3 value scaled to 100
+--     buckets. The checks are about which keys are rejected before any hashing, so they do not depend on it.
+--   * The mix of key kinds in `input key` is illustrative. Every check is conditioned on the kind of key, or is an
+--     implication from it, so no result depends on the mix.
+--   * Only the shorthand (no bucketing expression) is modeled. An explicit bucketing value is hashed as given,
+--     an empty string included (flagd-testbed "Fractional operator with string length boundaries"), and #1948
+--     does not cover it.
+
+enum Key = Named | Empty | Missing
+enum Outcome = On | Off | Default
+
+input key : Key ~ {Named: 0.7, Empty: 0.2, Missing: 0.1}
+def user_bucket : Num := uniform(0, 99)
+def empty_bucket : Num := 3
+
+def java_rejects(k : Key) : Bool := k == Missing
+def spec_rejects(k : Key) : Bool := k == Missing or k == Empty
+
+def outcome(fix : Bool) : Outcome :=
+  if (if fix then spec_rejects(key) else java_rejects(key)) then Default
+  else if (if key == Empty then empty_bucket else user_bucket) < 10 then On
+  else Off
+
+-- flagd#1948: a missing or empty targeting key falls back to the default variant.
+theorem empty_key_falls_back : outcome(false) == Default given key == Empty
+theorem missing_key_falls_back : outcome(false) == Default given key == Missing
+theorem empty_key_falls_back_fixed : outcome(true) == Default given key == Empty
+
+-- The fix does not move any named user.
+theorem named_users_unchanged : key == Named implies outcome(false) == outcome(true)
+
+-- Share of empty-key requests that get "on" for the 10% rollout, current and fixed.
+#prob outcome(false) == On given key == Empty
+#prob outcome(true) == On given key == Empty
+-- Named users: 10% "on" either way.
+#prob outcome(false) == On given key == Named
+#prob outcome(true) == On given key == Named

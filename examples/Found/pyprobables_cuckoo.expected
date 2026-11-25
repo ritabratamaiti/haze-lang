@@ -1,0 +1,32 @@
+examples/Found/pyprobables_cuckoo.hz:74:1: info: theorem shipped_hit_iff_same_fingerprint
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · ≤128 states/step
+  theorem accepted
+examples/Found/pyprobables_cuckoo.hz:80:1: info: theorem fixed_hit_needs_same_pair
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · ≤8192 states/step
+  theorem accepted
+examples/Found/pyprobables_cuckoo.hz:90:1: info: #eval error_rate
+  0.25
+examples/Found/pyprobables_cuckoo.hz:91:1: info: #prob fp_shipped
+  probability 0.330078 (=169/512)
+examples/Found/pyprobables_cuckoo.hz:92:1: info: #prob fp_fixed
+  probability ≈0.085263
+examples/Found/pyprobables_cuckoo.hz:93:1: info: claim fixed_meets_error_rate
+  probability ≈0.085263 · graded
+  grade prob · 1 parameter assignment(s) · ≤128 states/step
+  bound holds: plausibility ≤ 0.25
+examples/Found/pyprobables_cuckoo.hz:94:1: error: claim shipped_meets_error_rate
+  probability 0.330078 (=169/512) · graded
+  grade prob · 1 parameter assignment(s) · ≤32768 states/step
+  bound fails: plausibility 0.330078 (=169/512) > 0.25
+  a world where it happens (probability ≈3.05176e-5 (=1/32768)):
+    inputs: f1 = 0, f2 = 0, f3 = 0, p1 = true, p2 = true, p3 = true, fq = 0
+examples/Found/pyprobables_cuckoo.hz:100:1: info: #prob binomial(1000, 1/8192) >= 1
+  probability ≈0.11492
+examples/Found/pyprobables_cuckoo.hz:101:1: info: #prob binomial(1000, 1/40960000) >= 1
+  probability ≈2.44138e-5
+examples/Found/pyprobables_cuckoo.hz:105:1: info: #prob binomial(500, 1/8192) >= 1
+  probability ≈0.059213
+examples/Found/pyprobables_cuckoo.hz:106:1: info: #prob binomial(500, 1/40960000) >= 1
+  probability ≈1.2207e-5

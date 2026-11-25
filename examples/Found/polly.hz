@@ -1,0 +1,129 @@
+-- Polly.Core 8.9.1: BrokenCircuitException.RetryAfter while the circuit is half-open
+--
+-- What the code does (src/Polly.Core/CircuitBreaker/Controller/CircuitStateController.cs at tag
+-- 8.9.1, commit 8c62032; the file is the same blob, d479547, on main at ad7d87b):
+--   _blockedUntil, _circuitState         20-21
+--   OnActionPreExecuteAsync              124-186  if the circuit is Open and
+--                                                 PermitHalfOpenCircuitTest_NeedsLock() agrees,
+--                                                 this call is the probe and the circuit moves
+--                                                 to HalfOpen (145-151); otherwise Open and
+--                                                 HalfOpen reject the call with
+--                                                 CreateBrokenCircuitException() (153-159)
+--   PermitHalfOpenCircuitTest_NeedsLock  314-324  if now >= _blockedUntil, sets _blockedUntil =
+--                                                 now + _breakDuration; only called from the
+--                                                 Open branch at 145
+--   CreateBrokenCircuitException         332-342  RetryAfter = _blockedUntil - now (334), not
+--                                                 clamped
+--   OnUnhandledOutcomeAsync              194-218  a success while HalfOpen closes the circuit
+--                                                 (CloseCircuit_NeedsLock, 290-312)
+--   OnHandledOutcomeAsync                220-247  a failure while HalfOpen opens it again;
+--                                                 OpenCircuitFor_NeedsLock sets _blockedUntil =
+--                                                 now + break duration (344-369, 357)
+--   Nothing ends the half-open state on a timer. Only an outcome or manual control does.
+--
+-- Configuration of the reproduction: BreakDuration = 1 s, no BreakDurationGenerator. One time
+-- unit is 0.5 s, so the break duration is 2 units. The model starts when the circuit has just
+-- opened, at clock 0. With a BreakDurationGenerator, entering half-open still sets
+-- _blockedUntil from BreakDuration (319) and only reopening uses the generated value
+-- (352-357), so the same thing happens.
+--
+-- Abstractions:
+--   * Time moves in 0.5 s ticks and stops at 4 s. A negative value needs only a probe that is
+--     still running 0.5 s after the break duration ran out, which fits in the horizon.
+--   * Calls while Closed, the sampling window and the failure ratio are left out. They decide
+--     when the circuit opens, and the model starts from an open circuit. Closed is final here:
+--     opening again would repeat the same Open and HalfOpen cycle.
+--   * Success and Failure are outcomes that reach the controller while it is half-open. Success
+--     is one that ShouldHandle does not handle, Failure one that it does (routed in
+--     CircuitBreakerResilienceStrategy.cs 49-57). Either can come from the probe or from a call
+--     admitted before the circuit opened; the code does not tell them apart. Outcomes while
+--     Open change nothing (208-209, 235-238).
+--   * Manual control is left out. An isolated circuit throws IsolatedCircuitException, whose
+--     RetryAfter is null (157).
+--   * Each step picks one event uniformly, so that every event can happen at every step.
+--     Theorems need belief 1, so they hold or fail over every run. The probability Haze prints
+--     for a rejected theorem comes from this made-up scheduler, not from real traffic.
+--
+-- Variants:
+--   Released           the code as shipped
+--   NullWhileHalfOpen  the fix suggested in the issue: no RetryAfter for calls rejected while
+--                      half-open, because the half-open state has no deadline
+--   ClampZero          the smallest change: max(0, _blockedUntil - now)
+
+enum State = Closed | Open | HalfOpen
+enum Event = Tick | Call | Success | Failure
+enum Fix = Released | NullWhileHalfOpen | ClampZero
+
+def break_units : Num := 2   -- BreakDuration = 1 s
+def horizon : Num := 8       -- 4 s
+
+system Breaker(fix : Fix) {
+  var st : State := Open
+  var clock : Num := 0
+  var blocked_until : Num := break_units
+  var rejected : Bool := false          -- the call in this step got BrokenCircuitException
+  var has_retry_after : Bool := false   -- its RetryAfter is not null
+  var retry_after : Num := 0            -- its RetryAfter, in 0.5 s units
+
+  step {
+    let event := {Tick: 1/4, Call: 1/4, Success: 1/4, Failure: 1/4}
+    rejected := false
+    match event {
+      Tick => { if clock < horizon { clock := clock + 1 } }
+      Call => {
+        match st {
+          Open => {
+            if clock >= blocked_until {
+              st := HalfOpen                    -- this call is the probe
+              blocked_until := clock + break_units
+            } else {
+              rejected := true
+              has_retry_after := true
+              retry_after := blocked_until - clock
+            }
+          }
+          HalfOpen => {
+            rejected := true
+            match fix {
+              Released => { has_retry_after := true; retry_after := blocked_until - clock }
+              NullWhileHalfOpen => { has_retry_after := false }
+              ClampZero => { has_retry_after := true; retry_after := max(0, blocked_until - clock) }
+            }
+          }
+          Closed => skip
+        }
+      }
+      Success => { if st == HalfOpen { st := Closed } }
+      Failure => { if st == HalfOpen { st := Open; blocked_until := clock + break_units } }
+    }
+  }
+}
+
+-- BrokenCircuitException.RetryAfter: "Gets the amount of time before the circuit can become
+-- closed, if known." docs/strategies/circuit-breaker.md: "this indicates that circuit is open
+-- for at least this time period and you should retry your operation no sooner than the value
+-- given." Neither allows a negative period.
+theorem not_negative : Breaker(Released) |= always (rejected and has_retry_after implies retry_after >= 0)
+theorem not_negative_null_fix : Breaker(NullWhileHalfOpen) |= always (rejected and has_retry_after implies retry_after >= 0)
+theorem not_negative_clamp_fix : Breaker(ClampZero) |= always (rejected and has_retry_after implies retry_after >= 0)
+
+-- Calls rejected while Open always get a positive value: a call that arrives once the break is
+-- over becomes the probe instead of being rejected.
+theorem open_positive : Breaker(Released) |= always ((rejected and st == Open) implies retry_after > 0)
+
+-- After the break duration has run out, the clamp tells callers to retry at once although the
+-- probe is still running. With the null fix, every RetryAfter that is present is positive.
+#prob Breaker(ClampZero) |= eventually (rejected and st == HalfOpen and clock > blocked_until and retry_after == 0)
+theorem null_fix_positive : Breaker(NullWhileHalfOpen) |= always (rejected and has_retry_after implies retry_after > 0)
+
+-- The deterministic reproduction: the probe starts 1 s after the circuit opened (clock 2), and
+-- calls 0.5 s, 1.5 s, 2 s and 3 s into the probe get +500, -500, -1000 and -2000 ms.
+#prob Breaker(Released) |= eventually (rejected and st == HalfOpen and clock == 3 and retry_after == 1)
+#prob Breaker(Released) |= eventually (rejected and st == HalfOpen and clock == 5 and retry_after == -1)
+#prob Breaker(Released) |= eventually (rejected and st == HalfOpen and clock == 6 and retry_after == -2)
+#prob Breaker(Released) |= eventually (rejected and st == HalfOpen and clock == 8 and retry_after == -4)
+
+-- Haze prints only the state at the failing step. The shortest run that reaches it for
+-- not_negative (step 7) is Tick, Tick (clock 2, 1 s after opening), Call (the probe: HalfOpen,
+-- blocked_until 4), Tick, Tick, Tick (clock 5), Call: rejected with 4 - 5 = -1, that is -500 ms
+-- 1.5 s into the probe. The deterministic reproduction makes the same call and gets -500 ms.

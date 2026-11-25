@@ -1,0 +1,30 @@
+examples/Found/nats_go.hz:97:1: error: theorem tls_reconnect_uses_tls_jitter
+  probability 0.9375 · graded
+  grade prob · 1 parameter assignment(s) · ≤23 states/step
+  theorem rejected: belief is 0.9375, not 1
+  counterexample at step 2 (path mass 0.0625, degree 0):
+    state: fixed = false, phase = Waiting, secure = false, tls_config = false, requires = true, tls_used = true, bound = 100, cell = 0
+examples/Found/nats_go.hz:98:1: info: theorem tls_reconnect_uses_tls_jitter_fixed
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · ≤33 states/step
+  theorem accepted
+examples/Found/nats_go.hz:101:1: info: theorem plain_reconnect_uses_plain_jitter
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · ≤24 states/step
+  theorem accepted
+examples/Found/nats_go.hz:102:1: info: theorem plain_reconnect_uses_plain_jitter_fixed
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · ≤33 states/step
+  theorem accepted
+examples/Found/nats_go.hz:106:1: info: #prob Client(false) |= after[2] cell >= 1 given tls_used and not secure
+  probability 0
+examples/Found/nats_go.hz:107:1: info: #prob Client(true) |= after[2] cell >= 1 given tls_used and not secure
+  probability 0.9
+examples/Found/nats_go.hz:110:1: info: #prob Client(false) |= after[2] cell >= 1 given tls_used and secure
+  probability 0.9
+examples/Found/nats_go.hz:111:1: info: #prob Client(true) |= after[2] cell >= 1 given tls_used and secure
+  probability 0.9
+examples/Found/nats_go.hz:132:1: info: #prob Herd(false) |= after[1] (c1 == c2 and c2 == c3)
+  probability 1
+examples/Found/nats_go.hz:133:1: info: #prob Herd(true) |= after[1] (c1 == c2 and c2 == c3)
+  probability 0.01

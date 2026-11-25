@@ -1,0 +1,105 @@
+-- dubbo-go: the interleavedweightedroundrobin load balancer ignores provider weights.
+--
+-- Library: dubbo.apache.org/dubbo-go/v3 v3.3.2 (tag v3.3.2, commit cdda54b). The iwrr files are
+-- the same on main (2b68845, 18 Nov 2026) and develop (27ee18a, 24 Nov 2026).
+--
+-- One step is one client call to a service with two providers, A and B.
+--   cluster/loadbalance/iwrr/loadbalance.go#L31-L50
+--       The balancer struct is empty. Select, for two or more invokers, does
+--           iwrrp := NewInterleavedweightedRoundRobin(invokers, invocation)
+--           return iwrrp.Pick(invocation)
+--   cluster/loadbalance/iwrr/iwrr.go#L81-L102                                    -> build
+--       offset := rand.Uint64() % size; queue invokers[(idx+offset)%size] on current with
+--       their weights (weight 0 included); step = gcd of the weights.
+--   cluster/loadbalance/iwrr/iwrr.go#L104-L124                                   -> pick
+--       If current is empty, swap current and next. Pop the head and subtract step from its
+--       weight. If the weight is still > 0, push it back on current; otherwise reset it to
+--       max(GetWeight, 0) and push it on next. Return the popped invoker.
+--   cluster/cluster/failover/cluster_invoker.go#L66, #L81 and
+--   cluster/cluster/base/cluster_invoker.go#L160, #L194-L205
+--       Every call looks the balancer up by name (common/extension/loadbalance.go#L33-L35
+--       builds a new one) and calls Select once.
+--
+-- Parameters:
+--   reuse = false   a new picker for every call, as Select does in v3.3.2.
+--   reuse = true    one picker, built on the first call and reused. This is the proposed fix:
+--                   one picker per service and method, rebuilt when the invokers change.
+--   drop_zero       leave weight 0 invokers out of the picker, as Kitex does
+--                   (cloudwego/kitex v0.16.4, pkg/loadbalance/weighted_balancer.go#L93-L98).
+--   wa, wb          the weights of A and B in units of step: weights 100 and 300 are 1 and 3,
+--                   weights 0 and 100 are 0 and 1.
+--
+-- Abstractions, and why the results survive them:
+--   * Weights don't change (no warm-up), so the reset in pick restores the configured weight.
+--   * With two invokers a queue never holds more than two entries, so each queue is two
+--     slots, head first.
+--   * rand.Uint64() % 2 is 0 or 1 with probability 1/2 each, since 2^64 is even.
+--   * The run stops after 8 calls, two full rounds for weights 100 and 300.
+
+enum Inv = A | B | Nil
+
+system Balancer(reuse : Bool, drop_zero : Bool, wa : Num, wb : Num) {
+  var c1 : Inv := Nil        -- current queue, head first
+  var c2 : Inv := Nil
+  var n1 : Inv := Nil        -- next queue
+  var n2 : Inv := Nil
+  var ra : Num := 0          -- weight left on A's entry, in steps
+  var rb : Num := 0
+  var built : Bool := false
+  var calls : Num := 0
+  var a_picks : Num := 0
+  step {
+    if calls < 8 {
+      -- build (iwrr.go:86-99): on every call, or only on the first one with reuse
+      if not reuse or not built {
+        let offset := uniform(0, 1)
+        if drop_zero and wa == 0 { c1 := B  c2 := Nil }
+        else if offset == 0 { c1 := A  c2 := B }
+        else { c1 := B  c2 := A }
+        n1 := Nil
+        n2 := Nil
+        ra := wa
+        rb := wb
+        built := true
+      }
+      -- pick (iwrr.go:108-121)
+      if c1 == Nil {
+        c1 := n1
+        c2 := n2
+        n1 := Nil
+        n2 := Nil
+      }
+      let e := c1
+      c1 := c2
+      c2 := Nil
+      if e == A { ra := ra - 1 } else { rb := rb - 1 }
+      let left := if e == A then ra else rb
+      if left > 0 {
+        if c1 == Nil { c1 := e } else { c2 := e }
+      } else {
+        if e == A { ra := wa } else { rb := wb }
+        if n1 == Nil { n1 := e } else { n2 := e }
+      }
+      calls := calls + 1
+      if e == A { a_picks := a_picks + 1 }
+    }
+  }
+}
+
+-- The promise: the Go SDK load balancing docs list interleavedweightedroundrobin as "A weighted
+-- round robin algorithm" and link Wikipedia's Interleaved WRR section. With weights 100 and 300
+-- a round is four calls, and A gets exactly one of them.
+theorem released_follows_weights : Balancer(false, false, 1, 3) |= after[4] a_picks == 1
+theorem fixed_follows_weights : Balancer(true, true, 1, 3) |= after[4] a_picks == 1
+theorem fixed_follows_weights_2_rounds : Balancer(true, true, 1, 3) |= after[8] a_picks == 2
+
+-- Weight 0. dubbo-go's random, roundrobin and aliasmethod balancers send a weight 0 provider
+-- no calls.
+theorem released_skips_weight_0 : Balancer(false, false, 0, 1) |= after[4] a_picks == 0
+theorem reuse_only_skips_weight_0 : Balancer(true, false, 0, 1) |= after[4] a_picks == 0
+theorem fixed_skips_weight_0 : Balancer(true, true, 0, 1) |= after[8] a_picks == 0
+
+-- How many of the first four calls go to A.
+#eval Balancer(false, false, 1, 3) |= after[4] a_picks
+#eval Balancer(false, false, 0, 1) |= after[4] a_picks
+#eval Balancer(true, false, 0, 1) |= after[4] a_picks

@@ -1,0 +1,128 @@
+-- @Retryable(timeout) on reactive methods, spring-projects/spring-framework v7.1.0 (commit f2e4863d).
+-- v7.0.11 (commit 2670e428) and main at 0bbae075 run the same code; main only changed the license
+-- header, so its line numbers are 11 lower. Reactive methods go through reactor-core 3.9.0.
+-- Line numbers are at v7.1.0 and at reactor-core v3.9.0.
+--
+-- The promise, Retryable.java:139-140 (@Retryable#timeout), worded the same in RetryPolicy.java:59-62:
+--   "The maximum amount of elapsed time allowed for the initial invocation and any subsequent
+--    retry attempts, including delays."
+-- Issue #35963, which added the attribute in 7.0.2: "For reactive pipelines with @Retryable, we
+-- should be able to use the built-in timeout support in Project Reactor. In any case, the timeout
+-- should apply to the initial attempt as well as all retry attempts."
+-- The theorems check the weakest reading of that promise, one that the imperative path meets even
+-- though it lets a running attempt finish: no attempt starts once the timeout has passed.
+--
+-- Model elements and source:
+--   Imperative    AbstractRetryInterceptor.java:108-118 passes the timeout to the RetryPolicy.
+--                 RetryTemplate.java:147-157 and 209-228: after a failed attempt, stop if the
+--                 elapsed time, or the elapsed time plus the pending delay, reaches the timeout.
+--                 A running attempt is not interrupted.
+--   MonoTimeout   AbstractRetryInterceptor.java:197-206: mono.retryWhen(retry), then
+--                 mono.timeout(timeout) (L201-203). Mono.timeout(Duration) (Mono.java:4989-5001)
+--                 fails if no item arrives within the timeout from the subscription, so it limits
+--                 the whole call.
+--   FluxTimeout   AbstractRetryInterceptor.java:187-196: flux.retryWhen(retry), then
+--                 flux.timeout(timeout) (L191-193). Flux.timeout(Duration) (Flux.java:9617-9629)
+--                 fails "as soon as no item is emitted within the given Duration from the previous
+--                 emission (or the subscription for the first item)", a timeout "on a per-item
+--                 basis". It sits after retryWhen, so an item from any attempt restarts its timer.
+--   FluxDeadline  a fix: one deadline per call, Mono.delay(timeout).cache() used as the first and
+--                 every next timeout publisher of Flux.timeout(Publisher, Function).
+--   items         true: every attempt emits an item at 100, 200 and 300 ms and then fails, like
+--                 the reproduction's Flux. false: an attempt fails at 300 ms without items.
+--
+-- The reproduction's settings, in 50 ms ticks: timeout = 500 ms (10), delay = 50 ms (1),
+-- maxRetries = 5, and the default jitter 0 and multiplier 1, so every retry waits exactly 50 ms
+-- (RetryBackoffSpec.java:610-653 with jitter factor 0).
+--
+-- Abstractions, and why the conclusion survives them:
+--   * Time moves in 50 ms ticks. Every event in the reproduction falls on a multiple of 50 ms, so
+--     the ticks lose nothing: on Reactor's VirtualTimeScheduler the reactive calls end at 500 ms
+--     (Mono), 500 ms (Flux without items), 2050 ms (Flux with items) and 500 ms (one deadline),
+--     the same as here. On the wall clock they took a few ms longer.
+--   * Items matter only through their timing, so the model tracks the time since the last one.
+--   * The imperative check is one comparison, clock + delay >= timeout, which covers both
+--     checks in RetryTemplate (elapsed >= timeout, and elapsed + pending delay >= timeout).
+
+enum Path = Imperative | MonoTimeout | FluxTimeout | FluxDeadline
+enum Phase = Running | Waiting | Done
+
+def timeout : Num := 10
+def delay : Num := 1
+def attempt_len : Num := 6
+def max_retries : Num := 5
+
+system Call(path : Path, items : Bool) {
+  var phase : Phase := Running
+  var clock : Num := 0          -- ticks since the call was subscribed
+  var t : Num := 0              -- ticks into the current attempt or delay
+  var attempts : Num := 1       -- attempts started
+  var last_start : Num := 0     -- when the latest attempt started
+  var since_item : Num := 0     -- ticks since the last item, or since the subscription
+  var timed_out : Bool := false
+  step {
+    match phase {
+      Running => {
+        clock := clock + 1
+        t := t + 1
+        since_item := since_item + 1
+        if items and (t == 2 or t == 4 or t == 6) { since_item := 0 }
+        if (path == MonoTimeout or path == FluxDeadline) and clock >= timeout {
+          timed_out := true
+          phase := Done
+        } else if path == FluxTimeout and since_item >= timeout {
+          timed_out := true
+          phase := Done
+        } else if t == attempt_len {
+          if attempts > max_retries { phase := Done }
+          else if path == Imperative and clock + delay >= timeout {
+            timed_out := true
+            phase := Done
+          } else {
+            phase := Waiting
+            t := 0
+          }
+        }
+      }
+      Waiting => {
+        clock := clock + 1
+        t := t + 1
+        since_item := since_item + 1
+        if (path == MonoTimeout or path == FluxDeadline) and clock >= timeout {
+          timed_out := true
+          phase := Done
+        } else if path == FluxTimeout and since_item >= timeout {
+          timed_out := true
+          phase := Done
+        } else if t == delay {
+          phase := Running
+          t := 0
+          attempts := attempts + 1
+          last_start := clock
+        }
+      }
+      _ => skip
+    }
+  }
+}
+
+-- "maximum amount of elapsed time allowed for the initial invocation and any subsequent retry
+-- attempts": no attempt starts once the timeout has passed.
+theorem no_attempt_after_timeout_imperative : Call(Imperative, false) |= always[60] last_start < timeout
+theorem no_attempt_after_timeout_mono : Call(MonoTimeout, false) |= always[60] last_start < timeout
+theorem no_attempt_after_timeout_flux : Call(FluxTimeout, true) |= always[60] last_start < timeout
+theorem no_attempt_after_timeout_flux_no_items : Call(FluxTimeout, false) |= always[60] last_start < timeout
+theorem no_attempt_after_timeout_flux_deadline : Call(FluxDeadline, true) |= always[60] last_start < timeout
+
+-- When the call ends (in 50 ms ticks), how many attempts started, and whether it timed out.
+#eval Call(Imperative, false) |= after[60] clock
+#eval Call(MonoTimeout, false) |= after[60] clock
+#eval Call(FluxTimeout, true) |= after[60] clock
+#eval Call(FluxTimeout, false) |= after[60] clock
+#eval Call(FluxDeadline, true) |= after[60] clock
+#eval Call(Imperative, false) |= after[60] attempts
+#eval Call(MonoTimeout, false) |= after[60] attempts
+#eval Call(FluxTimeout, true) |= after[60] attempts
+#eval Call(FluxTimeout, false) |= after[60] attempts
+#eval Call(FluxDeadline, true) |= after[60] attempts
+#eval Call(FluxTimeout, true) |= after[60] timed_out

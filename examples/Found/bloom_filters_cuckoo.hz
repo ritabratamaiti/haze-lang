@@ -1,0 +1,71 @@
+-- bloom-filters (npm), CuckooFilter.create(n, errorRate): the fingerprint keeps about half the bits that
+-- the error-rate formula asks for, so the false positive rate is far above errorRate.
+--
+-- What the code does. Line numbers are for master at e2882ef (src/) and for the published 3.0.4 build
+-- (dist/, the same code as tag v3.0.4); the logic below is the same in both.
+--
+--   computeFingerpintLength  src/cuckoo/cuckoo-filter.ts:25-36    dist/cuckoo/cuckoo-filter.js:57-68
+--     f = ceil(log2(1/rate) + log2(2 * bucketSize)) bits, then returns ceil(f / 8), documented as
+--     "the optimal fingerprint length in bytes". Up to 1.3.9 it returned ceil(f / 4), "because we use
+--     base 16 64-bits hashes"; 2.0.0 changed it to ceil(f / 8).
+--   create                   src/cuckoo/cuckoo-filter.ts:87-96    dist/cuckoo/cuckoo-filter.js:107-113
+--     bucketSize defaults to 4; the fingerprint length is computeFingerpintLength(bucketSize, errorRate).
+--   _locations               src/cuckoo/cuckoo-filter.ts:319-339  dist/cuckoo/cuckoo-filter.js:329-345
+--     fingerprint = hashes.string.substring(0, fingerprintLength), where hashes.string is the hash in
+--     hexadecimal: src/hashing.ts:163-166 (hash.toString(16)); dist/hashing/hashing.js:208-211 and
+--     dist/utils.js:65-71 (numberToHex). A character holds 4 bits, not 8.
+--   has                      src/cuckoo/cuckoo-filter.ts:280-286  dist/cuckoo/cuckoo-filter.js:295-299
+--     true if bucket firstIndex or bucket secondIndex holds the query's fingerprint.
+--   rate                     src/cuckoo/cuckoo-filter.ts:292-296  dist/cuckoo/cuckoo-filter.js:304-308
+--     2^(log2(2 * bucketSize) - load * (fingerprintLength / load)) = 2 * bucketSize / 2^fingerprintLength.
+--
+-- Abstraction. Haze has no log2, so the model uses errorRate = 1/1024, for which the formula gives exactly
+-- f = 13 (checked below); errorRate 0.001 gives 13 too. Fingerprints are independent and uniform over
+-- 2^(4 * length) values. 3.0.4 pads the 32-bit hash to 8 hex characters, so this holds there except for
+-- hashes below 2^16; master doesn't pad, so its first character is never '0' and its real rate is a
+-- little higher than the model's. A query meets 2 * bucketSize stored fingerprints, as with two full
+-- buckets, which is the case the formula's bound 2 * bucketSize / 2^f is for. At the load create() gives
+-- (0.954 for n items) a query meets 7.6 on average, and the shipped rate is above errorRate once the
+-- filter is more than about 3% full. Bucket indexes are left out: they decide which stored fingerprints a
+-- query meets, not how likely each one is to match. The fix counts the length in hex characters again,
+-- ceil(f / 4), and rate() uses 4 bits per character.
+
+def b : Num := 4                     -- create()'s default bucketSize
+def error_rate : Num := 1/1024
+def f_bits : Num := 13               -- ceil(log2(1024) + log2(2 * 4))
+
+def pow2(k : Num) : Num := if k <= 0 then 1 else 2 * pow2(k - 1)
+def ceil(x : Num) : Num := 0 - floor(0 - x)
+
+-- f is the smallest number of bits with 2b / 2^f <= errorRate, which is what the formula computes.
+theorem f_matches_formula : 2 * b / pow2(f_bits) <= error_rate and 2 * b / pow2(f_bits - 1) > error_rate
+
+-- 1. The mechanism: computeFingerpintLength returns ceil(f / 8), and _locations keeps that many hex
+--    characters. For bucketSize 4, f runs from 8 (errorRate 0.04, the README example) to 63 (1e-18, the
+--    README's limit).
+def chars_shipped(f : Num) : Num := ceil(f / 8)
+def chars_fixed(f : Num) : Num := ceil(f / 4)
+
+theorem shipped_keeps_f_bits : forall f in 8..63, 4 * chars_shipped(f) >= f
+theorem fixed_keeps_f_bits : forall f in 8..63, 4 * chars_fixed(f) >= f
+
+-- 2. The promise: create(n, errorRate) is "optimal for a number of items and a desired error rate"
+--    (README), errorRate being "the error rate, i.e. 'false positive' rate, targetted by the filter"
+--    (computeFingerpintLength). A query that was never added is a false positive when one of the 2b
+--    stored fingerprints it meets equals its own. With fingerprints uniform over V values, the number
+--    that do is binomial(2b, 1/V).
+input matches_shipped : Num ~ binomial(2 * b, 1 / pow2(4 * chars_shipped(f_bits)))   -- 2 chars, 8 bits
+input matches_fixed : Num ~ binomial(2 * b, 1 / pow2(4 * chars_fixed(f_bits)))       -- 4 chars, 16 bits
+
+claim shipped_meets_error_rate : matches_shipped >= 1 with prob <= 1/1024             -- errorRate
+claim fixed_meets_error_rate : matches_fixed >= 1 with prob <= 1/1024
+
+-- 3. rate(): "compute the filter's false positive rate (or error rate)" (README). When it was added, as
+--    fpr in #9, it "should be less than the desired error_rate you previously defined using the create
+--    method". It counts each character as one bit.
+def rate_shipped : Num := 2 * b / pow2(chars_shipped(f_bits))
+def rate_fixed : Num := 2 * b / pow2(4 * chars_fixed(f_bits))
+
+#eval rate_shipped
+theorem shipped_rate_within_error_rate : rate_shipped <= error_rate
+theorem fixed_rate_within_error_rate : rate_fixed <= error_rate

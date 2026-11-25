@@ -1,0 +1,83 @@
+-- Caddy reverse_proxy, lb_policy random_choose: with idle upstreams the pick is not random.
+--
+-- caddyserver/caddy v2.11.9 (tag commit 0d98cae),
+-- modules/caddyhttp/reverseproxy/selectionpolicies.go. master at 679806f (2026-11-24) has the
+-- same two functions at #L222-L246 and #L812-L845.
+--
+--   #L237-L261  RandomChoiceSelection.Select: reservoir sampling over the available upstreams.
+--               The first k fill choices in config order (#L251-L254); the m-th available
+--               upstream replaces choices[j] when j := weakrand.IntN(m) is below k
+--               (#L255-L258). Then it returns leastRequests(choices) (#L260).
+--                                                       -> input j, slot0, slot1
+--   #L832-L860  leastRequests walks the candidates in order and returns the first one with no
+--               request in flight (#L843-L845). Otherwise it keeps the least loaded
+--               (#L846-L851) and breaks a tie with weakrand.IntN(len(best)) (#L859).
+--                                                       -> least_requests, shortcut = true
+--
+-- Abstraction. Three available upstreams, numbered 1, 2, 3 in config order, and choose = 2,
+-- so j is the only draw the sampling loop makes. With more upstreams, upstream 2 still enters
+-- choices[1] and can only be replaced there, so three are enough to show that it is never
+-- returned. With two upstreams the loop makes no draw and choices is always [1, 2].
+-- leastRequests is modeled for two candidates, with their requests in flight passed in.
+-- Health checks and max_requests only decide which upstreams enter the loop (#L247-L249), so
+-- all upstreams here are available. Both random draws (j and the tie-break) are exact uniform
+-- draws, as weakrand.IntN is unbiased.
+--
+-- The fix is a code change: delete the early return at #L843-L845, so idle candidates tie
+-- like any others and go through the random tie-break at #L859. That is shortcut = false.
+
+input j : Num ~ uniform(0, 2)   -- weakrand.IntN(3) when the loop reaches upstream 3
+
+-- choices after the loop: upstreams 1 and 2 fill it, then 3 replaces choices[j] if j < 2.
+def slot0 : Num := if j == 0 then 3 else 1
+def slot1 : Num := if j == 1 then 3 else 2
+
+-- leastRequests([a, b]), where a and b have la and lb requests in flight.
+def least_requests(a : Num, b : Num, la : Num, lb : Num, shortcut : Bool) : Num :=
+  if shortcut and la == 0 then a
+  else if shortcut and lb == 0 then b
+  else if la < lb then a
+  else if lb < la then b
+  else if uniform(0, 1) == 0 then a else b
+
+-- Every upstream idle, as between requests on a proxy where requests do not overlap.
+def shipped : Num := least_requests(slot0, slot1, 0, 0, true)
+def fixed : Num := least_requests(slot0, slot1, 0, 0, false)
+def shipped2 : Num := least_requests(1, 2, 0, 0, true)
+def fixed2 : Num := least_requests(1, 2, 0, 0, false)
+
+-- The sample itself is uniform: each upstream is a candidate with probability 2/3.
+#prob slot0 == 2 or slot1 == 2
+
+-- leastRequests (#L827-L831): "If more than one host has the same least number of active
+-- requests, then one of those is chosen at random." Two idle upstreams are both candidates
+-- and tie at zero, so each should be chosen half the time.
+claim shipped2_second_gets_half : shipped2 == 2 with prob >= 1/2
+claim fixed2_second_gets_half : fixed2 == 2 with prob >= 1/2
+
+-- Docs: "random_choose <n> selects two or more upstreams randomly, then chooses one with
+-- least load". With three idle upstreams, each should get a third of the requests.
+claim shipped_second_gets_third : shipped == 2 with prob >= 1/3
+claim fixed_second_gets_third : fixed == 2 with prob >= 1/3
+
+-- What the shipped code does instead, on every run.
+theorem shipped2_always_first : shipped2 == 1
+theorem shipped_never_second : shipped != 2
+
+#eval shipped
+#eval fixed
+
+-- The fix keeps the least-load rule: for every load from 0 to 2 requests per upstream, both
+-- versions return a candidate with the fewest requests in flight.
+def load(u : Num, l1 : Num, l2 : Num, l3 : Num) : Num :=
+  if u == 1 then l1 else if u == 2 then l2 else l3
+
+def picks_least_loaded(shortcut : Bool, l1 : Num, l2 : Num, l3 : Num) : Bool :=
+  let la := load(slot0, l1, l2, l3) in
+  let lb := load(slot1, l1, l2, l3) in
+  load(least_requests(slot0, slot1, la, lb, shortcut), l1, l2, l3) == min(la, lb)
+
+theorem shipped_least_loaded :
+  forall l1 in 0..2, forall l2 in 0..2, forall l3 in 0..2, picks_least_loaded(true, l1, l2, l3)
+theorem fixed_least_loaded :
+  forall l1 in 0..2, forall l2 in 0..2, forall l3 in 0..2, picks_least_loaded(false, l1, l2, l3)

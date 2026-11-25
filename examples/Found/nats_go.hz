@@ -1,0 +1,133 @@
+-- nats-io/nats.go v1.56.0 (tag commit d18c9e7a4d9f): which jitter bound doReconnect picks.
+-- Line numbers are for nats.go at that commit. main at 792e440f256c has the same code in every
+-- place listed below; only the line numbers differ, by at most 33.
+--
+-- The promise, nats.go:398-406 (Options docs):
+--   "ReconnectJitter sets the upper bound for a random delay added to ReconnectWait during
+--    a reconnect when no TLS is used. Defaults to 100ms."
+--   "ReconnectJitterTLS sets the upper bound for a random delay added to ReconnectWait
+--    during a reconnect when TLS is used. Defaults to 1s."
+-- README.md:304-307 says the same for nats.ReconnectJitter(500ms, 2s): "up to 500 milliseconds
+-- for non TLS connections and 2 seconds for TLS connections".
+--
+-- Model elements and source:
+--   secure, tls_config  Opts.Secure and Opts.TLSConfig != nil once Connect has run. Secure(),
+--                       ClientTLSConfig(), RootCAs(), ClientCert() and TLSHandshakeFirst() set
+--                       Secure (nats.go:1188-1291, 1801-1807); Connect sets it for TLSConfig,
+--                       RootCAsCB or TLSCertCB set directly (nats.go:2036-2043); a tls:// URL
+--                       sets both (secureFromSchemes, nats.go:2227, 2234-2246). Some of those
+--                       options also fill in TLSConfig; the model leaves tls_config false for
+--                       them, which cannot change the hint because they always set Secure.
+--   Failed              nats.go:3123-3128: a client that asks for TLS gets ErrSecureConnWanted
+--                       from a server that offers none.
+--   requires            tls_required in the server's INFO, kept in nc.info (nats.go:4450-4458).
+--   tls_used            checkForSecure, nats.go:3118-3146: `o := nc.Opts` copies the struct, so
+--                       `o.Secure = true` for a server that requires TLS (nats.go:3129-3131)
+--                       changes only the copy, while makeTLSConn (nats.go:3141) still wraps this
+--                       and every later connection to the server in TLS. tlsAfterInfo
+--                       (nats.go:3195-3203) uses the same test: Opts.Secure || info.TLSRequired.
+--   tls_hint, bound     doReconnect, nats.go:3539-3551: ReconnectJitterTLS only if
+--                       Opts.Secure || Opts.TLSConfig != nil, else ReconnectJitter. fixed = true
+--                       adds info.TLSRequired, the change suggested in the report.
+--   jitter_cell         nats.go:3648-3651: st = ReconnectWait + rand.Int63n(jitter).
+--
+-- Abstractions, and why the conclusion survives them:
+--   * One server in the pool, so every reconnect attempt sleeps first (doSleep, nats.go:3611).
+--     With more servers the sleep happens once per pass over the pool, with the same bound,
+--     which doReconnect picks once, before its loop.
+--   * rand.Int63n(bound) is kept in 100 ms cells. A uniform delay in [0, 1000 ms) lands in each
+--     of ten cells with probability exactly 1/10, and one in [0, 100 ms) always lands in cell 0,
+--     so the cell probabilities are exact. The theorems only read the bound.
+--   * The server either requires TLS or offers none (TLSAvailable alone is left out; there the
+--     client stays in plaintext unless it asks for TLS, and both versions agree).
+--   * Left out: CustomReconnectDelayCB, ReconnectToServerCB and ForceReconnect, which replace or
+--     skip this sleep; websocket URLs and custom dialers that skip the TLS wrapper; the
+--     in-process server, whose INFO never requires TLS; and RetryOnFailedConnect before any INFO
+--     arrived, where nc.info is empty and both versions use ReconnectJitter.
+--   * The 1/2 weights on the configuration choices are arbitrary. They only set the belief that
+--     Haze prints for the rejected theorem, which is therefore not meaningful; the Client #prob
+--     lines condition on the configuration and do not depend on them.
+
+enum Phase = Configure | Connected | Failed | Waiting
+
+def jitter_plain : Num := 100      -- DefaultReconnectJitter, ms (nats.go:57)
+def jitter_tls : Num := 1000       -- DefaultReconnectJitterTLS, ms (nats.go:58)
+
+-- doReconnect's test, nats.go:3549, plus info.TLSRequired when fixed.
+def tls_hint(fixed : Bool, secure : Bool, tls_config : Bool, requires : Bool) : Bool :=
+  secure or tls_config or (fixed and requires)
+
+-- rand.Int63n(bound) / 100 ms, rounded down. A fresh draw on every call.
+def jitter_cell(bound : Num) : Num := uniform(0, bound / 100 - 1)
+
+system Client(fixed : Bool) {
+  var phase : Phase := Configure
+  var secure : Bool := false        -- nc.Opts.Secure
+  var tls_config : Bool := false    -- nc.Opts.TLSConfig != nil
+  var requires : Bool := false      -- nc.info.TLSRequired
+  var tls_used : Bool := false      -- the connection, and every reconnect to it, uses TLS
+  var bound : Num := 0              -- the jitter bound doReconnect picks, ms
+  var cell : Num := 0               -- the jitter of a reconnect sleep, in 100 ms cells
+  step {
+    match phase {
+      Configure => {
+        let tls_url := flip(1/2)          -- a tls:// URL in the server list
+        let secure_option := flip(1/2)    -- Secure(), RootCAs(), ClientCert(), ...
+        let tls_fields := flip(1/2)       -- Options.TLSConfig set directly
+        let server_requires := flip(1/2)  -- the server has TLS and requires it
+        secure := tls_url or secure_option or tls_fields
+        tls_config := tls_url or tls_fields
+        requires := server_requires
+        if (tls_url or secure_option or tls_fields) and not server_requires { phase := Failed }
+        else { phase := Connected }
+      }
+      Connected => {
+        tls_used := secure or requires
+        let b := if tls_hint(fixed, secure, tls_config, requires) then jitter_tls else jitter_plain
+        bound := b
+        cell := jitter_cell(b)
+        phase := Waiting
+      }
+      _ => skip
+    }
+  }
+}
+
+-- "ReconnectJitterTLS ... during a reconnect when TLS is used."
+theorem tls_reconnect_uses_tls_jitter : Client(false) |= always[3] (tls_used implies bound == jitter_tls)
+theorem tls_reconnect_uses_tls_jitter_fixed : Client(true) |= always[3] (tls_used implies bound == jitter_tls)
+
+-- "ReconnectJitter ... during a reconnect when no TLS is used." Both versions keep this.
+theorem plain_reconnect_uses_plain_jitter : Client(false) |= always[3] ((phase == Waiting and not tls_used) implies bound == jitter_plain)
+theorem plain_reconnect_uses_plain_jitter_fixed : Client(true) |= always[3] ((phase == Waiting and not tls_used) implies bound == jitter_plain)
+
+-- The reproduction's case A: TLS is used only because the server requires it.
+-- Share of reconnect sleeps with at least 100 ms of jitter: 0 now, 9/10 with the fix.
+#prob Client(false) |= after[2] cell >= 1 given tls_used and not secure
+#prob Client(true) |= after[2] cell >= 1 given tls_used and not secure
+
+-- Cases B and C: the client asks for TLS itself. 9/10 in both versions.
+#prob Client(false) |= after[2] cell >= 1 given tls_used and secure
+#prob Client(true) |= after[2] cell >= 1 given tls_used and secure
+
+-- Three clients as in case A (nats:// URL, no TLS option, a server that requires TLS) lose the
+-- server at the same moment: chance that all three reconnect attempts, and the TLS handshakes
+-- that follow them, start in the same 100 ms cell.
+system Herd(fixed : Bool) {
+  var drawn : Bool := false
+  var c1 : Num := 0
+  var c2 : Num := 0
+  var c3 : Num := 0
+  step {
+    if not drawn {
+      let b := if tls_hint(fixed, false, false, true) then jitter_tls else jitter_plain
+      c1 := jitter_cell(b)
+      c2 := jitter_cell(b)
+      c3 := jitter_cell(b)
+      drawn := true
+    }
+  }
+}
+
+#prob Herd(false) |= after[1] (c1 == c2 and c2 == c3)
+#prob Herd(true) |= after[1] (c1 == c2 and c2 == c3)

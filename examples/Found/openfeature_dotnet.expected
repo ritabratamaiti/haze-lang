@@ -1,0 +1,44 @@
+examples/Found/openfeature_dotnet.hz:65:1: error: theorem documented_rollout_resolves
+  probability 0 · fails with certainty
+  grade prob · 1 parameter assignment(s) · ≤100 states/step
+  theorem rejected: belief is 0, not 1
+  counterexample at step 1 (path mass 0.01, degree 0):
+    inputs: user_hash = 0
+    state: fix = false, kind = Arith, t = 1, outcome = ParseError
+examples/Found/openfeature_dotnet.hz:66:1: info: theorem documented_rollout_resolves_fixed
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · ≤100 states/step
+  theorem accepted
+examples/Found/openfeature_dotnet.hz:69:1: error: theorem matches_reference
+  probability 0 · fails with certainty
+  grade prob · 1 parameter assignment(s) · ≤100 states/step
+  theorem rejected: belief is 0, not 1
+  counterexample at step 1 (path mass 0.01, degree 0):
+    inputs: user_hash = 0
+    state: fix = false, kind = Arith, t = 1, outcome = ParseError, ref_outcome = Off
+examples/Found/openfeature_dotnet.hz:70:1: info: theorem matches_reference_fixed
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · ≤100 states/step
+  theorem accepted
+examples/Found/openfeature_dotnet.hz:73:1: info: theorem literal_weights_resolve
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · ≤100 states/step
+  theorem accepted
+examples/Found/openfeature_dotnet.hz:74:1: info: theorem var_weights_resolve
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · ≤100 states/step
+  theorem accepted
+examples/Found/openfeature_dotnet.hz:75:1: info: theorem if_weights_resolve
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · ≤100 states/step
+  theorem accepted
+examples/Found/openfeature_dotnet.hz:78:1: info: #prob Rollout(false, Arith) |= after[6] ref_outcome == On
+  probability 0.5
+examples/Found/openfeature_dotnet.hz:79:1: info: #prob Rollout(false, Arith) |= after[6] outcome == On
+  probability 0
+examples/Found/openfeature_dotnet.hz:80:1: info: #prob Rollout(true, Arith) |= after[6] outcome == On
+  probability 0.5
+examples/Found/openfeature_dotnet.hz:84:1: info: #prob Rollout(false, Arith) |= after[12] ref_outcome == On
+  probability 1
+examples/Found/openfeature_dotnet.hz:85:1: info: #prob Rollout(false, Arith) |= after[12] outcome == ParseError
+  probability 1

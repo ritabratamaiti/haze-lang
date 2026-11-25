@@ -1,0 +1,36 @@
+examples/Found/pyrate_limiter.hz:64:1: error: theorem free_key_no_wait
+  probability 0 · refuted
+  grade crisp · 1 parameter assignment(s) · ≤1 states/step
+  theorem rejected: belief is 0, not 1
+  counterexample at step 6 (path mass 1, degree 0):
+    state: mode = Wait, t = 6, held = true, b = LockWait, b_wait = 1
+examples/Found/pyrate_limiter.hz:65:1: info: theorem free_key_no_wait_fixed
+  probability 1 · proved
+  grade crisp · 1 parameter assignment(s) · ≤1 states/step
+  theorem accepted
+examples/Found/pyrate_limiter.hz:66:1: error: theorem free_key_no_timeout
+  probability 0 · refuted
+  grade crisp · 1 parameter assignment(s) · ≤1 states/step
+  theorem rejected: belief is 0, not 1
+  counterexample at step 25 (path mass 1, degree 0):
+    state: mode = Timeout, t = 25, held = true, b = TimedOut, b_wait = 20
+examples/Found/pyrate_limiter.hz:67:1: info: theorem free_key_no_timeout_fixed
+  probability 1 · proved
+  grade crisp · 1 parameter assignment(s) · ≤1 states/step
+  theorem accepted
+examples/Found/pyrate_limiter.hz:68:1: error: theorem nonblocking_returns_at_once
+  probability 0 · refuted
+  grade crisp · 1 parameter assignment(s) · ≤1 states/step
+  theorem rejected: belief is 0, not 1
+  counterexample at step 6 (path mass 1, degree 0):
+    state: mode = NoWait, t = 6, held = true, b = LockWait, b_wait = 1
+examples/Found/pyrate_limiter.hz:69:1: info: theorem nonblocking_returns_at_once_fixed
+  probability 1 · proved
+  grade crisp · 1 parameter assignment(s) · ≤1 states/step
+  theorem accepted
+examples/Found/pyrate_limiter.hz:72:1: info: #eval Async(false, Wait) |= after[50] b_wait
+  36
+examples/Found/pyrate_limiter.hz:73:1: info: #eval Async(false, NoWait) |= after[50] b_wait
+  36
+examples/Found/pyrate_limiter.hz:74:1: info: #eval Async(true, NoWait) |= after[50] b_wait
+  0

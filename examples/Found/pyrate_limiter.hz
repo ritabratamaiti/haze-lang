@@ -1,0 +1,80 @@
+-- vutran1710/PyrateLimiter 4.5.1 (PyPI; tag v4.5.1 = 968301d) and master at 2fc53b9:
+-- Limiter.try_acquire_async with one bucket per key (the factory from tests/test_lock_release.py).
+-- Line numbers are pyrate_limiter/limiter.py at 2fc53b9; 4.5.1 has the same code at other lines.
+--
+-- The run is the reproduction in the report, in 10 ms ticks, with Rate(1, 400 ms) and
+-- buffer_ms = 10. Key A is full. At t = 0 a second call on A (A's waiter) starts; at t = 5
+-- (50 ms) a call on key B, whose bucket is empty, starts.
+--
+-- Model element   Source
+-- held            try_acquire_async, run() L476-L483: `async with lock:` around
+--                 `await self._acquire_async(...)`. _get_async_lock (L376-L389) keeps one
+--                 asyncio.Lock per thread and event loop, shared by every key.
+-- t == 41         A's waiter: in _try_acquire (L623-L711) the first put on A fails under the
+--                 RLock and, with _force_async, the delay coroutine is returned (L693-L698).
+--                 _delay_waiter reads waiting() = 400 ms (L219), _delay_to_sleep_ms adds
+--                 buffer_ms (L208), and _retry_async (L223-L250) sleeps 410 ms
+--                 (asyncio.sleep, L238), re-puts (L246) and returns True. All of that runs
+--                 inside run()'s `async with`, so the lock is held until t = 41.
+-- b, b_wait       B's call waits for the same lock, then its put succeeds (B has room).
+-- Timeout         timeout=0.2: asyncio.wait_for(run(), timeout=timeout) (L488) gives up after
+--                 20 ticks and try_acquire_async returns False (L490-L491).
+-- NoWait          blocking=False, or timeout=0: `return await run()` (L489), so nothing
+--                 bounds the wait for the lock. B may also be a blocking=False call on A
+--                 itself: it should return False at once and waits the same way.
+-- fixed = true    the change suggested in the report: _retry_async releases the lock around
+--                 asyncio.sleep and takes it back for each re-put, as the sync path has done
+--                 with the RLock since #304 (_blocking_retry_sync L331-L374). A's re-put at
+--                 t = 41 then holds the lock for no time at this granularity.
+--
+-- Abstractions: time moves in 10 ms ticks and puts take no time. Only the lock is modeled;
+-- the buckets appear as "A is full until its waiter wakes" and "B has room". asyncio runs one
+-- coroutine at a time, so B can only run while A's waiter is suspended, and the only
+-- suspension that lasts is the sleep. With the timing fixed to the reproduction's there is a
+-- single run per variant; B starting at any other tick before 41 waits until t = 41 the
+-- same way. The model does not count admissions, so it says nothing about over-admission
+-- with or without the fix; the report checks that on the package.
+
+enum Mode = Wait | Timeout | NoWait     -- B's call: default, timeout=0.2, blocking=False
+enum Call = NotYet | LockWait | Done | TimedOut
+
+system Async(fixed : Bool, mode : Mode) {
+  var t : Num := 0
+  var held : Bool := not fixed     -- A's waiter holds the asyncio.Lock while it sleeps
+  var b : Call := NotYet
+  var b_wait : Num := 0            -- ticks B has waited for the lock
+  step {
+    t := t + 1
+    if t == 41 { held := false }   -- A wakes after 410 ms, re-puts, returns, releases
+    if b == LockWait {
+      b_wait := b_wait + 1
+      if not held { b := Done }    -- B gets the lock and its put succeeds
+      else if mode == Timeout and b_wait == 20 { b := TimedOut }
+    }
+    if b == NotYet and t == 5 {
+      if held { b := LockWait } else { b := Done }
+    }
+  }
+}
+
+-- try_acquire_async docstring (L450-L452): "blocking : bool, default True. If True, wait until
+-- a permit is available (subject to timeout); if False, return immediately." README: "Per-key
+-- limits: track different services, users, or resources independently."
+-- B's permit is available when it asks, so B should not wait, in any mode.
+theorem free_key_no_wait : Async(false, Wait) |= always[50] b_wait == 0
+theorem free_key_no_wait_fixed : Async(true, Wait) |= always[50] b_wait == 0
+theorem free_key_no_timeout : Async(false, Timeout) |= always[50] b != TimedOut
+theorem free_key_no_timeout_fixed : Async(true, Timeout) |= always[50] b != TimedOut
+theorem nonblocking_returns_at_once : Async(false, NoWait) |= always[50] b_wait == 0
+theorem nonblocking_returns_at_once_fixed : Async(true, NoWait) |= always[50] b_wait == 0
+
+-- How long B waits, in 10 ms ticks.
+#eval Async(false, Wait) |= after[50] b_wait
+#eval Async(false, NoWait) |= after[50] b_wait
+#eval Async(true, NoWait) |= after[50] b_wait
+
+-- The counterexamples are the reproduction's calls. free_key_no_timeout fails at t = 25 with
+-- b_wait = 20: B gave up 200 ms after it started ("try_acquire_async('B', timeout=0.2) ->
+-- False after 201 ms"). The other two fail at t = 6, the first tick B spends waiting; B then
+-- waits 36 ticks in all (the #eval lines), the 360 ms that try_acquire_async('B') and the
+-- blocking=False calls take on the package.

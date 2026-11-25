@@ -1,0 +1,28 @@
+examples/Found/slog_sampling.hz:122:1: error: theorem at_most_threshold_released
+  probability 0.25 · graded
+  grade prob · 1 parameter assignment(s) · 217 reachable states
+  theorem rejected: belief is 0.25, not 1
+  counterexample at step 9 (path mass 0.001953 (=1/512), degree 0):
+    state: buf = Released, map_state = Published, cnt = 2, accepted = 3, pc_a = Get, held_a = NoCounter, left_a = 1, pc_b = Get, held_b = NoCounter, left_b = 2
+examples/Found/slog_sampling.hz:123:1: error: theorem at_most_threshold_ideal_map
+  probability 0.5 · graded
+  grade prob · 1 parameter assignment(s) · 111 reachable states
+  theorem rejected: belief is 0.5, not 1
+  counterexample at step 8 (path mass 0.003906 (=1/256), degree 0):
+    state: buf = IdealMap, map_state = Published, cnt = 2, accepted = 3, pc_a = Get, held_a = NoCounter, left_a = 1, pc_b = Get, held_b = NoCounter, left_b = 2
+examples/Found/slog_sampling.hz:124:1: info: theorem at_most_threshold_fixed
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · 64 reachable states
+  theorem accepted
+examples/Found/slog_sampling.hz:129:1: info: theorem ideal_map_one_extra
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · 111 reachable states
+  theorem accepted
+examples/Found/slog_sampling.hz:130:1: info: #prob Window(Released) |= eventually accepted == per + threshold
+  probability 0.011719 (=3/256)
+examples/Found/slog_sampling.hz:131:1: info: #prob Window(Released) |= eventually accepted > threshold
+  probability 0.75
+examples/Found/slog_sampling.hz:132:1: info: #prob Window(IdealMap) |= eventually accepted > threshold
+  probability 0.5
+examples/Found/slog_sampling.hz:135:1: info: #prob Window(SyncMapFix) |= eventually (pc_a == Done and pc_b == Done and accepted == threshold)
+  probability 1

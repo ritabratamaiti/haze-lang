@@ -1,0 +1,92 @@
+-- throttled/throttled v2.15.1 (commit 7516f44; master is the release commit).
+-- GCRARateLimiterCtx.RateLimitCtx called with quantity 0 (a "peek") while one other request
+-- for the same key runs. Line numbers are for rate.go at 7516f44.
+--
+-- rate.go#L181-L182 (also #L25-L26): "If quantity is 0, no update is performed allowing you
+-- to "peek" at the state of the RateLimiter for a given key."
+-- rate_test.go#L231 (TestRateLimitPeekReturnsRetryAfter): "Peeking returns limited==false."
+--
+-- One step is one action of the peek, or the whole of the other request:
+--   rate.go#L190-L265   the retry loop. Read is GetWithTime (#L197) and the arithmetic up to
+--                       the store call. Cas is CompareAndSwapWithTTL (#L245-L249); a failed
+--                       swap goes round the loop again (#L254-L264).
+--   rate.go#L208-L213   q is the quantity parameter: origQuantity := quantity, and a peek sets
+--                       quantity = 1. Nothing resets it, so a second pass has origQuantity 1.
+--   rate.go#L215-L220   newTat = max(now, tat) + quantity emission intervals
+--   rate.go#L222-L233   limited if newTat - tau > now; only a call with origQuantity != 0
+--                       stops there, and it returns limited = true without writing
+--   rate.go#L235-L241   a peek writes newTat = max(now, tat), the value it read
+--   other               one quantity-1 request, done atomically: whatever its own retries do,
+--                       it ends with stored + 1, or is limited if the bucket is full
+--
+-- Abstractions: time is frozen, as in the reproduction, so stored is the TAT minus now in
+-- emission intervals. MaxBurst 2 gives a limit of 3, so tau = 3. `before` requests have
+-- already been granted. The empty-key branch (SetIfNotExistsWithTTL) has the same retry
+-- structure and is left out. The scheduler is a fair coin between "the other request runs now"
+-- and "the peek takes its next action". The theorems cover every interleaving, so only the
+-- #prob numbers depend on the coin.
+-- fixed = true decides once, before the loop, that the call is a peek (the suggested fix).
+
+enum Phase = Read | Cas | Done
+
+def tau : Num := 3
+
+system Peek(fixed : Bool, before : Num) {
+  var stored : Num := before   -- TAT - now, in emission intervals
+  var reals : Num := before    -- quantity-1 requests granted
+  var other_done : Bool := false
+  var phase : Phase := Read
+  var q : Num := 0             -- the quantity variable inside RateLimitCtx
+  var seen : Num := 0          -- tatVal read by the current pass
+  var newv : Num := 0          -- the value the current pass will write
+  var limited : Bool := false  -- what the peek returns
+  step {
+    let other_now := (not other_done) and flip(1/2)
+    if other_now {
+      if stored + 1 <= tau {
+        stored := stored + 1
+        reals := reals + 1
+      }
+      other_done := true
+    } else {
+      match phase {
+        Read => {
+          let orig := q
+          let inc := if orig == 0 then 1 else orig
+          if orig == 0 and not fixed { q := 1 }
+          seen := stored
+          if stored + inc > tau and orig != 0 {
+            limited := true
+            phase := Done            -- limited: return without writing
+          } else {
+            newv := if orig == 0 then stored else stored + inc
+            phase := Cas
+          }
+        }
+        Cas => {
+          if stored == seen {
+            stored := newv
+            phase := Done
+          } else {
+            phase := Read            -- the swap lost the race: go round again
+          }
+        }
+        _ => skip
+      }
+    }
+  }
+}
+
+-- "no update is performed": once the peek has returned, the stored TAT counts only the
+-- quantity-1 requests that were granted. One request granted before, so the bucket has room.
+theorem peek_does_not_consume : Peek(false, 1) |= always (phase == Done implies stored == reals)
+theorem peek_does_not_consume_fixed : Peek(true, 1) |= always (phase == Done implies stored == reals)
+
+-- "Peeking returns limited==false." Two granted before, so the other request takes the last unit.
+theorem peek_not_limited : Peek(false, 2) |= always not limited
+theorem peek_not_limited_fixed : Peek(true, 2) |= always not limited
+
+-- How often each happens under the fair-coin scheduler (model numbers for this scheduler,
+-- not rates for real traffic).
+#prob Peek(false, 1) |= eventually stored > reals
+#prob Peek(false, 2) |= eventually limited

@@ -1,0 +1,93 @@
+-- @Retryable jitter on reactive methods, spring-projects/spring-framework v7.1.0 (commit f2e4863d).
+-- v7.0.11 (commit 2670e428) and main at 0bbae075 run the same code; main only changed the license
+-- header, so its line numbers are 11 lower. Reactive methods go through reactor-core 3.9.0, the
+-- version in the reactor-bom 2026.0.0 that 7.1.0 builds against (7.0.11 uses 3.8.9, whose
+-- RetryBackoffSpec is identical). Line numbers are at v7.1.0 and at reactor-core v3.9.0.
+--
+-- The promise, Retryable.java:205-213 (@Retryable#jitter), worded the same in RetryPolicy.java:271-282:
+--   "A jitter value for the base retry attempt, randomly subtracted or added to the calculated
+--    delay, resulting in a value between delay - jitter and delay + jitter but never below the
+--    base delay() or above maxDelay(). [...] When delay() is 0 combined with a positive jitter,
+--    the delay never grows regardless of any configured multiplier, so the full configured
+--    jitter is applied directly as a random delay in the range from 0 to min(jitter, maxDelay)."
+-- core/resilience.adoc:84-89 repeats the second sentence; lines 91-92 then say that @Retryable
+-- "also works for reactive methods with a reactive return type, decorating the pipeline with
+-- Reactor's retry capabilities", and lines 103-104 point to the annotation attributes for details.
+--
+-- Model elements and source:
+--   Imperative     AbstractRetryInterceptor.java:108-118 builds a RetryPolicy, whose builder makes
+--                  an ExponentialBackOff (RetryPolicy.java:489-495). ExponentialBackOff.java:298-326:
+--                  the first interval is the delay, and applyJitter draws from
+--                  [max(delay - jitter, delay), min(delay + jitter, maxDelay)).
+--   Reactive       AbstractRetryInterceptor.java:179-183: Retry.backoff(maxRetries, delay)
+--                  .jitter(calculateJitterFactor(spec)), where calculateJitterFactor (L211-214) is 0
+--                  for a zero delay and min(1, jitter / delay) otherwise.
+--                  RetryBackoffSpec.java:610-653: a zero backoff retries at once (L623-626);
+--                  otherwise jitterOffset = backoff * (long) (100 * factor) / 100 ms, and on the
+--                  first retry the delay is drawn from [delay, delay + jitterOffset).
+--   ReactiveFixed  the suggested change: reactive methods take their delays from the same BackOff
+--                  as imperative ones, so this path follows the imperative rule. A Reactor
+--                  prototype of it (Retry.from driven by that BackOff) gave delays over the whole
+--                  documented range in the reproduction.
+--
+-- Abstractions, and why the conclusion survives them:
+--   * Only the first retry is modeled. With the default multiplier 1, every retry has the same
+--     backoff and the same range in both libraries, so the first one stands for all of them.
+--   * maxDelay is the default (Long.MAX_VALUE ms), so min(..., maxDelay) never binds.
+--   * Java computes the jitter factor in double arithmetic. For the factors used here (0, 1/2
+--     and 1) the double results, and Reactor's (long) (100 * factor), are exact.
+--   * Delays are whole milliseconds, drawn uniformly, as in both libraries.
+
+enum Path = Imperative | Reactive | ReactiveFixed
+
+system FirstRetry(path : Path, delay : Num, jitter : Num) {
+  var done : Bool := false
+  var high : Num := 0   -- exclusive upper end of the range the first delay is drawn from (ms)
+  var wait : Num := 0   -- the first retry delay (ms)
+  step {
+    if not done {
+      match path {
+        Reactive => {
+          let factor := if delay == 0 then 0 else min(1, jitter / delay)
+          let offset := floor(delay * floor(100 * factor) / 100)
+          high := if delay == 0 then 0 else delay + offset   -- delay 0: no draw, the retry starts at once
+          wait := if delay == 0 or offset == 0 then delay else delay + uniform(0, offset - 1)
+        }
+        _ => {
+          high := delay + jitter
+          wait := delay + uniform(0, jitter - 1)
+        }
+      }
+      done := true
+    }
+  }
+}
+
+-- "never below the base delay or above maxDelay": the first delay is drawn from
+-- [delay, delay + jitter), which for delay = 0 is the documented [0, min(jitter, maxDelay)).
+theorem range_delay0_imperative : FirstRetry(Imperative, 0, 500) |= always[1] (done implies high == 500)
+theorem range_delay0_reactive : FirstRetry(Reactive, 0, 500) |= always[1] (done implies high == 500)
+theorem range_delay0_reactive_fixed : FirstRetry(ReactiveFixed, 0, 500) |= always[1] (done implies high == 500)
+theorem range_delay100_imperative : FirstRetry(Imperative, 100, 500) |= always[1] (done implies high == 600)
+theorem range_delay100_reactive : FirstRetry(Reactive, 100, 500) |= always[1] (done implies high == 600)
+theorem range_delay100_reactive_fixed : FirstRetry(ReactiveFixed, 100, 500) |= always[1] (done implies high == 600)
+-- Control: with jitter <= delay the two paths already agree.
+theorem range_jitter50_imperative : FirstRetry(Imperative, 100, 50) |= always[1] (done implies high == 150)
+theorem range_jitter50_reactive : FirstRetry(Reactive, 100, 50) |= always[1] (done implies high == 150)
+
+-- A delay drawn uniformly from the documented range lands in its upper half half of the time:
+-- [250, 500) ms for delay 0, [350, 600) ms for delay 100.
+claim upper_half_delay0_imperative : FirstRetry(Imperative, 0, 500) |= after[1] wait >= 250 with prob >= 0.5
+claim upper_half_delay0_reactive : FirstRetry(Reactive, 0, 500) |= after[1] wait >= 250 with prob >= 0.5
+claim upper_half_delay0_reactive_fixed : FirstRetry(ReactiveFixed, 0, 500) |= after[1] wait >= 250 with prob >= 0.5
+claim upper_half_delay100_imperative : FirstRetry(Imperative, 100, 500) |= after[1] wait >= 350 with prob >= 0.5
+claim upper_half_delay100_reactive : FirstRetry(Reactive, 100, 500) |= after[1] wait >= 350 with prob >= 0.5
+claim upper_half_delay100_reactive_fixed : FirstRetry(ReactiveFixed, 100, 500) |= after[1] wait >= 350 with prob >= 0.5
+
+-- Mean first delay in ms, to compare with the reproduction.
+#expect FirstRetry(Imperative, 0, 500) |= after[1] wait
+#expect FirstRetry(Reactive, 0, 500) |= after[1] wait
+#expect FirstRetry(Imperative, 100, 500) |= after[1] wait
+#expect FirstRetry(Reactive, 100, 500) |= after[1] wait
+#expect FirstRetry(Imperative, 100, 50) |= after[1] wait
+#expect FirstRetry(Reactive, 100, 50) |= after[1] wait

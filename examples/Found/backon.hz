@@ -1,0 +1,85 @@
+-- backon (Rust crate), FibonacciBuilder::with_jitter: the jitter stays below min_delay on
+-- every retry, though the docs say it is drawn from (0, current_delay).
+--
+-- Xuanwo/backon 1.6.0 (crates.io; tag v1.6.0 at commit e24dc927). The default branch at
+-- 262a7697 has the same jitter code. Line numbers refer to backon/src/backoff/fibonacci.rs
+-- at v1.6.0 unless marked main.
+--
+-- The promise, fibonacci.rs:63-66 (FibonacciBuilder::with_jitter):
+--   "When jitter is enabled, FibonacciBackoff will add a random jitter between
+--    (0, current_delay) to the delay."
+-- PR #184 changed this doc from (0, min_delay) to (0, current_delay) for both builders,
+-- "so the jitter is always a relevant size compared to the delays".
+--
+-- Model elements and source:
+--   attempts          fibonacci.rs:177-180   stop after max_times, then attempts += 1
+--   first retry       fibonacci.rs:183-193   next = min_delay, current_delay = next,
+--                                            jitter next * rng.f32() (range = base)
+--   later retries     fibonacci.rs:195-213   if cur < max_delay: next = cur + prev when
+--                                            previous_delay is set, and previous_delay = cur;
+--                                            jitter is min_delay * rng.f32() (fibonacci.rs:209)
+--   main 262a7697     fibonacci.rs:198-223   same, plus a clamp of next to max_delay
+--                                            (main :209-215); jitter line is main :219
+--   controls          exponential.rs:232-235 ExponentialBackoff adds tmp_cur * rng.f32()
+--                     constant.rs:147-150    ConstantBackoff adds delay * rng.f32()
+--
+-- Units are 100 ms: min_delay = 1, max_delay = 600 (60 s), max_times = 10, the settings of
+-- the reproduction. The clamp added on main never applies here (the largest base is 5.5 s),
+-- so the model covers both 1.6.0 and main.
+--
+-- Abstractions, and why the conclusion survives them:
+--   * None is 0 for current_delay and previous_delay. Every real delay is at least
+--     min_delay = 1, so 0 never stands for a real delay.
+--   * rng.f32() is kept in 100 ms cells: a jitter uniform on [0, d) for a whole number d of
+--     100 ms lands in each of d cells with probability 1/d, and a jitter below
+--     min_delay = 100 ms always lands in cell 0. The theorems read only the range.
+--   * f32 rounding in fastrand's f32() and in Duration::mul_f32 is left out; it moves
+--     values by nanoseconds. saturating_add never saturates at these sizes.
+--
+-- fixed = true draws every jitter from (0, current_delay), the change suggested in the report
+-- (next += next.mul_f32(rng.f32()) in the later-retry branch); the theorem then holds.
+
+def min_delay : Num := 1      -- 100 ms
+def max_delay : Num := 600    -- 60 s
+def max_times : Num := 10
+
+system Fib(fixed : Bool) {
+  var attempts : Num := 0
+  var cur : Num := 0          -- current_delay, 0 for None
+  var prev : Num := 0         -- previous_delay, 0 for None
+  var base : Num := 0         -- delay of the latest retry before jitter
+  var range : Num := 0        -- its jitter is drawn from [0, range)
+  var cell : Num := 0         -- that jitter in 100 ms cells, rounded down
+  step {
+    if attempts < max_times {
+      attempts := attempts + 1
+      if cur == 0 {
+        cur := min_delay
+        base := min_delay
+        range := min_delay
+      } else {
+        let next := if cur < max_delay and prev > 0 then cur + prev else cur
+        if cur < max_delay { prev := cur }
+        cur := next
+        base := next
+        range := if fixed then next else min_delay
+      }
+      cell := uniform(0, range - 1)
+    }
+  }
+}
+
+-- "a random jitter between (0, current_delay)"
+theorem jitter_range_is_current_delay : Fib(false) |= always[10] range == base
+theorem jitter_range_is_current_delay_fixed : Fib(true) |= always[10] range == base
+
+-- Base delays: 1, 1, 2, 3, 5, 8, 13, 21, 34, 55 (x 100 ms).
+#eval Fib(false) |= after[10] base
+
+-- Chance of at least 100 ms of jitter on retry 3 (base 200 ms) and retry 10 (base 5.5 s).
+-- The reproduction measured 0 of 10,000 for 1.6.0 and main on both retries, and
+-- 0.5010 and 0.9821 with the fix applied to main.
+#prob Fib(false) |= after[3] cell >= 1
+#prob Fib(true) |= after[3] cell >= 1
+#prob Fib(false) |= after[10] cell >= 1
+#prob Fib(true) |= after[10] cell >= 1

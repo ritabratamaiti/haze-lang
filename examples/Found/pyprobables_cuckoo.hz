@@ -1,0 +1,106 @@
+-- pyprobables CuckooFilter: why the false positive rate grows with the number of stored keys
+-- and passes the filter's own error_rate.
+--
+-- Library: pyprobables 0.7.0 (PyPI; tag v0.7.0 at a2a3ab5). master at f503fd7 has the same code for
+-- everything below. probables/cuckoo/cuckoo.py, 0.7.0 lines [master lines]:
+--   _generate_fingerprint_info  492-506 [512-526]   fingerprint = low f bits of fnv_1a(key) (500 [520]),
+--                                                     then both indexes from the fingerprint (501 [521]).
+--   _indicies_from_fingerprint  483-490 [503-510]   idx_1 = fingerprint % capacity,
+--                                                     idx_2 = fnv_1a(str(fingerprint)) % capacity.
+--   check, _check_if_present    306-315, 440-446 [306-315, 448-454]
+--                                                     True when bucket idx_1 or idx_2 of the query's
+--                                                     fingerprint holds that fingerprint.
+--   add, _insert_fingerprint    291-304, 361-392 [291-304, 361-400]
+--                                                     add() returns early when the fingerprint is already in
+--                                                     bucket idx_1 or idx_2 (300-302). Otherwise it is stored
+--                                                     in one of them; a kicked fingerprint moves to the other
+--                                                     index of the same fingerprint (383-385 [386-388]), so
+--                                                     it always sits in one of its own two buckets.
+--   remove                      317-330 [317-330]   deletes one copy of the fingerprint from idx_1 or idx_2.
+--   error_rate, _set_error_rate 246-249, 433-438 [246-249, 441-446]
+--                                                     init_error_rate(e) keeps e as error_rate and sets f with
+--   _calc_fingerprint_size      522-524 [542-544]   f = ceil(log2(1/e) + log2(b) + 1), so 2b / 2^f <= e.
+--   _calc_error_rate            518-520 [538-540]   error_rate = 1 / 2^(f - log2(b) - 1) = 2b / 2^f.
+--
+-- Abstraction. A key is modeled by its fingerprint, uniform on 0..F-1 (FNV-1a low bits of random keys),
+-- and by which of its two buckets the cuckoo kicks left it in (p). g stands for fnv_1a(str(fp)) % capacity;
+-- theorem 1 holds for every function g, so the stand-in does not matter. The small filter has F = 8
+-- fingerprints (f = 3 bits), m = 8 buckets of b = 1 slot and three added keys, so its error_rate is
+-- 2b / F = 1/4. With either layout, whether a stored key answers a query does not depend on b; b only
+-- enters through that bound. Insert failures and expansion are left out (3 keys in 8 slots). Expansion
+-- re-inserts every fingerprint at its own two indexes in the larger table, so theorem 1 holds there too.
+-- Part 4 redoes the counts at the size of init_error_rate(0.001): F = 8192, m = 10000, b = 4.
+--
+-- The fix variant is the partial-key layout that the 2b / 2^f formula assumes (Fan et al. 2014): the
+-- primary bucket r comes from hash bits that are not part of the fingerprint, and the alternate bucket is
+-- (g(fp) - r) mod m, which maps each bucket of a pair to the other. The other fix the report offers keeps
+-- the shipped layout and changes the error-rate formula and the docs; that one is arithmetic and is not
+-- modeled here.
+
+def F : Num := 8
+def m : Num := 8
+def b : Num := 1
+def error_rate : Num := 2 * b / F
+
+def mod(x : Num, n : Num) : Num := x - n * floor(x / n)
+def g(v : Num) : Num := mod(5 * v + 3, m)
+
+-- Shipped: both indexes are functions of the fingerprint.
+def idx1(v : Num) : Num := mod(v, m)
+def idx2(v : Num) : Num := g(v)
+def loc(v : Num, p : Bool) : Num := if p then idx1(v) else idx2(v)
+def hit(v : Num, p : Bool, q : Num) : Bool := v == q and (loc(v, p) == idx1(q) or loc(v, p) == idx2(q))
+
+-- Fix: primary bucket r from independent hash bits.
+def alt(r : Num, v : Num) : Num := mod(g(v) - r, m)
+def floc(v : Num, r : Num, p : Bool) : Num := if p then r else alt(r, v)
+def fhit(v : Num, r : Num, p : Bool, q : Num, rq : Num) : Bool :=
+  v == q and (floc(v, r, p) == rq or floc(v, r, p) == alt(rq, q))
+
+-- Three added keys and one query key that was never added.
+input f1 : Num ~ uniform(0, F - 1)
+input f2 : Num ~ uniform(0, F - 1)
+input f3 : Num ~ uniform(0, F - 1)
+input p1 : Bool ~ {true: 0.5, false: 0.5}
+input p2 : Bool ~ {true: 0.5, false: 0.5}
+input p3 : Bool ~ {true: 0.5, false: 0.5}
+input fq : Num ~ uniform(0, F - 1)
+input r1 : Num ~ uniform(0, m - 1)
+input rq : Num ~ uniform(0, m - 1)
+
+-- 1. The mechanism. With the shipped indexes, a stored key answers a query exactly when the two
+--    fingerprints are equal, wherever the kicks put it. So check() compares the query with every
+--    stored fingerprint, not with the 2b in its own two buckets.
+theorem shipped_hit_iff_same_fingerprint : hit(f1, p1, fq) == (f1 == fq)
+--    add(y) runs the same test before storing y, and remove(y) deletes the copy that the test finds.
+--    So with x stored, add(y) keeps no copy of y, and remove(y) then deletes x's entry, exactly when x
+--    and y have the same fingerprint ('user-99' and 'user-404' in the report).
+
+-- 2. With the fix, an equal fingerprint only matters when the stored key also has the query's bucket pair.
+theorem fixed_hit_needs_same_pair : fhit(f1, r1, p1, fq, rq) == (f1 == fq and (r1 == rq or r1 == alt(rq, fq)))
+
+-- 3. The documented promise: error_rate is the false positive rate ("The error rate of the cuckoo
+--    filter", cuckoo.py 246-249).
+def fp_shipped : Bool := hit(f1, p1, fq) or hit(f2, p2, fq) or hit(f3, p3, fq)
+
+def fixed_key_hits() : Bool :=
+  let v := uniform(0, F - 1) in let r := uniform(0, m - 1) in let p := flip(0.5) in fhit(v, r, p, fq, rq)
+def fp_fixed : Bool := fixed_key_hits() or fixed_key_hits() or fixed_key_hits()
+
+#eval error_rate
+#prob fp_shipped
+#prob fp_fixed
+claim fixed_meets_error_rate : fp_fixed with prob <= 0.25           -- error_rate = 2b / F = 1/4
+claim shipped_meets_error_rate : fp_shipped with prob <= 0.25
+
+-- 4. The same counts at the size of CuckooFilter.init_error_rate(0.001) (f = 13, m = 10000, b = 4,
+--    error_rate 0.001) with random keys. By theorem 1 each stored key matches a query with
+--    probability 2^-13; with the fix (theorem 2) it also needs the query's bucket pair, about 2 / m.
+--    False positive rate with 1000 keys, shipped and fixed:
+#prob binomial(1000, 1/8192) >= 1
+#prob binomial(1000, 1/40960000) >= 1
+--    A key that was added and never removed, after 500 other random keys were removed: it is lost when
+--    it shares one stored copy with one of the 500 (the note under theorem 1), which takes an equal
+--    fingerprint and, with the fix, also the same bucket pair. Shipped and fixed:
+#prob binomial(500, 1/8192) >= 1
+#prob binomial(500, 1/40960000) >= 1

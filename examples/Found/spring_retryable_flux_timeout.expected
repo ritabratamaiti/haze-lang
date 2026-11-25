@@ -1,0 +1,44 @@
+examples/Found/spring_retryable_flux_timeout.hz:111:1: info: theorem no_attempt_after_timeout_imperative
+  probability 1 · proved
+  grade crisp · 1 parameter assignment(s) · ≤1 states/step
+  theorem accepted
+examples/Found/spring_retryable_flux_timeout.hz:112:1: info: theorem no_attempt_after_timeout_mono
+  probability 1 · proved
+  grade crisp · 1 parameter assignment(s) · ≤1 states/step
+  theorem accepted
+examples/Found/spring_retryable_flux_timeout.hz:113:1: error: theorem no_attempt_after_timeout_flux
+  probability 0 · refuted
+  grade crisp · 1 parameter assignment(s) · ≤1 states/step
+  theorem rejected: belief is 0, not 1
+  counterexample at step 14 (path mass 1, degree 0):
+    state: path = FluxTimeout, items = true, phase = Running, clock = 14, t = 0, attempts = 3, last_start = 14, since_item = 1
+examples/Found/spring_retryable_flux_timeout.hz:114:1: info: theorem no_attempt_after_timeout_flux_no_items
+  probability 1 · proved
+  grade crisp · 1 parameter assignment(s) · ≤1 states/step
+  theorem accepted
+examples/Found/spring_retryable_flux_timeout.hz:115:1: info: theorem no_attempt_after_timeout_flux_deadline
+  probability 1 · proved
+  grade crisp · 1 parameter assignment(s) · ≤1 states/step
+  theorem accepted
+examples/Found/spring_retryable_flux_timeout.hz:118:1: info: #eval Call(Imperative, false) |= after[60] clock
+  13
+examples/Found/spring_retryable_flux_timeout.hz:119:1: info: #eval Call(MonoTimeout, false) |= after[60] clock
+  10
+examples/Found/spring_retryable_flux_timeout.hz:120:1: info: #eval Call(FluxTimeout, true) |= after[60] clock
+  41
+examples/Found/spring_retryable_flux_timeout.hz:121:1: info: #eval Call(FluxTimeout, false) |= after[60] clock
+  10
+examples/Found/spring_retryable_flux_timeout.hz:122:1: info: #eval Call(FluxDeadline, true) |= after[60] clock
+  10
+examples/Found/spring_retryable_flux_timeout.hz:123:1: info: #eval Call(Imperative, false) |= after[60] attempts
+  2
+examples/Found/spring_retryable_flux_timeout.hz:124:1: info: #eval Call(MonoTimeout, false) |= after[60] attempts
+  2
+examples/Found/spring_retryable_flux_timeout.hz:125:1: info: #eval Call(FluxTimeout, true) |= after[60] attempts
+  6
+examples/Found/spring_retryable_flux_timeout.hz:126:1: info: #eval Call(FluxTimeout, false) |= after[60] attempts
+  2
+examples/Found/spring_retryable_flux_timeout.hz:127:1: info: #eval Call(FluxDeadline, true) |= after[60] attempts
+  2
+examples/Found/spring_retryable_flux_timeout.hz:128:1: info: #eval Call(FluxTimeout, true) |= after[60] timed_out
+  false

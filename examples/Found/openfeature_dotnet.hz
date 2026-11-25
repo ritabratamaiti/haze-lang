@@ -1,0 +1,85 @@
+-- open-feature/dotnet-sdk-contrib: OpenFeature.Providers.Flagd.Core 2.0.3 (tag c89e272), used by
+-- OpenFeature.Providers.Flagd 0.8.2 (tag c234974, also main) for the in-process and file resolvers.
+-- FractionalRule.cs and JsonEvaluator.cs are the same at both commits. Line numbers are at c234974.
+-- Mechanism: a flagd `fractional` weight that is a JsonLogic expression, evaluated over time.
+--
+-- Model element -> source:
+--   backing(kind)     JsonLogic 5.5.0 (json-everything) hands back the parsed JSON node for a literal,
+--                     `var` or `if`, and a new decimal-backed JsonValue for `-`, `+`, `*`, `/`, `%`,
+--                     `min` and `max`. FractionalRule.cs#L86 evaluates each bucket with it.
+--   reads_ok          FractionalRule.cs#L127-L130: weightNode.GetValue<double>(), which throws
+--                     InvalidOperationException for a decimal-backed value
+--   ParseError        JsonEvaluator.cs#L371-L379: any exception from JsonLogic.Apply becomes
+--                     FeatureProviderException(ParseError); the client gets the code default
+--   w_on, w_off       the documented rule, ["on", {"-": [ts, start]}], ["off", {"-": [end, ts]}]
+--   max(0, _)         FractionalRule.cs#L138-L139 (a negative weight is clamped to 0)
+--   bucket, variant   FractionalRule.cs#L182-L193 (bucket = (hash * totalWeight) >> 32, first range
+--                     that contains it)
+--   ref_outcome       flagd Go core v0.19.3, core/pkg/evaluator/fractional.go#L230-L260 (reads the
+--                     weight as a float64, same clamp) and #L285-L293 (same bucket formula)
+--   fix = true        reads the number whatever its backing type, for example
+--                     double.Parse(weightNode.ToJsonString(), ...) at L130
+--
+-- Abstractions, and why the result survives them:
+--   * Time is scaled: the documented window, 1743360000 to 1743964800 (7 days), becomes 0 to 10, and
+--     one step is one tenth of it. The read fails for every value, so the scale doesn't matter.
+--   * The 32-bit murmur3 hash of [flagKey, targetingKey] becomes user_hash, uniform on 0..99, and the
+--     bucket floor(user_hash * total / 100). The reference and .NET use the same bucket, and the
+--     failure happens before the hash is used.
+--   * kind is the JsonLogic form of both weights; the weight values follow the rollout for every
+--     kind, since the read depends only on the form. Literal, Var and IfExpr (an `if` that picks a
+--     literal, as in the testbed) stand for the forms that work today; Arith stands for the
+--     arithmetic operators, all of which failed in the reproduction.
+--   * Weights here are integers from 0 to 11, so the integer and range checks (L133-L136) and the
+--     total weight check (L158-L161) always pass and are left out.
+
+enum Kind = Literal | Var | IfExpr | Arith
+enum Backing = JsonElement | DecimalValue
+enum Outcome = On | Off | ParseError
+
+def backing(k : Kind) : Backing := match k { Arith => DecimalValue, _ => JsonElement }
+def reads_ok(fix : Bool, k : Kind) : Bool := fix or backing(k) == JsonElement
+
+-- One user, identified only by where their hash falls.
+input user_hash : Num ~ uniform(0, 99)
+
+system Rollout(fix : Bool, kind : Kind) {
+  var t : Num := 0
+  var outcome : Outcome := Off
+  var ref_outcome : Outcome := Off
+  step {
+    let w_on := max(0, t - 0)
+    let w_off := max(0, 10 - t)
+    let total := w_on + w_off
+    let bucket := floor(user_hash * total / 100)
+    let variant := if bucket < w_on then On else Off
+    ref_outcome := variant
+    outcome := if reads_ok(fix, kind) then variant else ParseError
+    t := t + 1
+  }
+}
+
+-- Spec (fractional-operation-spec.md#L19-L20): the weight is "an optional integer item (or JsonLogic
+-- expression resolving to one)". Docs (fractional-operation.md#L217): "Weight values can be JSONLogic
+-- expressions, enabling progressive rollouts and dynamic traffic splitting without a dedicated operator."
+theorem documented_rollout_resolves : Rollout(false, Arith) |= always[12] outcome != ParseError
+theorem documented_rollout_resolves_fixed : Rollout(true, Arith) |= always[12] outcome != ParseError
+
+-- Same variant as the reference implementation for every user at every step.
+theorem matches_reference : Rollout(false, Arith) |= always[12] outcome == ref_outcome
+theorem matches_reference_fixed : Rollout(true, Arith) |= always[12] outcome == ref_outcome
+
+-- The forms that work today, which is why the gap went unnoticed.
+theorem literal_weights_resolve : Rollout(false, Literal) |= always[12] outcome == ref_outcome
+theorem var_weights_resolve : Rollout(false, Var) |= always[12] outcome == ref_outcome
+theorem if_weights_resolve : Rollout(false, IfExpr) |= always[12] outcome == ref_outcome
+
+-- Halfway through the window (step 6 evaluates t = 5): share of users on "on".
+#prob Rollout(false, Arith) |= after[6] ref_outcome == On
+#prob Rollout(false, Arith) |= after[6] outcome == On
+#prob Rollout(true, Arith) |= after[6] outcome == On
+
+-- After the window closes (step 12 evaluates t = 11), as in the reproduction: the reference serves
+-- "on" to every user and the current read fails for every user.
+#prob Rollout(false, Arith) |= after[12] ref_outcome == On
+#prob Rollout(false, Arith) |= after[12] outcome == ParseError

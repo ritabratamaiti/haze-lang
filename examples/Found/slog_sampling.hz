@@ -1,0 +1,135 @@
+-- samber/slog-sampling v1.7.0 (tag commit c87dfd0; the non-test Go files are identical on main
+-- at ee67d27) with its dependency github.com/cornelk/hashmap v1.0.8 (commit 199c5e7).
+--
+-- Promise (README.md:179, "Threshold sampling"): "If `Rate` is zero, the middleware will drop
+-- all log entries after the first `Threshold` records in that interval." AbsoluteSamplingOption
+-- (README.md:208-210, middleware_absolute.go:13-15): "This will log all entries with the same
+-- hash until max is reached, in a `Tick` interval as-is." In the first window the previous
+-- count is 0, so it behaves exactly like Threshold = Max, Rate = 0, and this model covers both.
+--
+-- Two goroutines log the same message (one key) for the first time. Model elements and the
+-- source they stand for, at those commits:
+--   pc = Get       UnlimitedBuffer.GetOrInsert calls b.items.Get    buffer/buffer_unlimited.go:23-26
+--                  (hashmap Get starts its search at the index slot hashmap.go:47-60, store.go:16-21)
+--   Get -> Ins     the generator runs between the miss and Insert   buffer/buffer_unlimited.go:27
+--   pc = Ins       b.items.Insert(key, v); GetOrInsert returns v    buffer/buffer_unlimited.go:28
+--                  whatever Insert returned. Insert links the new   hashmap.go:127-146, list.go:32-44,
+--                  element into the sorted list, or returns false   list.go:114-127
+--                  when the key is already in the list
+--   pc = Pub       Insert then publishes the element in the index   hashmap.go:148, store.go:24-45
+--   pc = Count     counter.Inc and the n > Threshold check          counters.go:26-49,
+--                                                                   middleware_threshold.go:60-91
+--                  (absolute: counterWithMemory.Inc, n > Max)       counters.go:77-95,
+--                                                                   middleware_absolute.go:53-71
+--   map_state      Absent / Linked (in the list, not yet in the index) / Published
+--   held = Own     the counter GetOrInsert returned is not the stored one, so nobody else counts on it
+--
+-- Variants (system parameter):
+--   Released   the code above.
+--   IdealMap   the same Get-then-Insert code over a map whose Insert is one atomic step (no
+--              Linked state). It still fails: the bug is in GetOrInsert, not in the map.
+--   SyncMapFix the proposed fix: Load, then sync.Map.LoadOrStore on a miss, which returns the
+--              stored counter to every caller in one atomic step (no Linked state).
+--
+-- Abstractions, and why the conclusion survives them:
+--   * One key and one window (Tick far longer than the run). A fresh counter's first Inc
+--     returns 1, which is what counter.Inc does when resetAt is 0.
+--   * One key in a fresh map: its index slot stays empty until Insert publishes the element,
+--     so Get misses in the Linked state. With one key the map never resizes (8 slots; it grows
+--     above 50% fill, hashmap.go:239-243, defines.go:4-7).
+--   * counter.Inc is one atomic step. This leaves out its separate reset race (Store(1) or
+--     Swap(1) before the CAS, counters.go:34-41 and 85-92), which counters_test.go:86-87 on main
+--     already notes. That race can only add accepted records, so it cannot hide the violation;
+--     it is also why the real fixed buffer can still, rarely, go over the cap and the model's
+--     fixed variant cannot.
+--   * The scheduler picks a goroutine with probability 1/2 at every step. That only makes
+--     every interleaving reachable. The theorems quantify over all of them; the #prob numbers
+--     are for this toy scheduler and are not production rates.
+--   * Two goroutines, three records each, Threshold 2. More goroutines or records only add
+--     ways to fail (the stress run uses 8 goroutines, 50 records each, Threshold 10).
+
+enum Buf = Released | IdealMap | SyncMapFix
+enum Pc = Get | Ins | Pub | Count | Done
+enum MapState = Absent | Linked | Published
+enum Held = NoCounter | Stored | Own
+enum Who = A | B
+
+def threshold : Num := 2
+def per : Num := 3
+
+system Window(buf : Buf) {
+  var map_state : MapState := Absent
+  var cnt : Num := 0              -- the stored counter
+  var accepted : Num := 0
+
+  var pc_a : Pc := Get
+  var held_a : Held := NoCounter
+  var left_a : Num := per
+  var pc_b : Pc := Get
+  var held_b : Held := NoCounter
+  var left_b : Num := per
+
+  step {
+    let who := {A: 1/2, B: 1/2}
+    let pc := if who == A then pc_a else pc_b
+    let held := if who == A then held_a else held_b
+    let left := if who == A then left_a else left_b
+    match pc {
+      Get => {
+        if map_state == Published {
+          if who == A { pc_a := Count; held_a := Stored } else { pc_b := Count; held_b := Stored }
+        } else {
+          if who == A { pc_a := Ins } else { pc_b := Ins }
+        }
+      }
+      Ins => {
+        if map_state == Absent {
+          if buf == Released {
+            map_state := Linked
+            if who == A { pc_a := Pub } else { pc_b := Pub }
+          } else {
+            map_state := Published
+            if who == A { pc_a := Count; held_a := Stored } else { pc_b := Count; held_b := Stored }
+          }
+        } else {
+          if buf == SyncMapFix {
+            -- LoadOrStore returns the counter that is stored
+            if who == A { pc_a := Count; held_a := Stored } else { pc_b := Count; held_b := Stored }
+          } else {
+            -- Insert returns false; GetOrInsert still returns the counter it just generated
+            if who == A { pc_a := Count; held_a := Own } else { pc_b := Count; held_b := Own }
+          }
+        }
+      }
+      Pub => {
+        map_state := Published
+        if who == A { pc_a := Count; held_a := Stored } else { pc_b := Count; held_b := Stored }
+      }
+      Count => {
+        let n := if held == Stored then cnt + 1 else 1
+        if held == Stored { cnt := cnt + 1 }
+        if n <= threshold { accepted := accepted + 1 }
+        let next := if left - 1 > 0 then Get else Done
+        if who == A { left_a := left - 1; pc_a := next; held_a := NoCounter } else { left_b := left - 1; pc_b := next; held_b := NoCounter }
+      }
+      Done => skip
+    }
+  }
+}
+
+-- README.md:179, Threshold sampling: "If `Rate` is zero, the middleware will drop all log entries
+-- after the first `Threshold` records in that interval."
+theorem at_most_threshold_released : Window(Released) |= always accepted <= threshold
+theorem at_most_threshold_ideal_map : Window(IdealMap) |= always accepted <= threshold
+theorem at_most_threshold_fixed : Window(SyncMapFix) |= always accepted <= threshold
+
+-- With an atomic map, only the first record of the goroutine that loses the insert race is
+-- extra. With the hashmap's two-step Insert, every record B logs while A sits between linking
+-- and publishing is counted on a throwaway counter.
+theorem ideal_map_one_extra : Window(IdealMap) |= always accepted <= threshold + 1
+#prob Window(Released) |= eventually accepted == per + threshold
+#prob Window(Released) |= eventually accepted > threshold
+#prob Window(IdealMap) |= eventually accepted > threshold
+
+-- The fix still lets the first Threshold records through.
+#prob Window(SyncMapFix) |= eventually (pc_a == Done and pc_b == Done and accepted == threshold)

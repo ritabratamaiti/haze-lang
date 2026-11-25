@@ -1,0 +1,52 @@
+examples/Found/unleash_node.hz:67:1: info: theorem encodings_match_reproduction
+  probability 1 · proved
+  grade crisp · 1 parameter assignment(s) · ≤1 states/step
+  theorem accepted
+examples/Found/unleash_node.hz:76:1: error: theorem node_hashes_go_bytes
+  probability 0.166667 (=1/6) · graded
+  grade prob · 1 parameter assignment(s) · ≤6 states/step
+  theorem rejected: belief is 0.166667 (=1/6), not 1
+  counterexample (probability 0.166667 (=1/6), degree 0):
+    inputs: ch = EAcute
+examples/Found/unleash_node.hz:77:1: info: theorem node_hashes_go_bytes_fixed
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · ≤6 states/step
+  theorem accepted
+examples/Found/unleash_node.hz:81:1: error: theorem distinct_chars_distinct_bytes
+  probability 0.944444 (=17/18) · graded
+  grade prob · 1 parameter assignment(s) · ≤36 states/step
+  theorem rejected: belief is 0.944444 (=17/18), not 1
+  counterexample (probability 0.027778 (=1/36), degree 0):
+    inputs: ch = UUmlaut, ch2 = AEAcute
+examples/Found/unleash_node.hz:82:1: info: theorem distinct_chars_distinct_bytes_fixed
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · ≤36 states/step
+  theorem accepted
+examples/Found/unleash_node.hz:96:1: error: theorem same_decision_as_go
+  probability 0.428571 (=3/7) · graded
+  grade prob · 1 parameter assignment(s) · ≤7 states/step
+  theorem rejected: belief is 0.428571 (=3/7), not 1
+  counterexample (probability 0.142857 (=1/7), degree 0):
+    inputs: id = Jose
+examples/Found/unleash_node.hz:97:1: info: theorem same_decision_as_go_fixed
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · ≤7 states/step
+  theorem accepted
+examples/Found/unleash_node.hz:107:1: info: theorem ascii_ids_agree
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · ≤20000 states/step
+  theorem accepted
+examples/Found/unleash_node.hz:109:1: error: theorem non_ascii_ids_agree
+  probability 0.5 · graded
+  grade prob · 1 parameter assignment(s) · ≤20000 states/step
+  theorem rejected: belief is 0.5, not 1
+  counterexample (probability 0.00005, degree 0):
+    inputs: kind = NonAscii, utf8_hash = 1, low_byte_hash = 51
+examples/Found/unleash_node.hz:110:1: info: theorem non_ascii_ids_agree_fixed
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · ≤20000 states/step
+  theorem accepted
+examples/Found/unleash_node.hz:114:1: info: #prob differs(false, 50) given kind == NonAscii
+  probability 0.5
+examples/Found/unleash_node.hz:115:1: info: #prob differs(false, 10) given kind == NonAscii
+  probability 0.18

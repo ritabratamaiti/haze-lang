@@ -1,0 +1,76 @@
+examples/Found/spring_retryable_jitter.hz:68:1: info: theorem range_delay0_imperative
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · ≤1 states/step
+  theorem accepted
+examples/Found/spring_retryable_jitter.hz:69:1: error: theorem range_delay0_reactive
+  probability 0 · fails with certainty
+  grade prob · 1 parameter assignment(s) · ≤1 states/step
+  theorem rejected: belief is 0, not 1
+  counterexample at step 1 (path mass 1, degree 0):
+    state: path = Reactive, delay = 0, jitter = 500, done = true, high = 0
+examples/Found/spring_retryable_jitter.hz:70:1: info: theorem range_delay0_reactive_fixed
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · ≤1 states/step
+  theorem accepted
+examples/Found/spring_retryable_jitter.hz:71:1: info: theorem range_delay100_imperative
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · ≤1 states/step
+  theorem accepted
+examples/Found/spring_retryable_jitter.hz:72:1: error: theorem range_delay100_reactive
+  probability 0 · fails with certainty
+  grade prob · 1 parameter assignment(s) · ≤1 states/step
+  theorem rejected: belief is 0, not 1
+  counterexample at step 1 (path mass 1, degree 0):
+    state: path = Reactive, delay = 100, jitter = 500, done = true, high = 200
+examples/Found/spring_retryable_jitter.hz:73:1: info: theorem range_delay100_reactive_fixed
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · ≤1 states/step
+  theorem accepted
+examples/Found/spring_retryable_jitter.hz:75:1: info: theorem range_jitter50_imperative
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · ≤1 states/step
+  theorem accepted
+examples/Found/spring_retryable_jitter.hz:76:1: info: theorem range_jitter50_reactive
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · ≤1 states/step
+  theorem accepted
+examples/Found/spring_retryable_jitter.hz:80:1: info: claim upper_half_delay0_imperative
+  probability 0.5 · graded
+  grade prob · 1 parameter assignment(s) · ≤500 states/step
+  bound holds: belief ≥ 0.5
+examples/Found/spring_retryable_jitter.hz:81:1: error: claim upper_half_delay0_reactive
+  probability 0 · fails with certainty
+  grade prob · 1 parameter assignment(s) · ≤1 states/step
+  bound fails: belief 0 < 0.5
+  counterexample at step 1 (path mass 1, degree 0):
+    state: path = Reactive, delay = 0, jitter = 500, done = true, wait = 0
+examples/Found/spring_retryable_jitter.hz:82:1: info: claim upper_half_delay0_reactive_fixed
+  probability 0.5 · graded
+  grade prob · 1 parameter assignment(s) · ≤500 states/step
+  bound holds: belief ≥ 0.5
+examples/Found/spring_retryable_jitter.hz:83:1: info: claim upper_half_delay100_imperative
+  probability 0.5 · graded
+  grade prob · 1 parameter assignment(s) · ≤500 states/step
+  bound holds: belief ≥ 0.5
+examples/Found/spring_retryable_jitter.hz:84:1: error: claim upper_half_delay100_reactive
+  probability 0 · fails with certainty
+  grade prob · 1 parameter assignment(s) · ≤100 states/step
+  bound fails: belief 0 < 0.5
+  counterexample at step 1 (path mass 0.01, degree 0):
+    state: path = Reactive, delay = 100, jitter = 500, done = true, wait = 100
+examples/Found/spring_retryable_jitter.hz:85:1: info: claim upper_half_delay100_reactive_fixed
+  probability 0.5 · graded
+  grade prob · 1 parameter assignment(s) · ≤500 states/step
+  bound holds: belief ≥ 0.5
+examples/Found/spring_retryable_jitter.hz:88:1: info: #expect FirstRetry(Imperative, 0, 500) |= after[1] wait
+  expectation 249.5
+examples/Found/spring_retryable_jitter.hz:89:1: info: #expect FirstRetry(Reactive, 0, 500) |= after[1] wait
+  expectation 0
+examples/Found/spring_retryable_jitter.hz:90:1: info: #expect FirstRetry(Imperative, 100, 500) |= after[1] wait
+  expectation 349.5
+examples/Found/spring_retryable_jitter.hz:91:1: info: #expect FirstRetry(Reactive, 100, 500) |= after[1] wait
+  expectation 149.5
+examples/Found/spring_retryable_jitter.hz:92:1: info: #expect FirstRetry(Imperative, 100, 50) |= after[1] wait
+  expectation 124.5
+examples/Found/spring_retryable_jitter.hz:93:1: info: #expect FirstRetry(Reactive, 100, 50) |= after[1] wait
+  expectation 124.5

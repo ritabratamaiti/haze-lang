@@ -1,0 +1,26 @@
+examples/Found/aiomisc.hz:121:1: error: theorem opens_when_every_call_fails
+  probability 0.868852 (=53/61) · graded
+  grade prob · 1 parameter assignment(s) · 82 reachable states
+  theorem rejected: belief is 0.868852 (=53/61), not 1
+  counterexample at step 5 (path mass 0.004115 (=1/243), degree 0):
+    state: fixed = false, slow = false, s0 = Bad, s1 = Bad, s2 = Bad, s3 = Bad, created = 4, inflight = false, streak = 5, broken = false, missed = true
+examples/Found/aiomisc.hz:122:1: error: theorem opens_when_every_call_fails_slow
+  probability 0 · fails with certainty
+  grade prob · 1 parameter assignment(s) · 66 reachable states
+  theorem rejected: belief is 0, not 1
+  counterexample at step 6 (path mass 0.001372 (=1/729), degree 0):
+    state: fixed = false, slow = true, s0 = Empty, s1 = Bad, s2 = Bad, s3 = Bad, created = 4, inflight = true, streak = 5, broken = false, missed = true
+examples/Found/aiomisc.hz:124:1: info: theorem opens_when_every_call_fails_fixed
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · 64 reachable states
+  theorem accepted
+examples/Found/aiomisc.hz:125:1: info: theorem opens_when_every_call_fails_slow_fixed
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · 109 reachable states
+  theorem accepted
+examples/Found/aiomisc.hz:128:1: info: #prob Breaker(false, false) |= eventually broken
+  probability 1
+examples/Found/aiomisc.hz:129:1: info: #prob Breaker(false, true) |= eventually broken
+  probability 0
+examples/Found/aiomisc.hz:130:1: info: #prob Breaker(true, true) |= eventually broken
+  probability 1

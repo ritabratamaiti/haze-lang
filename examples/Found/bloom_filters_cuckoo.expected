@@ -1,0 +1,35 @@
+examples/Found/bloom_filters_cuckoo.hz:41:1: info: theorem f_matches_formula
+  probability 1 · proved
+  grade partial · 1 parameter assignment(s) · ≤1 states/step
+  theorem accepted
+examples/Found/bloom_filters_cuckoo.hz:49:1: error: theorem shipped_keeps_f_bits
+  probability 0 · refuted
+  grade crisp · 1 parameter assignment(s) · ≤1 states/step
+  theorem rejected: belief is 0, not 1
+  counterexample (probability 1, degree 0):
+    falsified by f = 8
+examples/Found/bloom_filters_cuckoo.hz:50:1: info: theorem fixed_keeps_f_bits
+  probability 1 · proved
+  grade crisp · 1 parameter assignment(s) · ≤1 states/step
+  theorem accepted
+examples/Found/bloom_filters_cuckoo.hz:60:1: error: claim shipped_meets_error_rate
+  probability ≈0.030826 · graded
+  grade prob+partial · 1 parameter assignment(s) · ≤9 states/step
+  bound fails: plausibility ≈0.030826 > ≈9.76563e-4 (=1/1024)
+  a world where it happens (probability ≈0.030405):
+    inputs: matches_shipped = 1
+examples/Found/bloom_filters_cuckoo.hz:61:1: info: claim fixed_meets_error_rate
+  probability ≈1.22064e-4 · graded
+  grade prob+partial · 1 parameter assignment(s) · ≤9 states/step
+  bound holds: plausibility ≤ ≈9.76563e-4 (=1/1024)
+examples/Found/bloom_filters_cuckoo.hz:69:1: info: #eval rate_shipped
+  2
+examples/Found/bloom_filters_cuckoo.hz:70:1: error: theorem shipped_rate_within_error_rate
+  probability 0 · refuted
+  grade partial · 1 parameter assignment(s) · ≤1 states/step
+  theorem rejected: belief is 0, not 1
+  counterexample (probability 1, degree 0):
+examples/Found/bloom_filters_cuckoo.hz:71:1: info: theorem fixed_rate_within_error_rate
+  probability 1 · proved
+  grade partial · 1 parameter assignment(s) · ≤1 states/step
+  theorem accepted

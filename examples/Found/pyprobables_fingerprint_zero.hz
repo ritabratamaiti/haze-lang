@@ -1,0 +1,82 @@
+-- pyprobables CuckooFilter and CountingCuckooFilter: export() writes 0 for an empty slot and the
+-- loaders drop every 0, but 0 is also a fingerprint, so after export() and loading, every key whose
+-- fingerprint is 0 reads as absent.
+--
+-- Library: pyprobables 0.7.0 (PyPI; tag v0.7.0 = a2a3ab5). master at f503fd7 has the same code for
+-- everything below. Line numbers are for 0.7.0, with master in brackets where they differ.
+--
+--   cuckoo.py  _generate_fingerprint_info  492-506 [512-526]  fingerprint = low f bits of fnv_1a(key)
+--                                                             (500 [520]); 0 is one of the 2^f values.
+--   cuckoo.py  _indicies_from_fingerprint  483-490 [503-510]  both bucket indexes come from the
+--                                                             fingerprint alone.
+--   cuckoo.py  add                         291-304            does nothing when the fingerprint is
+--                                                             already in its buckets (300-302).
+--   cuckoo.py  check                       306-315            True when the fingerprint is in one of
+--                                                             its two buckets.
+--   cuckoo.py  export                      332-349            writes each bucket as bucket_size uint32
+--                                                             values, padded with 0 (346).
+--   cuckoo.py  _parse_bucket               426-431 [434-439]  keeps [el for el in bucket if el]
+--                                                             (429 [437]).
+--   countingcuckoo.py  __bucket_decomposition  326-334 [348-356]  writes (fingerprint, count) pairs,
+--                                                             padded with (0, 0) (332-333 [354-355]).
+--   countingcuckoo.py  _parse_buckets      286-303 [294-311]  keeps a pair only `if finger > 0`
+--                                                             (297 [305]).
+--
+-- Abstraction. Two keys are added to an empty filter. A key is represented by h, the low f bits of
+-- its hash, uniform on 0..F-1 with F = 8 (f = 3). The real F is 2^13 for init_error_rate(0.001) and
+-- 2^32 for CuckooFilter(); that changes only how often h is 0 (part 4). Bucket positions are left
+-- out: export() and the parsers go slot by slot and keep the nonzero values in order, so a stored
+-- value comes back in the bucket it was written from, and check() only asks whether the value is
+-- there. One bucket of bucket_size = 3 slots then holds the first key's fingerprint, the second
+-- key's (left empty when the two are equal, because add() skips it) and one unused slot. written()
+-- and loaded() also describe the fingerprint field of the counting filter's pairs.
+--
+-- The fix (remap = true) never produces fingerprint 0: a key whose low f bits are 0 gets fingerprint
+-- 1, as efficient/cuckoofilter's TagHash does (tag += (tag == 0)).
+
+def F : Num := 8
+def EMPTY : Num := 0 - 1
+
+input h1 : Num ~ uniform(0, F - 1)
+input h2 : Num ~ uniform(0, F - 1)
+
+-- _generate_fingerprint_info(), as shipped (remap = false) and with the fix (remap = true)
+def fp(h : Num, remap : Bool) : Num := if remap and h == 0 then 1 else h
+
+-- export(): bucket.extend([0] * (self.bucket_size - len(bucket)))
+def written(s : Num) : Num := if s == EMPTY then 0 else s
+-- _parse_bucket(): [el for el in bucket if el]
+def loaded(w : Num) : Num := if w != 0 then w else EMPTY
+
+-- The bucket after add(key 1) and add(key 2).
+def slot0(remap : Bool) : Num := fp(h1, remap)
+def slot1(remap : Bool) : Num := if fp(h2, remap) == fp(h1, remap) then EMPTY else fp(h2, remap)
+def slot2 : Num := EMPTY
+
+-- check(): is the key's fingerprint in the bucket, before export() and after loading?
+def found_before(h : Num, remap : Bool) : Bool :=
+  fp(h, remap) == slot0(remap) or fp(h, remap) == slot1(remap) or fp(h, remap) == slot2
+def found_after(h : Num, remap : Bool) : Bool :=
+  fp(h, remap) == loaded(written(slot0(remap))) or fp(h, remap) == loaded(written(slot1(remap)))
+    or fp(h, remap) == loaded(written(slot2))
+
+-- 1. Why the parser drops zeros: the padding of an unused slot must not come back as a fingerprint.
+theorem padding_not_loaded : loaded(written(slot2)) == EMPTY
+
+-- 2. The promise: a key that was added and not removed is found (check(): "False if definately
+--    not"), before export() and after loading (quickstart: export, then
+--    CuckooFilter(filepath=...).check(...) prints True).
+theorem shipped_found_before_export : found_before(h1, false) and found_before(h2, false)
+theorem shipped_found_after_reload : found_after(h1, false) and found_after(h2, false)
+theorem fixed_found_after_reload : found_after(h1, true) and found_after(h2, true)
+
+-- 3. As shipped, a key is lost exactly when its own fingerprint is 0, whatever the other key is.
+theorem shipped_lost_iff_zero :
+  ((not found_after(h1, false)) == (h1 == 0)) and ((not found_after(h2, false)) == (h2 == 0))
+
+#prob not found_after(h1, false)
+
+-- 4. With init_error_rate(0.001) (f = 13) and 10,000 random keys, each key's fingerprint is 0 with
+--    probability 2^-13, so by part 3 the number of lost keys is binomial(10000, 1/8192).
+#prob binomial(10000, 1/8192) >= 1
+#expect binomial(10000, 1/8192)

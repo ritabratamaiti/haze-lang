@@ -1,0 +1,71 @@
+-- dubbo-go, leastactive load balancer: the weighted choice among tied providers is off by one.
+--
+-- Library: dubbo.apache.org/dubbo-go/v3 v3.3.2 (tag v3.3.2, commit cdda54be1f35). The file is
+-- byte-identical on main at 2b68845f6145 (18 Nov 2026) and develop at 27ee18a28eaa (24 Nov 2026).
+--
+-- What the code does, cluster/loadbalance/leastactive/loadbalance.go:
+--   lines 85-110   Scan the invokers; keep the indexes with the fewest active calls (the tied
+--                  set), their warm-up-adjusted weights, totalWeight W and whether all weights
+--                  are equal. Modeled by: three tied providers with weights w1, w2, w3.
+--   lines 112-114  One provider with the fewest actives: return it. Not modeled (no draw).
+--   line  116      Weighted draw only if the tied weights differ and W > 0 (true for 1, 1, 2).
+--                  Equal tied weights skip the draw and go to line 127, which is correct.
+--   line  117      offsetWeight := rand.Int63n(totalWeight) + 1          -> draw + 1 (draw 0..W-1)
+--   lines 118-124  for each tied invoker: offsetWeight -= weight;
+--                  if offsetWeight < 0 return it                        -> walk(o)
+--   line  127      nobody matched: leastIndexes[rand.Intn(leastCount)]  -> tie, uniform 1..3
+--
+-- Abstraction. Only the selection among the tied set is modeled; how actives are counted does
+-- not matter once providers are tied. Weights 1, 1, 2 are the reproduction's idle-provider case.
+-- The model's draw and tie are the two math/rand calls Select makes, in the same order, taken as
+-- independent uniform values, so a world of this model is one Select call. Replaying the real
+-- Select with math/rand seeded for each of the 12 (draw, tie) pairs gives exactly the #eval
+-- distributions below. With k tied providers and positive weights, the same walk gives the
+-- first one (w1 - 1)/W + 1/(kW) and each other one wj/W + 1/(kW); the reproduction checks those
+-- numbers for other weights on the real package.
+--
+-- The fix is a code change: draw rand.Int63n(totalWeight) without "+ 1" (what Java Dubbo has
+-- done since apache/dubbo#2962 and what dubbo-go's random balancer does). It is the second
+-- variant below, and the same checks pass with it.
+
+def w1 : Num := 1
+def w2 : Num := 1
+def w3 : Num := 2
+def total : Num := w1 + w2 + w3
+
+input draw : Num ~ uniform(0, total - 1)   -- rand.Int63n(totalWeight)
+input tie : Num ~ uniform(1, 3)            -- 1 + rand.Intn(leastCount), only used on fallthrough
+
+-- Lines 118-124 and 127.
+def walk(o : Num) : Num :=
+  if o - w1 < 0 then 1
+  else if o - w1 - w2 < 0 then 2
+  else if o - w1 - w2 - w3 < 0 then 3
+  else tie
+
+def shipped : Num := walk(draw + 1)   -- line 117 as released
+def fixed : Num := walk(draw)         -- line 117 without "+ 1"
+
+-- The weighted slot each draw should land in: draws 0..w1-1 belong to provider 1, the next w2
+-- to provider 2, the last w3 to provider 3. With a uniform draw this gives each provider wj/W.
+def slot(o : Num) : Num := if o < w1 then 1 else if o < w1 + w2 then 2 else 3
+
+-- The promise: "Least Active First + Weighted Random" (dubbo-go load balancing docs) and
+-- "Ties are resolved by warm-up-adjusted weight" (client/options.go on main), so a tied provider
+-- should be picked with probability wj/W. The walk is meant to hand each draw to the provider
+-- whose slot it falls in, which gives exactly those probabilities; the claims further down
+-- check the probabilities themselves.
+theorem shipped_follows_weights : shipped == slot(draw)
+theorem fixed_follows_weights : fixed == slot(draw)
+
+-- Mechanism: the released walk gives provider 1 only w1 - 1 = 0 draws, so it is picked only when
+-- the top draw (offsetWeight = W) falls through to the uniform fallback and the fallback picks it.
+theorem first_only_by_fallthrough : shipped == 1 implies (draw == total - 1 and tie == 1)
+
+-- Shares. Weighted random should give 1/4, 1/4, 1/2.
+#eval shipped
+#eval fixed
+claim shipped_first_share : shipped == 1 with prob >= 1/4
+claim fixed_first_share : fixed == 1 with prob >= 1/4
+claim shipped_third_share : shipped == 3 with prob <= 1/2
+claim fixed_third_share : fixed == 3 with prob <= 1/2

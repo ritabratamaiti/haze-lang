@@ -1,0 +1,24 @@
+examples/Found/throttled.hz:82:1: error: theorem peek_does_not_consume
+  probability 0.75 · graded
+  grade prob · 1 parameter assignment(s) · 11 reachable states
+  theorem rejected: belief is 0.75, not 1
+  counterexample at step 5 (path mass 0.25, degree 0):
+    state: fixed = false, stored = 3, reals = 2, other_done = true, phase = Done, q = 1, seen = 2, newv = 3
+examples/Found/throttled.hz:83:1: info: theorem peek_does_not_consume_fixed
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · 9 reachable states
+  theorem accepted
+examples/Found/throttled.hz:86:1: error: theorem peek_not_limited
+  probability 0.75 · graded
+  grade prob · 1 parameter assignment(s) · 10 reachable states
+  theorem rejected: belief is 0.75, not 1
+  counterexample at step 4 (path mass 0.25, degree 0):
+    state: fixed = false, stored = 3, other_done = true, phase = Done, q = 1, seen = 3, newv = 2, limited = true
+examples/Found/throttled.hz:87:1: info: theorem peek_not_limited_fixed
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · 9 reachable states
+  theorem accepted
+examples/Found/throttled.hz:91:1: info: #prob Peek(false, 1) |= eventually stored > reals
+  probability 0.25
+examples/Found/throttled.hz:92:1: info: #prob Peek(false, 2) |= eventually limited
+  probability 0.25

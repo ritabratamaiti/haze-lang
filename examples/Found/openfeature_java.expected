@@ -1,0 +1,26 @@
+examples/Found/openfeature_java.hz:54:1: error: theorem empty_key_falls_back
+  probability 0 · fails with certainty
+  grade prob · 1 parameter assignment(s) · ≤300 states/step
+  theorem rejected: belief is 0, not 1
+  counterexample (probability 0.002, degree 0):
+    inputs: key = Empty
+examples/Found/openfeature_java.hz:55:1: info: theorem missing_key_falls_back
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · ≤300 states/step
+  theorem accepted
+examples/Found/openfeature_java.hz:56:1: info: theorem empty_key_falls_back_fixed
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · ≤300 states/step
+  theorem accepted
+examples/Found/openfeature_java.hz:59:1: info: theorem named_users_unchanged
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · ≤300 states/step
+  theorem accepted
+examples/Found/openfeature_java.hz:62:1: info: #prob outcome(false) == On given key == Empty
+  probability 1
+examples/Found/openfeature_java.hz:63:1: info: #prob outcome(true) == On given key == Empty
+  probability 0
+examples/Found/openfeature_java.hz:65:1: info: #prob outcome(false) == On given key == Named
+  probability 0.1
+examples/Found/openfeature_java.hz:66:1: info: #prob outcome(true) == On given key == Named
+  probability 0.1

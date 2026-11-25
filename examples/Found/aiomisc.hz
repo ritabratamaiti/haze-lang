@@ -1,0 +1,130 @@
+-- aiomisc 18.0.42 (PyPI, latest; built from master at 43c8f01ae3fa, per aiomisc/version.py in the
+-- wheel): does CircuitBreaker open when every call fails?
+--
+-- Each step is one bucket period (response_time / BUCKET_COUNT seconds, bucket(), lines 173-175).
+-- In every period 0, 1 or 2 calls start, and every call fails. With slow = false a call fails
+-- right away; with slow = true it fails one period after it started (a timeout longer than a
+-- bucket).
+--
+-- Model element -> source (aiomisc/circuit_breaker.py at 43c8f01)
+--   s0..s3       the buckets in the window, newest first: CircuitBreaker._statistic (deque with
+--                maxlen BUCKET_COUNT, line 144) filtered by __gen_statistic (lines 196-208)
+--   Missing      no bucket for that period
+--   Empty        a bucket whose calls have not finished: counter[TOTAL] == 0
+--   Bad          a bucket with a finished failing call: fail ratio 1 >= error_ratio
+--   created      len(self._statistic), capped by the deque's maxlen (the check at lines 289-294)
+--   released     context() (lines 322-342) calls self.counter() (lines 177-194), which appends a
+--                new, empty bucket for the current period, *before* self._compute_state()
+--                (lines 277-320); the call's outcome is added to that bucket when the call ends
+--                (_on_passing, lines 227-239)
+--   ratio        recovery_ratio (lines 256-275): total_count += 1 for every bucket in the window,
+--                including empty ones, upper_count += 1 for buckets with fail ratio >= error_ratio
+--   open         PASSING -> BROKEN when recovery_ratio >= PASSING_BROKEN_THRESHOLD = 1 (lines 88,
+--                296-303), i.e. every bucket in the window is Bad
+--   fixed        the proposed change: the outcome is added to the bucket of the period in which the
+--                call *finishes* and no bucket is created at call start, so the evaluation only sees
+--                buckets with finished calls
+--
+-- Abstractions, and why the conclusion survives them:
+--   * BUCKET_COUNT is 10 in aiomisc and 4 here. With the released code the newest bucket in the
+--     window is always empty when a period's first call is evaluated, whatever the count.
+--   * Every call fails, so a bucket is never "Good"; the documented promise is about this case.
+--   * The window is the current period and the 3 before it. With gaps in the traffic the real
+--     window can also hold one older bucket; with every call failing that bucket is Bad (or, in the
+--     released code, possibly Empty), so it cannot make the released code open or the fix miss.
+--   * A slow call fails exactly one period after it started, at the same point in the period, and
+--     finishes just after the call that starts at that moment has been evaluated. In the released
+--     code any failure slower than one bucket leaves the current bucket empty at every evaluation,
+--     so this is the smallest such case and longer delays only leave more buckets empty. With the
+--     fix, a longer delay only postpones the buckets that the outcomes land in.
+--   * Recovery is not modeled: the run stops when the breaker opens.
+--   * n is uniform only so that every traffic pattern is possible; the theorems hold or fail over
+--     every run, and no probability here is a production rate.
+
+enum Slot = Missing | Empty | Bad
+
+def B : Num := 4
+
+system Breaker(fixed : Bool, slow : Bool) {
+  var s0 : Slot := Missing
+  var s1 : Slot := Missing
+  var s2 : Slot := Missing
+  var s3 : Slot := Missing
+  var created : Num := 0
+  var inflight : Bool := false   -- slow: the previous period's calls have not finished yet
+  var streak : Num := 0          -- consecutive previous periods that had calls (capped)
+  var broken : Bool := false
+  var missed : Bool := false     -- a call was let through although the docs say it should be rejected
+
+  step {
+    if not broken {
+      let n := uniform(0, 2)
+      let need := if slow then B + 1 else B
+      -- a new period: the window moves on by one bucket
+      s3 := s2
+      s2 := s1
+      s1 := s0
+      s0 := Missing
+      if n == 0 {
+        if slow and inflight {
+          -- last period's calls fail now
+          if fixed { s0 := Bad; created := min(created + 1, B) } else { s1 := Bad }
+        }
+        inflight := false
+        streak := 0
+      } else {
+        -- first call of the period
+        if not fixed {
+          s0 := Empty
+          created := min(created + 1, B)
+        }
+        let all_bad := (s0 == Bad or s0 == Missing) and (s1 == Bad or s1 == Missing)
+          and (s2 == Bad or s2 == Missing) and (s3 == Bad or s3 == Missing)
+        let any := s0 != Missing or s1 != Missing or s2 != Missing or s3 != Missing
+        if created >= B and all_bad and any {
+          broken := true
+        } else {
+          if streak >= need { missed := true }
+          -- outcomes that arrive during this period
+          if slow {
+            if inflight {
+              if fixed { s0 := Bad; created := min(created + 1, B) } else { s1 := Bad }
+            }
+          } else {
+            if fixed {
+              if s0 == Missing { created := min(created + 1, B) }
+              s0 := Bad
+            } else {
+              s0 := Bad
+            }
+          }
+          -- second call of the period
+          if n == 2 {
+            let all_bad2 := (s0 == Bad or s0 == Missing) and (s1 == Bad or s1 == Missing)
+              and (s2 == Bad or s2 == Missing) and (s3 == Bad or s3 == Missing)
+            let any2 := s0 != Missing or s1 != Missing or s2 != Missing or s3 != Missing
+            if created >= B and all_bad2 and any2 { broken := true }
+          }
+          inflight := slow
+          streak := min(streak + 1, B + 1)
+        }
+      }
+    }
+  }
+}
+
+-- docs/source/circuit_breaker.rst: "The next state will be determined after collecting statistics
+-- for passing_time seconds. If an effective error ratio is greater than error_ratio then the next
+-- state will be set to BROKEN". Here every call fails, so once a full window of periods with calls
+-- has been collected (one more period for slow failures, whose outcomes arrive a period later),
+-- the next call must be rejected.
+theorem opens_when_every_call_fails : Breaker(false, false) |= always not missed
+theorem opens_when_every_call_fails_slow : Breaker(false, true) |= always not missed
+
+theorem opens_when_every_call_fails_fixed : Breaker(true, false) |= always not missed
+theorem opens_when_every_call_fails_slow_fixed : Breaker(true, true) |= always not missed
+
+-- The released code does open with two quick failures per period, as in the dense runs.
+#prob Breaker(false, false) |= eventually broken
+#prob Breaker(false, true) |= eventually broken
+#prob Breaker(true, true) |= eventually broken

@@ -1,0 +1,32 @@
+examples/Found/polly.hz:106:1: error: theorem not_negative
+  probability 0.986025 (=11501/11664) · graded
+  grade prob · 1 parameter assignment(s) · 434 reachable states
+  theorem rejected: belief is 0.986025 (=11501/11664), not 1
+  counterexample at step 7 (path mass ≈6.10352e-5 (=1/16384), degree 0):
+    state: fix = Released, st = HalfOpen, clock = 5, blocked_until = 4, rejected = true, has_retry_after = true, retry_after = -1
+examples/Found/polly.hz:107:1: info: theorem not_negative_null_fix
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · 541 reachable states
+  theorem accepted
+examples/Found/polly.hz:108:1: info: theorem not_negative_clamp_fix
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · 372 reachable states
+  theorem accepted
+examples/Found/polly.hz:112:1: info: theorem open_positive
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · 383 reachable states
+  theorem accepted
+examples/Found/polly.hz:116:1: info: #prob Breaker(ClampZero) |= eventually (rejected and st == HalfOpen and clock > blocked_until and retry_after == 0)
+  probability 0.013975 (=163/11664)
+examples/Found/polly.hz:117:1: info: theorem null_fix_positive
+  probability 1 · holds with certainty
+  grade prob · 1 parameter assignment(s) · 541 reachable states
+  theorem accepted
+examples/Found/polly.hz:121:1: info: #prob Breaker(Released) |= eventually (rejected and st == HalfOpen and clock == 3 and retry_after == 1)
+  probability 0.041667 (=1/24)
+examples/Found/polly.hz:122:1: info: #prob Breaker(Released) |= eventually (rejected and st == HalfOpen and clock == 5 and retry_after == -1)
+  probability 0.00463 (=1/216)
+examples/Found/polly.hz:123:1: info: #prob Breaker(Released) |= eventually (rejected and st == HalfOpen and clock == 6 and retry_after == -2)
+  probability 0.001543 (=1/648)
+examples/Found/polly.hz:124:1: info: #prob Breaker(Released) |= eventually (rejected and st == HalfOpen and clock == 8 and retry_after == -4)
+  probability ≈2.28624e-4 (=1/4374)

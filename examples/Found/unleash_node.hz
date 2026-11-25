@@ -1,0 +1,115 @@
+-- Unleash Node SDK (npm unleash-client 6.12.2, tag v6.12.2 = dc113ce; main at 6f03d8c has the same code):
+-- a userId with a non-ASCII character gets a different rollout number than in the Go SDK and in Yggdrasil.
+--
+-- Every SDK computes MurmurHash3_x86_32(groupId + ":" + id, seed) % 100 + 1 and enables a flexible rollout when
+-- that number is <= the percentage. They differ in the bytes they hash.
+--   node  src/strategy/util.ts#L3-L6 passes the JS string to murmurhash3js 3.0.1 x86.hash32;
+--         flexible-rollout-strategy.ts#L44-L45 compares with the percentage. murmurhash3js
+--         lib/murmurHash3js.js#L189-L241 builds blocks from key.charCodeAt(i) & 0xff (#L209, tail #L222-L235)
+--         and mixes in key.length (#L198-L199, #L237): one byte per UTF-16 code unit, its low byte.
+--                                                                             -> node_len, node_byte
+--   go    unleash-go-sdk v6.5.1 (8f45514) internal/strategies/helpers.go#L67-L89 copies the string's
+--         UTF-8 bytes into a buffer for murmur3.SeedSum32; flexible_rollout.go#L65-L66 compares.
+--   ygg   unleash-yggdrasil (main 9d1d47d) src/strategy_parsing.rs#L48-L56 hashes Cursor::new(format!(..)),
+--         the UTF-8 bytes of a Rust String; #L407-L410 compares. Python UnleashClient 7.0.0 and the Node SDK
+--         built from draft PR #919 evaluate with this engine.                 -> utf8_len, utf8_byte
+--   fix   Node hashes the UTF-8 bytes too (TextEncoder output and a byte-array MurmurHash3, or the engine).
+--
+-- Abstractions
+--   * Part 1 looks at one character. The rest of the key (group id, ':' and ASCII characters) gives the same
+--     bytes in every SDK, so two SDKs hash the same key exactly when each character gives the same bytes.
+--   * MurmurHash3 itself is not modeled; it is the same function everywhere. A standard MurmurHash3 (Python
+--     mmh3) over the low bytes gives the Node SDK's number for all 12,012 ids in the reproduction, and over
+--     the UTF-8 bytes it predicts every Go, Python and engine decision.
+--   * Part 2 uses the seven ids of the reproduction with their measured rollout numbers.
+--   * Part 3 treats the hashes of two different byte strings as independent and uniform on 1..100, as a good
+--     hash gives. ASCII ids give the same bytes, so they share one number. The 1/2 share of ASCII ids is
+--     arbitrary: every check is conditioned on the kind of id.
+
+-- Part 1. The bytes hashed for one character: e U+0065, é U+00E9, ü U+00FC, Ǽ U+01FC, 日 U+65E5, 😀 U+1F600.
+enum Ch = SmallE | EAcute | UUmlaut | AEAcute | Nichi | Grin
+def code(c : Ch) : Num :=
+  match c { SmallE => 101, EAcute => 233, UUmlaut => 252, AEAcute => 508, Nichi => 26085, Grin => 128512 }
+def mod(a : Num, n : Num) : Num := a - n * floor(a / n)
+
+-- Node: one UTF-16 code unit below U+10000, a surrogate pair above, and each unit gives its low byte.
+def node_len(c : Ch) : Num := if code(c) < 65536 then 1 else 2
+def utf16_unit(c : Ch, i : Num) : Num :=
+  if code(c) < 65536 then code(c)
+  else if i == 1 then 55296 + floor((code(c) - 65536) / 1024)
+  else 56320 + mod(code(c) - 65536, 1024)
+def node_byte(c : Ch, i : Num) : Num := mod(utf16_unit(c, i), 256)
+
+-- Go and Yggdrasil: UTF-8.
+def utf8_len(c : Ch) : Num :=
+  if code(c) < 128 then 1 else if code(c) < 2048 then 2 else if code(c) < 65536 then 3 else 4
+def pow64(k : Num) : Num := if k == 0 then 1 else if k == 1 then 64 else if k == 2 then 4096 else 262144
+def utf8_byte(c : Ch, i : Num) : Num :=
+  let n := utf8_len(c) in
+  if n == 1 then code(c)
+  else if i == 1 then (if n == 2 then 192 else if n == 3 then 224 else 240) + floor(code(c) / pow64(n - 1))
+  else 128 + mod(floor(code(c) / pow64(n - i)), 64)
+
+-- The bytes Node hashes, today and with the fix.
+def hashed_len(c : Ch, fix : Bool) : Num := if fix then utf8_len(c) else node_len(c)
+def hashed_byte(c : Ch, fix : Bool, i : Num) : Num := if fix then utf8_byte(c, i) else node_byte(c, i)
+def same_as_go(c : Ch, fix : Bool) : Bool :=
+  hashed_len(c, fix) == utf8_len(c)
+    and (forall i in 1..4, i <= utf8_len(c) implies hashed_byte(c, fix, i) == utf8_byte(c, i))
+def same_in_node(a : Ch, b : Ch, fix : Bool) : Bool :=
+  hashed_len(a, fix) == hashed_len(b, fix)
+    and (forall i in 1..4, i <= hashed_len(a, fix) implies hashed_byte(a, fix, i) == hashed_byte(b, fix, i))
+
+input ch : Ch ~ {SmallE: 1/6, EAcute: 1/6, UUmlaut: 1/6, AEAcute: 1/6, Nichi: 1/6, Grin: 1/6}
+input ch2 : Ch ~ {SmallE: 1/6, EAcute: 1/6, UUmlaut: 1/6, AEAcute: 1/6, Nichi: 1/6, Grin: 1/6}
+
+-- The encodings agree with the reproduction: é is e9 in Node and c3 a9 in UTF-8; 😀 is 3d 00 and f0 9f 98 80.
+theorem encodings_match_reproduction :
+  node_len(EAcute) == 1 and node_byte(EAcute, 1) == 233
+  and utf8_byte(EAcute, 1) == 195 and utf8_byte(EAcute, 2) == 169
+  and node_len(Grin) == 2 and node_byte(Grin, 1) == 61 and node_byte(Grin, 2) == 0
+  and utf8_byte(Grin, 1) == 240 and utf8_byte(Grin, 2) == 159 and utf8_byte(Grin, 3) == 152
+  and utf8_byte(Grin, 4) == 128
+
+-- src/test/strategy/util.test.ts#L5: "normalized values are the same across node, java, and go clients".
+-- With the same hash function, that needs the same bytes.
+theorem node_hashes_go_bytes : same_as_go(ch, false)
+theorem node_hashes_go_bytes_fixed : same_as_go(ch, true)
+
+-- Distinct characters should give distinct bytes. In Node, ü and Ǽ both give the byte fc, so two ids that differ
+-- only there always get the same number (both 50 in the reproduction).
+theorem distinct_chars_distinct_bytes : ch != ch2 implies not same_in_node(ch, ch2, false)
+theorem distinct_chars_distinct_bytes_fixed : ch != ch2 implies not same_in_node(ch, ch2, true)
+
+-- Part 2. The reproduction: flexibleRollout 50% on groupId new-checkout, ids user-1, josé, zoë,
+-- müller@example.de, 😀, ü and Ǽ. Node numbers from normalizedStrategyValue in 6.12.2; UTF-8 numbers from mmh3,
+-- which the Go, Python and PR #919 decisions follow.
+enum Id = User1 | Jose | Zoe | Mueller | Smiley | U | AE
+input id : Id ~ {User1: 1/7, Jose: 1/7, Zoe: 1/7, Mueller: 1/7, Smiley: 1/7, U: 1/7, AE: 1/7}
+def node_number(i : Id) : Num :=
+  match i { User1 => 32, Jose => 67, Zoe => 35, Mueller => 92, Smiley => 100, U => 50, AE => 50 }
+def utf8_number(i : Id) : Num :=
+  match i { User1 => 32, Jose => 25, Zoe => 61, Mueller => 9, Smiley => 27, U => 19, AE => 36 }
+def node_enabled(fix : Bool) : Bool := (if fix then utf8_number(id) else node_number(id)) <= 50
+def go_enabled : Bool := utf8_number(id) <= 50
+
+theorem same_decision_as_go : node_enabled(false) == go_enabled
+theorem same_decision_as_go_fixed : node_enabled(true) == go_enabled
+
+-- Part 3. How often the decisions differ, for ids with and without a non-ASCII character.
+enum Kind = Ascii | NonAscii
+input kind : Kind ~ {Ascii: 1/2, NonAscii: 1/2}
+input utf8_hash : Num ~ uniform(1, 100)
+input low_byte_hash : Num ~ uniform(1, 100)
+def node_hash(fix : Bool) : Num := if fix or kind == Ascii then utf8_hash else low_byte_hash
+def differs(fix : Bool, rollout : Num) : Bool := (node_hash(fix) <= rollout) != (utf8_hash <= rollout)
+
+theorem ascii_ids_agree : not differs(false, 50) given kind == Ascii
+-- The counterexample below (utf8_hash = 1, low_byte_hash = 51) is u559-öñ in the reproduction: on in Go, off in Node.
+theorem non_ascii_ids_agree : not differs(false, 50) given kind == NonAscii
+theorem non_ascii_ids_agree_fixed : not differs(true, 50) given kind == NonAscii
+
+-- Measured: 4,995 of 10,009 at 50% and 1,770 of 10,009 at 10%. A 500/500 variant split differs as often as
+-- a 50% rollout (measured 5,082 of 10,009).
+#prob differs(false, 50) given kind == NonAscii
+#prob differs(false, 10) given kind == NonAscii
