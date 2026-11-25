@@ -400,10 +400,9 @@ much they move the result. That ranking says which estimate is worth improving f
 that a property can't read are left out.
 
 Results of unbounded properties can carry two notes. One says that exploration stopped at the
-`explore` limit, so the interval also accounts for the unexplored states. The other says that
-part of the state space was too large to solve exactly; Haze then solves it in floating point
-and checks the resulting bounds in exact arithmetic, so the interval is guaranteed to contain
-the true value but is no longer a single exact number.
+`explore` limit, so the interval also accounts for the unexplored states. The other identifies
+components solved with certified bounds: Haze proposes the bounds in floating point and checks
+them in rational arithmetic. The interval contains the true value.
 
 All numbers are exact. A number with a long decimal expansion is rounded and marked with `≈`,
 followed by the exact fraction when it's short, as in `0.666667 (=2/3)`. Numbers below 0.001 are
@@ -411,13 +410,15 @@ shown in scientific notation, as in `≈1.37018e-8 (=1/72982849)`.
 
 ## Limits
 
-Haze gets exact answers by enumerating every state, so models have to be finite and not too
-large. Temporal properties can look at most 100,000 steps ahead, `uniform` ranges and quantifier
-ranges can have at most 100,000 values, and `binomial` allows at most 10,000 trials. At most
+Haze enumerates the distinct configurations relevant to a property. A bounded temporal
+property can look at most 100,000 steps ahead, `uniform` ranges and quantifier ranges can
+have at most 100,000 values, and `binomial` allows at most 10,000 trials. At most
 2,000,000 distinct configurations are kept per step, after merging equal configurations and
 dropping variables the property can't read.
 
-Unbounded properties explore at most 100,000 states unless `explore` says otherwise.
+Unbounded `always`, `eventually` and expected-step queries have no step horizon. They explore
+up to 100,000 states by default; `explore N` or `--states N` changes that budget. If exploration
+stops there, the result accounts for unvisited states as unknown.
 Groups of states that can all reach each other are solved exactly when they have at most 120
 states, and with certified bounds when they are larger.
 
@@ -430,8 +431,8 @@ Two reductions keep this manageable. Each query builds only the inputs and param
 or an earlier observation, can read, so unrelated inputs don't multiply the number of worlds. And
 a state variable that can't influence the property, directly or through the variables it's
 computed from and the conditions around its assignments, isn't tracked at all. A clock or a
-counter that a property never reads doesn't split its states. For scale, the models in this repository have up to
-about a thousand states per step, and each file checks in well under a minute.
+counter that a property never reads doesn't split its states. The output reports the
+configuration count for the property being checked.
 
 The `haze` command's options, its exit status and its JSON output are described in
 [Command line and JSON](Command-Line.md).

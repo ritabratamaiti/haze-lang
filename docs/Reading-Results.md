@@ -185,9 +185,9 @@ interval that contains the true value. Raising the limit narrows it when the une
 are unlikely to be reached, as in a queue that's usually short. It can't help when they are
 likely, as in a random walk that drifts away.
 
-The second means part of the problem was too large to solve exactly. Haze solved it in floating
-point and then checked the resulting bounds in exact arithmetic. The bounds are guaranteed to
-contain the true value, but the result is no longer a single exact number.
+The second identifies a component that crossed the 120-state threshold for the certified
+solver. Floating point proposes lower and upper bounds; rational arithmetic checks them. The
+reported interval contains the true value.
 
 An expected number of steps can be infinite:
 

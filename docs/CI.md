@@ -97,9 +97,8 @@ implementation against its model.
 
 ## Keeping checks fast
 
-Haze explores every state a property can depend on, so the time a file takes depends on the
-model. The examples in the repository each check in under a minute on a laptop, and most take a
-second or two. If a model gets slow:
+Checking time depends on how many configurations the property distinguishes, how many parameter
+assignments it uses and the size of the rational numbers involved. If a model gets slow:
 
 - Check the `states/step` and `reachable states` figures in the output. They show which property
   is expensive.

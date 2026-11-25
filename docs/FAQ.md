@@ -2,17 +2,22 @@
 
 ## Is Haze ready to use?
 
-Haze is at version 0.1 and experimental. The checker is tested against hand-computed results and
-independent calculations, but the language may still change in ways that break existing models,
-and there's no editor support yet. It's a good fit for checking a design or a protocol before
-or alongside writing the code, and not yet something to build a product on.
+You can run a model in the [browser](https://haze-lang.pages.dev/play/), check it in
+[CI](CI.md) and replay its generated tests against an implementation. The
+[conformance example](../examples/Conformance/README.md) does all the checking locally with
+a Python client and the `haze` binary. Version 0.1 is experimental: pin the release used in
+CI because the language may change. The browser has an editor; this release does not ship an
+IDE extension.
 
 ## Should I use Haze or PRISM?
 
-For large models, nondeterminism, continuous time, rewards or full temporal logics, use PRISM or
-Storm. Haze is for small models of software where you want exact answers, rough rates, readable
-counterexamples or generated tests. [How Haze compares](Comparison.md) goes through the
-differences.
+In Haze, the [three-send example](https://haze-lang.pages.dev/play/?example=rough-numbers)
+checks a 99.99% delivery target without assuming the loss rate is known exactly. It reports
+the probability at each candidate rate, checks the belief bound and shows a failure at 5%
+loss. Haze expresses the protocol in discrete steps. PRISM and Storm also analyze models with
+continuous time or nondeterministic choices and support reward properties. The
+[comparison](Comparison.md#prism-and-storm) covers these differences and links the results
+for models checked with all three tools.
 
 ## Why fuzzy parameters and not a prior distribution?
 
@@ -34,13 +39,15 @@ table shows which values are responsible. [Fuzzy parameters](Fuzzy-Parameters.md
 
 ## Does a Haze theorem prove my system correct?
 
-It proves the model correct, for the model's sizes and horizons and for every value of its
-parameters. If the model says three replicas and six steps, the theorem says nothing about four
-replicas or seven steps. Whether the model matches the code is a separate question, and
-[Testing real code](../examples/Conformance/README.md) shows one way to check it.
+An accepted theorem establishes the stated property for the model and its parameter values.
+If the model has three replicas and the property says `always[6]`, the result covers those
+replicas through step six. With `always` and no bound, the property covers runs of any length
+for that same model. [Testing real code](../examples/Conformance/README.md) checks the
+separate question of whether an implementation behaves like the model.
 
-The checker itself isn't formally verified. Its foundations are partly proved in Lean, and its
-results are tested ([Trust and testing](Design.md#trust-and-testing)).
+Lean proofs cover parts of the checker's foundations, including the grade lattice and fuzzy
+connectives. The checker as a whole is not formally verified.
+[Trust and testing](Design.md#trust-and-testing) describes the evidence.
 
 ## Why exact fractions?
 
@@ -61,10 +68,12 @@ value. Raising `--fuel` or `explore` narrows the interval when the unknown part 
 
 ## How large can a model be?
 
-Haze enumerates states explicitly. It keeps at most 2 million configurations per step, explores
-100,000 states for a property without a bound unless you set `explore`, and checks every
-combination of fuzzy parameter values. The models in the repository have up to about a thousand
-states per step. [Limits](Language-Reference.md#limits) has the details.
+For a bounded property, the limit is 2 million distinct configurations per step after Haze
+merges equal configurations and drops state that cannot affect the answer. Unbounded properties
+explore up to 100,000 states by default. Set `explore N` to change that budget; if it is
+exhausted, the result accounts for unexplored behavior as unknown. The output reports
+`states/step` or `reachable states` for the property you checked.
+[Limits](Language-Reference.md#limits) lists the other bounds.
 
 ## Does the playground send my code to a server?
 

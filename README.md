@@ -14,26 +14,21 @@
 [![Launch Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/ritabratamaiti/haze-lang/main?labpath=notebooks%2Ftry_haze.ipynb)
 [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/ritabratamaiti/haze-lang)
 
-Haze is a small language for checking software that has to cope with things going wrong some
-of the time. You write a model of a system, such as a payment client that retries failed
-requests, together with the parts you don't control: messages that get lost, services that go
-down, rates you only have a rough idea of. Then you state what the system should guarantee,
-and Haze checks it.
+Haze is a language for checking what software guarantees when operations can fail. A payment
+client can meet its delivery target and still charge twice if a reply gets lost. Write both
+requirements in the model: Haze computes the delivery probability and shows the retry that
+causes the second charge.
 
-Because the model includes chance, Haze answers with a probability rather than true or false. It
-computes the probability as an exact fraction, without simulation, within a fixed number of steps
-or over runs of any length. When a guarantee can fail, Haze shows you a run where it does.
+A lost packet is a random event. The packet loss *rate* may be an estimate. Haze keeps those
+separate: give the rate several possible values and say how plausible each one is. The checker
+reports what happens at each rate and compares your requirement with the resulting belief or
+plausibility bound. You don't need a probability distribution over the estimates.
 
-Some numbers aren't known well enough to be probabilities. If all you know is that packet loss
-is "around 2%, maybe worse", you can write that, and Haze answers with a range, from the
-*belief* (how strongly what you know guarantees the property) to the *plausibility* (how strongly
-it allows it).
-
-Haze is at version 0.1 and experimental, so the language may still change. It checks
-discrete-time models by enumerating their states, and it has no nondeterminism or continuous time
-yet. For large models, [PRISM](https://www.prismmodelchecker.org/) and
-[Storm](https://www.stormchecker.org/) are better choices; [How Haze compares](docs/Comparison.md)
-goes into the differences.
+Haze checks discrete-time models using rational arithmetic; for large components of an
+unbounded check it certifies bounds in rational arithmetic. The same model can generate tests
+for an implementation. [Model types and limits](docs/Comparison.md#prism-and-storm) and the
+[26-property cross-check with PRISM and Storm](docs/Benchmarks.md) give the technical details.
+Version 0.1 is experimental; pin the release if your CI depends on a particular syntax.
 
 Haze is written in [Lean 4](https://lean-lang.org/) and borrows its design. Your program is
 translated into a small core language, and a separate kernel checks every declaration again
@@ -102,9 +97,9 @@ After that, the [`examples`](examples) folder has models of common reliability p
 | [`incident_triage.hz`](examples/incident_triage.hz) | The likely root cause of an incident, given which alerts fired. |
 | [`probability_classics.hz`](examples/probability_classics.hz) | Textbook problems with known answers, such as the birthday problem, gambler's ruin and the boy-or-girl paradox. |
 
-Haze isn't limited to software. The models in [`examples/Gallery`](examples/Gallery) come from
-other fields, and each of their answers has been checked against a closed-form result or an
-independent calculation (see [`scripts/verify_gallery.py`](scripts/verify_gallery.py)):
+The models in [`examples/Gallery`](examples/Gallery) also cover probability, engineering and
+science. [`scripts/verify_gallery.py`](scripts/verify_gallery.py) checks gallery results against
+closed-form answers and independent calculations:
 
 | Example | Field | What it computes |
 |---|---|---|

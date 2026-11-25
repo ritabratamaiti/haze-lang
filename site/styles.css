@@ -193,14 +193,6 @@ pre.code { background: var(--code-bg); border: 1px solid var(--line); border-rad
 .grades code { font-size: 0.8rem; }
 @media (max-width: 900px) { .pipeline { grid-template-columns: 1fr 1fr; } }
 
-/* comparison */
-.compare { width: 100%; border-collapse: collapse; margin-top: 24px; font-size: 0.93rem; }
-.compare th, .compare td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
-.compare thead th { color: var(--muted); font-weight: 600; font-size: 0.85rem; }
-.compare td:first-child { font-weight: 600; white-space: nowrap; }
-.compare .haze { background: color-mix(in srgb, var(--accent) 7%, transparent); }
-.table-scroll { overflow-x: auto; }
-
 /* install */
 .install-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 24px 0 12px; }
 .install-panel { position: relative; }

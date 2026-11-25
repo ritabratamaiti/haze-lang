@@ -1,110 +1,89 @@
 # How Haze compares
 
-People usually ask how Haze relates to the probabilistic model checkers PRISM and Storm, to Lean,
-to probabilistic programming languages, and to testing tools. Haze is version 0.1 and much smaller
-than any of them, so the sections below also say where each one is the better choice.
+A client sends a request up to three times. Its delivery target is 99.99%, but the team has
+an estimate of the packet loss rate, not a known constant. In [the runnable Haze model](https://haze-lang.pages.dev/play/?example=rough-numbers),
+each send can fail independently. The loss rate is fixed across all three sends. At 2% loss the
+delivery probability is 0.999992; at 5% it is 0.999875. That difference changes whether the
+target holds.
+
+Haze keeps the uncertainty about the rate separate from the randomness of each send. You list
+the candidate rates and how plausible each one is. Haze checks the requirement against the
+resulting *belief* or *plausibility* bound and reports the results by rate. In this example the
+lower bound is about 0.999759, below the target. The output also shows the three lost sends at
+5% loss. That run explains how delivery can fail; the bound comes from the full model.
 
 ## PRISM and Storm
 
-[PRISM](https://www.prismmodelchecker.org/) and [Storm](https://www.stormchecker.org/) are the
-established probabilistic model checkers, and Haze does the same kind of job: you describe a
-system as a Markov chain and check temporal properties of it. They are much more capable than
-Haze in most respects:
+Haze, [PRISM](https://www.prismmodelchecker.org/) and [Storm](https://www.stormchecker.org/)
+all check probabilities on discrete-time Markov chains. We cross-checked 26 properties on
+PRISM's die, ring and leader-election examples. Haze returned the exact reference fraction in
+21 cases and a certified interval containing it in the other five. The
+[results and reproduction commands](Benchmarks.md) identify the model, property and engine
+for each comparison.
 
-- **Models.** PRISM supports discrete- and continuous-time Markov chains, Markov decision
-  processes (which add nondeterministic choices), probabilistic timed automata and partially
-  observable models. Storm supports Markov chains, Markov decision processes and Markov automata.
-  Haze supports only discrete-time Markov chains: there's no nondeterminism and no continuous
-  time.
-- **Properties.** Both check rich temporal logics (PCTL, CSL, LTL) with rewards. Haze checks a
-  single `after`, `always` or `eventually` per property, with or without a bound, optionally
-  conditioned with `given`, plus expected values and expected steps until a property holds. It
-  has no `until`, no nested operators and no rewards beyond `#expect`.
-- **Scale.** Both have symbolic engines, based on decision diagrams, that handle state spaces far
-  larger than Haze's explicit enumeration. Haze keeps at most 2 million configurations per step,
-  and the models in its repository have up to about a thousand.
-- **Maturity.** Both have been developed and used in research for many years, with many
-  published case studies. Haze is new.
+For unknown rates, [PRISM's parametric checks](https://www.prismmodelchecker.org/manual/RunningPRISM/ParametricModelChecking/)
+can return a rational function of the rate, and its [interval models](https://www.prismmodelchecker.org/manual/ModelTypes/UncertainModels/)
+specify ranges for transition probabilities. [Storm](https://www.stormchecker.org/documentation/usage/running-storm-on-parametric-models.html)
+can compute a solution function or verify a region of parameter values. In Haze, the input
+is a [fuzzy parameter](Fuzzy-Parameters.md): the author specifies how much support each
+candidate rate has. A possibility of 0.5 does not mean half the requests use that rate.
+The same rate applies to every attempt.
 
-If you need any of these, use PRISM or Storm. On the models they have in common, the three tools agree:
-[Checking Haze against PRISM and Storm](Benchmarks.md) compares their answers on PRISM's
-example models.
+| Feature | Haze | PRISM and Storm |
+|---|---|---|
+| Model | Discrete-time steps written with assignments, conditionals and assertions. Each parameter assignment defines a Markov chain. The language has no nondeterministic scheduler or continuous-time transitions. | Both support discrete- and continuous-time Markov chains and Markov decision processes. [PRISM](https://www.prismmodelchecker.org/manual/) also supports probabilistic timed automata and partially observable models; [Storm](https://www.stormchecker.org/documentation/background/models.html) also supports Markov automata. |
+| Property | A state property or one temporal operator: `after[k]`, `always` or `eventually`. The latter two can be bounded or unbounded. `given` conditions a state or `after[k]` property. `#expect` includes expected steps to a condition. | Temporal logics including PCTL, CSL and LTL, and reward queries. The available properties depend on the model type and engine. |
+| State space | Explicit configurations, after merging equal states and dropping variables irrelevant to the property. | Both have explicit and symbolic engines. A symbolic engine can represent sets of states and transitions with a decision diagram. |
+| Arithmetic | Rational arithmetic. For unbounded checks, Haze solves components of up to 120 states exactly. For larger components it proposes bounds numerically and checks them in rational arithmetic. | Numerical and exact modes. The cross-check records both the default and exact-engine results. |
 
-Haze differs in a few ways that matter for checking software:
+Haze's [language reference](Language-Reference.md#limits) sets the limit at 2 million distinct
+configurations per step for bounded checks. Unbounded checks explore up to 100,000 states by
+default; `explore` sets the budget and unexplored behavior counts as unknown. Temporal
+operators do not nest. The language has no general `until` operator or separate reward
+structure.
 
-- **Exact by default.** PRISM and Storm compute in floating point by default, with iterative
-  methods that stop at a chosen precision. Both have exact modes: Storm can compute with rational
-  numbers, and PRISM's exact model checking works through its parametric engine on small models.
-  Haze always computes with fractions. For large parts of a problem it uses floating point only to
-  find bounds, which it then checks exactly.
-- **Rates you only roughly know.** PRISM supports interval Markov chains and MDPs, where a
-  transition probability is an interval, and both tools support parametric models, where a
-  probability is a symbol and the result is a function of it. Haze's fuzzy parameters take a
-  different approach: a parameter has a few candidate values, each with a possibility, and the
-  answer is a belief and plausibility pair, with a table of results by value. That's less general
-  than a parametric result, but it gives one answer to compare with a requirement, and it says
-  which estimate moves the result most.
-- **Counterexamples by default.** When any theorem or probability bound fails, Haze shows a run
-  that breaks it, with the parameter values and the state at the step where it breaks. PRISM
-  generates counterexample paths for properties without probabilities, such as `A [ G "inv" ]`.
-  Storm can generate counterexamples for probability bounds on reachability, either as a minimal
-  set of model commands or as the most probable paths that exceed the bound, when you ask for one.
-- **Tests from the model.** `#tests` lists a model's runs in order of probability as test cases,
-  with the random decisions made at each step, reports how much of the probability they cover,
-  and sizes a statistical test with a known false-alarm rate. Storm's most-probable-paths
-  counterexamples are related, but they aren't aimed at testing an implementation.
-  [Testing real code](../examples/Conformance/README.md) uses these to test a Python client
-  against its model.
-- **The language.** A Haze step is written like code, with assignments, `if`, `match`, local
-  variables, functions and `assert`. PRISM's language, which Storm also reads, describes modules
-  as guarded commands, which is more general but further from the code being modeled.
+Haze can carry a check into an implementation test. On a bounded system property, `#tests`
+emits the random decisions along runs in probability order, their cumulative probability and
+failing examples. With fuzzy rates it generates runs at the most possible parameter values.
+The [payment client test](../examples/Conformance/README.md) replays those
+decisions against a Python implementation. A run with a lost reply distinguishes the client
+that deduplicates a payment from one that charges twice.
 
 ## Lean
 
-Haze is written in [Lean 4](https://lean-lang.org/) and follows Lean's design, with an untrusted
-elaborator and a small kernel that checks every declaration again. [Design and
-semantics](Design.md#starting-from-lean) explains the correspondence.
+In Lean the scope of a proof comes from its statement: a theorem can quantify over the replica
+count `N`. In Haze you specify a replica count and a property, and the checker computes the
+result without a proof script. The number of replicas and the length of a run are separate:
+`always[6]` checks through step six; `always` checks the same model with no time horizon.
+Neither declaration changes a three-replica model into a proof about all `N`.
 
-A proof in Lean holds for every input and every size: for all `N`, for all message orders. A Haze
-theorem holds for the finite model you wrote, such as three replicas, a horizon of six steps, and
-the parameter values you listed. In exchange, Haze needs no proofs: it checks the model
-automatically and computes probabilities, which are hard to reason about in a proof assistant.
-
-Haze's own trust story is also weaker than Lean's. Some of its foundations, such as the laws of
-the grade lattice and of the fuzzy connectives, are proved in Lean, but the checker itself isn't
-verified. It's tested against hand-computed results and independent calculations
-([Trust and testing](Design.md#trust-and-testing)).
+Haze is written in [Lean 4](https://lean-lang.org/). Its kernel rechecks the types and grades
+assigned by the elaborator. Lean proofs cover the grade lattice and laws of the fuzzy
+connectives; the checker as a whole is not formally verified. [Trust and testing](Design.md#trust-and-testing)
+describes the proofs, numerical certificates and independent checks separately.
 
 ## Probabilistic programming languages
 
-Probabilistic programming languages such as [Stan](https://mc-stan.org/) and
-[PyMC](https://www.pymc.io/) are built for statistics: fitting models with continuous parameters
-to data, by sampling or approximate inference. Haze has no continuous distributions and doesn't
-learn from data sets.
-
-Some probabilistic languages compute exact answers for discrete programs, such as
-[Dice](https://github.com/SHoltzen/dice) and [PSI](https://psisolver.org/). Haze's `observe`
-gives exact posteriors the same way, but its focus is different: systems that run for many
-steps, temporal properties, and requirements that are checked rather than queries that are
-answered.
+[Stan](https://mc-stan.org/) and [PyMC](https://www.pymc.io/) fit statistical models to data
+and infer distributions over parameters. [Dice](https://github.com/SHoltzen/dice) and
+[PSI](https://psisolver.org/) also support exact inference for discrete programs. Haze's
+`observe` computes conditional distributions for discrete inputs. Use an `input` if a rate
+is drawn from a distribution; use a `param` if the rate is fixed but its value is uncertain.
+The same Haze file can state a requirement about what happens after a sequence of steps.
+The released language uses discrete distributions and explicitly listed parameter values.
 
 ## Testing tools
 
-Property-based testing tools such as Hypothesis and QuickCheck run code on many random inputs,
-and simulation estimates probabilities by running a model many times. Both work on real code of
-any size, which Haze doesn't. What Haze adds is exhaustiveness on the model: it considers every
-run, so it finds a one-in-a-million failure as reliably as a common one, and its probabilities
-are exact rather than estimates. A good use of both is to check the design in Haze and test the
-implementation against the same model, as [Testing real code](../examples/Conformance/README.md)
-does.
+Hypothesis and QuickCheck exercise an implementation with generated inputs. Simulation
+estimates a probability from sampled runs. Haze computes probability from the transitions
+in the model, so a rare branch contributes its weight without having to turn up in a sample.
+The result describes the model; replay against the implementation checks whether the code
+behaves as specified. In [Found with Haze](../examples/Found/README.md), each linked report
+pairs the model with a reproduction against the library.
 
 ## Summary
 
-| | Haze | PRISM, Storm | Lean | Stan, PyMC |
-|---|---|---|---|---|
-| Answers | Exact probabilities and expectations, with certified bounds for large unbounded problems; counterexamples; generated tests | Probabilities, expectations and rewards for temporal logics | Proofs that hold for every input and size | Posterior distributions |
-| Uncertain rates | Fuzzy parameters, giving belief and plausibility | Parametric and interval models | Whatever you formalize | Priors over parameters |
-| Arithmetic | Exact fractions | Floating point by default, with exact modes | Exact | Floating point, sampling |
-| Models | Discrete-time Markov chains | DTMCs, CTMCs, MDPs, PTAs, POMDPs, Markov automata | Any mathematics | Statistical models, often continuous |
-| Scale | Explicit states, up to 2 million configurations per step | Much larger, with symbolic engines | Unbounded, with effort | Large data sets |
-| Effort | Write a model; checking is automatic | Write a model; checking is automatic | Write the proofs | Write a model; tune inference |
+For the delivery question, change the loss estimates in the [playground](https://haze-lang.pages.dev/play/?example=rough-numbers)
+and rerun the claim. For a requirement such as `charges <= 1`, the
+[conformance example](../examples/Conformance/README.md) follows the check through to a test
+you can run on the client.

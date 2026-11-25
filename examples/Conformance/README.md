@@ -1,16 +1,14 @@
 # Checking real code against a Haze model
 
-A Haze model is most useful when it describes code that actually runs. This sample shows one
-way to keep the two in step, with a common pattern: write a model of the component, prove what it must
-guarantee, and then test the real implementation against the model. Haze itself only provides the model checking and its
-[JSON output](../../docs/Command-Line.md#json-output); everything else here is ordinary
-Python.
+This example checks a Python payment client against a Haze specification. Haze verifies the
+requirements and emits outcome distributions and test cases as
+[JSON](../../docs/Command-Line.md#json-output). The Python harness drives the client with the
+specified losses and compares its charges and delivery outcomes with the model.
 
-The [`payments`](payments) folder holds three files: the model,
-[`payments.hz`](payments/payments.hz), which serves as the specification; the implementation, a
-small Python payment client in [`payments_client.py`](payments/payments_client.py); and
-[`test_conformance.py`](payments/test_conformance.py), which checks one against the other. To run
-the test, build Haze and run it from the repository root:
+The [`payments`](payments) folder contains the [model](payments/payments.hz), the
+[client](payments/payments_client.py), an [exhaustive comparison](payments/test_conformance.py)
+and a [test that replays generated runs](payments/test_weighted.py). To run the exhaustive
+comparison from the repository root:
 
 ```sh
 lake build
