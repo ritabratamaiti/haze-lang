@@ -60,6 +60,7 @@ jobs:
         working-directory: site
         run: |
           npm ci
+          npm test
           node build.mjs
 
       # Needs a Cloudflare API token with the "Cloudflare Pages: Edit" permission in the

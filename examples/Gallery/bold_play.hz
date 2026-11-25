@@ -1,16 +1,26 @@
--- Bold play: reaching a goal with bets that are slightly against you
---
--- You have $50 and need $100 by tonight, and the only way to get it is an even-money bet that you
--- lose a little more often than you win, such as red at roulette. Flat betting puts the same stake
--- on every spin. Bold play bets everything it has, or just enough to reach $100. Dubins and Savage
--- ("How to Gamble If You Must", 1965) showed that when each bet is unfavorable, bold play gives the
--- best chance of reaching the goal. When each bet is favorable, the smallest bets do best instead,
--- and in a fair game every strategy gives the same chance.
---
--- Both systems stop at $0 or $100. `eventually` without a bound covers runs of any length, so the
--- answers are exact. Stakes are whole dollars, spins are independent, and there is no table limit.
+/-
+# The $940 hiding in a $50 bankroll
 
--- Flat betting: the same stake on every spin.
+A $50 chip on red has a 47.4% chance of becoming $100 at American roulette.
+Change it for singles and play until you double up or go broke. Now it's 0.51%.
+
+Run locally with `haze bold_play.hz`. The two players put the same claim to the
+checker at the end. One claim fails on purpose, so the file exits with status 1.
+-/
+
+/-
+## Fifty chips on the rail
+
+Put fifty singles on the rail and bet one on red. A win leaves 51. A loss on the
+next spin leaves 50. The player is back where she started. In the dealer's book,
+two dollars have already been bet.
+
+Stop when the rail is empty or it holds a hundred chips. At $1 a spin, the spin
+count is also the total wagered: about $940 on average, all from that first $50.
+Red wins on 18 pockets and loses on 20, including 0 and 00. At even money the
+house keeps 2/38 of each dollar wagered in expectation. Its take here is $49.49.
+-/
+
 system Flat(p : Num, stake : Num, start : Num) {
   var money : Num := start
   step {
@@ -20,7 +30,25 @@ system Flat(p : Num, stake : Num, start : Num) {
   }
 }
 
--- Bold play: everything you have, or just enough to reach $100.
+#expect Flat(18/38, 1, 50) |= steps until money == 0 or money == 100  -- Spins to cash-out
+#prob Flat(18/38, 1, 50) |= eventually money == 100                  -- Chance of $100
+
+/-
+## Leave the chip whole
+
+Now hand the dealer one $50 chip. The house gets its edge on $50 once: an average
+of $2.63. The chance of leaving with $100 is 9/19, about 92 times the chance
+with singles.
+
+At $60, bold play doesn't mean all in. It means bet $40: a win is enough, and a
+loss leaves $20 to play with. Dubins and Savage proved this rule maximizes the
+chance of reaching a target in an unfavorable even-money game without a table
+limit (*How to Gamble If You Must*, 1965).
+
+![Chance of reaching $100 by starting balance: at $50, bold play gives 47.4% and singles give 0.51%.](https://haze-lang.pages.dev/blog/images/bold-play-curve.png)
+Figure 1. The fair game is the diagonal. Both solid lines use the American wheel.
+-/
+
 system Bold(p : Num, start : Num) {
   var money : Num := start
   step {
@@ -31,34 +59,74 @@ system Bold(p : Num, start : Num) {
   }
 }
 
--- American roulette: red wins on 18 of the 38 pockets. From $50 to $100, by stake:
-#prob Flat(18/38, 1, 50) |= eventually money == 100
-#prob Flat(18/38, 5, 50) |= eventually money == 100
-#prob Flat(18/38, 10, 50) |= eventually money == 100
-#prob Flat(18/38, 25, 50) |= eventually money == 100
-#prob Bold(18/38, 50) |= eventually money == 100
+#prob Bold(18/38, 50) |= eventually money == 100      -- One $50 bet
+#prob Flat(18/38, 5, 50) |= eventually money == 100   -- $5 per spin
+#prob Flat(18/38, 10, 50) |= eventually money == 100  -- $10 per spin
+#prob Flat(18/38, 25, 50) |= eventually money == 100  -- $25 per spin
 
--- European roulette: red wins on 18 of 37.
-#prob Flat(18/37, 1, 50) |= eventually money == 100
-#prob Bold(18/37, 50) |= eventually money == 100
+/-
+## Lift out the double zero
 
--- $1 stakes take about 940 spins on average, so about $940 goes on the table, and the house keeps
--- 2/38 of every dollar bet: an expected loss of about $49.49 of the $50. Bold play bets $50 once.
-#expect Flat(18/38, 1, 50) |= steps until money == 0 or money == 100
+One change to the wheel: take out 00. Red still pays even money and a single
+zero still takes the full stake. The one-chip player picks up a little over one
+percentage point. For the $1 player, removing that one losing pocket makes
+doubling more than twelve times as likely.
 
--- From $30, bold play bets $30, then goes around the cycle 60, 20, 40, 80 until it wins or loses.
-#prob Bold(18/38, 30) |= eventually money == 100
-#prob Flat(18/38, 1, 30) |= eventually money == 100
-#expect Bold(18/38, 30) |= steps until money == 0 or money == 100
+Either player could keep more money *on average* by walking away with the $50.
+That wouldn't get them to $100. The same distinction between cash and a target
+motivates [*Gambling for Goals*](https://www.nber.org/papers/w36010), the household
+finance paper [discussed at Marginal Revolution](https://marginalrevolution.com/marginalrevolution/2026/11/gambling-for-goals.html).
+-/
 
--- In a fair game both strategies reach $100 from $30 with probability exactly 3/10.
-#prob Bold(1/2, 30) |= eventually money == 100
-#prob Flat(1/2, 1, 30) |= eventually money == 100
+#prob Bold(18/37, 50) |= eventually money == 100     -- One $50 bet, single zero
+#prob Flat(18/37, 1, 50) |= eventually money == 100  -- Singles, single zero
 
--- A bet whose edge you only roughly know: you win most plausibly 49% of the time, possibly 49.5%
--- or 50%, and just possibly 50.5% if your edge is real. With $1 stakes the chance of doubling
--- depends heavily on which of these is true; with bold play it barely moves.
+/-
+## Back at sixty
+
+Give the bold player $30. A red takes it to $60. A loss, two wins and another
+loss take it through $20, $40 and $80, then back to $60. That loop can repeat
+any number of times. `eventually` has no deadline: Haze solves one equation per
+reachable balance rather than cutting the session off at the thousandth spin.
+
+At $50 one spin settles the game. At $25 a win lands on $50; at $75 a loss does
+the same. Write the balance as a fraction x of the goal: each spin that leaves
+the game undecided takes it to 2x or 2x - 1. Either drops the first binary digit
+after the point. Look for the copies of the $50 notch at quarters and eighths.
+With arbitrarily fine stakes the success curve rises continuously but has slope
+zero almost everywhere. [Billingsley gives the proof](https://www.jstor.org/stable/27852139).
+
+![Shortfall from a fair wheel in percentage points, with notches at $25, $50 and $75.](https://haze-lang.pages.dev/blog/images/bold-play-shortfall.png)
+Figure 2. Of 4,097 starting balances plotted, the largest shortfall is 3.57 points near $66.67.
+-/
+
+#prob Bold(18/38, 30) |= eventually money == 100                     -- Bold from $30
+#prob Flat(18/38, 1, 30) |= eventually money == 100                  -- Singles from $30
+#expect Bold(18/38, 30) |= steps until money == 0 or money == 100    -- Spins, bold from $30
+#prob Bold(1/2, 30) |= eventually money == 100                       -- Bold on a fair wheel
+#prob Flat(1/2, 1, 30) |= eventually money == 100                    -- Singles on a fair wheel
+
+/-
+## Rub out the odds, keep the ledger
+
+Put the $50 back. This time the win rate is fixed but unknown. Your best estimate
+is 49%; you give a favorable 50.5% much less weight. These are judgments, not
+casino data. A possibility of 0.2 doesn't mean one session in five has good odds.
+Only the spins are random.
+
+Both players want at least a 40% chance of doubling. At 49% per spin, singles
+get there about 12% of the time; at 50.5%, about 73%. One $50 bet just takes
+the odds it's given: 49% to 50.5%. Haze checks the 40% requirement against
+*belief*, which is 0.119175 for singles and 0.49 for one bet. The fifty straight
+losses in the output illustrate a losing run; one streak can't refute a
+probability bound. The combined probability of all the winning runs settles it.
+
+Try swapping the weights 1 and 0.2 below. Even with 50.5% ranked first, the
+$1 player still misses the target: belief rises to just 37.76%. The 49.5%
+estimate still carries weight 0.7. [How Haze weighs the rows](https://haze-lang.pages.dev/docs/fuzzy/).
+-/
+
 param win : Num ~= {0.49: 1, 0.495: 0.7, 0.5: 0.4, 0.505: 0.2}
 
-claim flat_doubles : Flat(win, 1, 50) |= eventually money == 100 with prob >= 0.4
-claim bold_doubles : Bold(win, 50) |= eventually money == 100 with prob >= 0.4
+claim flat_doubles : Flat(win, 1, 50) |= eventually money == 100 with prob >= 0.4  -- $1 per spin
+claim bold_doubles : Bold(win, 50) |= eventually money == 100 with prob >= 0.4     -- One $50 bet

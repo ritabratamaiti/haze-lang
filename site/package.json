@@ -4,6 +4,7 @@
   "type": "module",
   "description": "The Haze website: landing page, playground, tour, gallery and docs",
   "scripts": {
+    "test": "node --test literate.test.mjs",
     "build": "node build.mjs",
     "serve": "node build.mjs --serve",
     "deploy": "node build.mjs && npx --yes wrangler@4 pages deploy dist --project-name haze-lang --branch main"

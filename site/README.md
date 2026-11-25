@@ -17,6 +17,11 @@ node build.mjs --serve           # builds dist/ and serves it on http://localhos
   link.
 - `content/presets/*.hz` are the playground's examples, and `content/tour.md` is the tour: one
   `##` chapter each, with prose and a `haze` code block.
+- A blog entry can point to a gallery `.hz` file with `source:` in its front matter. In the
+  script, a column-zero `/-` block with a Markdown `#` title contains the introduction. Each
+  `##` block starts a spread: its prose sits beside the executable lines that follow its `-/`.
+  Trailing labels on queries name the rows on the result slip. The runner and `.hz` download
+  use the same source. See `content/blog/bold-play.md`.
 - `src/` is the browser code: the editor, the engine worker, the result cards, share links and the
   home page animation.
 

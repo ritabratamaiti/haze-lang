@@ -15,6 +15,7 @@ import { deflateRawSync } from "node:zlib";
 import { createServer } from "node:http";
 import { join, dirname, relative, extname, posix } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { percent, readEssay } from "./literate.mjs";
 
 const SITE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(SITE, "..");
@@ -98,7 +99,7 @@ const EXAMPLES = [
   ["examples/Tutorial/JobWorker.hz", "Tutorial", "Tutorial: a job worker", "The language step by step, from one random value to a full system."],
   ["examples/probability_classics.hz", "Probability", "Probability classics", "The birthday problem, gambler's ruin, the boy-or-girl paradox and more, with known answers."],
   ["examples/Gallery/games.hz", "Games", "Craps, tennis and Penney's game", "The odds in craps (244/495), winning a game of tennis from deuce, and Penney's coin game."],
-  ["examples/Gallery/bold_play.hz", "Games", "Bold play", "Why one $50 bet at roulette doubles your money far more often than fifty $1 bets, and how a real edge reverses that."],
+  ["examples/Gallery/bold_play.hz", "Games", "Bold play", "The odds of turning $50 into $100 on one spin or $1 at a time, on a roulette wheel and in a game with uncertain odds."],
   ["examples/Gallery/security.hz", "Security", "PIN guessing and intrusion alarms", "Leaked PIN frequencies against lockout limits, and why most intrusion alarms are false."],
   ["examples/Gallery/production_test.hz", "Electronics test", "Guard bands in production test", "How often a noisy meter ships out-of-spec parts, why retesting makes it worse, and the guard band that fixes it."],
   ["examples/Gallery/chip_design.hz", "Chip design", "Why big GPUs disable cores", "The yield of NVIDIA's 814 mm² GH100 die at TSMC's reported defect density, with and without spare SMs."],
@@ -430,7 +431,8 @@ page("docs", layout({ root: "../", path: "docs/", canonical: "docs/", title: "Do
 // Each post is site/content/blog/SLUG.md: a front matter block (title, date, author, summary,
 // optionally an order for posts on the same day and an image for link previews, given as a path
 // under the site root), then the post in Markdown, starting with `# Title`. Images for posts live
-// in site/content/blog/images and are served from /blog/images/.
+// in site/content/blog/images and are served from /blog/images/. A post with `source` instead of
+// a Markdown body renders a gallery script. Its comment header supplies the title and summary.
 function frontMatter(src, file) {
   const m = src.match(/^---\n([\s\S]*?)\n---\n/);
   if (!m) throw new Error(`${file}: a blog post must start with a front matter block`);
@@ -439,15 +441,63 @@ function frontMatter(src, file) {
     const kv = line.match(/^(\w+):\s*(.*)$/);
     if (kv) meta[kv[1]] = kv[2];
   }
-  for (const k of ["title", "date", "author", "summary"]) if (!meta[k]) throw new Error(`${file}: missing ${k}`);
+  for (const k of meta.source ? ["date", "author"] : ["title", "date", "author", "summary"])
+    if (!meta[k]) throw new Error(`${file}: missing ${k}`);
   return { meta, body: src.slice(m[0].length) };
 }
 const BLOG_DIR = join(SITE, "content", "blog");
 const dayMonthYear = (d) => new Date(`${d}T12:00:00Z`).toLocaleDateString("en-GB", { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" });
 const POSTS = (existsSync(BLOG_DIR) ? readdirSync(BLOG_DIR).filter((f) => f.endsWith(".md")) : []).map((f) => {
   const { meta, body } = frontMatter(read(join(BLOG_DIR, f)), f);
-  return { slug: f.replace(/\.md$/, ""), file: `site/content/blog/${f}`, ...meta, ...renderDoc(body, `site/content/blog/${f}`) };
+  const post = { slug: f.replace(/\.md$/, ""), file: `site/content/blog/${f}`, ...meta };
+  if (!meta.source) return { ...post, ...renderDoc(body, post.file) };
+  const example = GALLERY.find((e) => e.path === meta.source);
+  if (!example || body.trim()) throw new Error(`${f}: source must name a gallery file and replace the Markdown body`);
+  return { ...post, file: example.path, example, ...readEssay(example.code, example.path) };
 }).sort((a, b) => b.date.localeCompare(a.date) || (Number(a.order ?? 0) - Number(b.order ?? 0)));
+
+function ledger(p, root, foot) {
+  const { code, records, path } = p.example;
+  const name = posix.basename(path);
+  const prose = (s) => renderDoc(s, path).html.replaceAll("@ROOT@", root)
+    .replace(/<p>(<img [^>]+>)\s*(Figure \d+\.[^<]+)<\/p>/g, "<figure>$1<figcaption>$2</figcaption></figure>");
+  const entries = p.entries.map((entry, i) => {
+    const serial = String(i + 1).padStart(2, "0");
+    const figures = [];
+    const scene = prose(entry.story).replace(/<figure>[\s\S]*?<\/figure>/g, (f) => { figures.push(f); return ""; });
+    const rows = records.filter((r) => r.line >= entry.line && r.line <= entry.endLine);
+    const lines = entry.source.split("\n");
+    const slip = rows.map((r) => {
+      const k = r.line - entry.line;
+      const label = lines[k].match(/\s+-- (.+)$/);
+      if (label) lines[k] = lines[k].slice(0, label.index);
+      let value;
+      if (r.kind === "prob" && r.belief === r.plausibility) value = percent(r.belief);
+      else if (r.kind === "claim" && typeof r.accepted === "boolean")
+        value = `${r.accepted ? "Pass" : "Fail"} · ${percent(r.belief)} belief`;
+      else value = r.message.split("\n")[1]?.trim().replace(/^expected steps /, "") ?? r.message;
+      return `<div><dt>${esc(label?.[1] ?? r.name ?? r.kind ?? "Diagnostic")}</dt><dd>${esc(value)}</dd></div>`;
+    }).join("");
+    const ticket = rows.length ? `<div class="ledger-ticket"><div class="ledger-line">TILL SLIP ${serial} &nbsp; / &nbsp; RECORDED RUN</div><dl>${slip}</dl>
+<details class="ledger-receipt"><summary>Full checker output (${rows.length})</summary>
+<pre>${rows.map((r) => `L${r.line}  ${esc(r.message)}`).join("\n\n")}</pre></details></div>` : "";
+    return `<section class="ledger-entry" id="${slug(entry.title)}"><header><span class="ledger-folio">${serial}</span><h2>${esc(entry.title)}</h2></header>
+<div class="ledger-spread"><div class="ledger-scene">${scene}</div><div class="ledger-code"><div class="ledger-code-head"><span class="ledger-line">HAZE &nbsp; / &nbsp; L${entry.line}</span><button type="button" class="ledger-edit" data-edit-line="${entry.line}" hidden>Edit in source</button></div>
+<pre><code>${highlightHaze(lines.join("\n"))}</code></pre></div>${ticket}</div>${figures.join("")}</section>`;
+  }).join("\n");
+  return `<article class="ledger wrap"><header class="ledger-cover"><div class="ledger-mast"><a href="../">Haze blog</a><span>TABLE LEDGER &nbsp; / &nbsp; ${esc(name)}</span></div>
+<h1>${esc(p.title)}</h1><p class="ledger-deck">${esc(p.summary)}</p>
+<p class="ledger-credit">${esc(p.author)} &nbsp; / &nbsp; <time datetime="${p.date}">${dayMonthYear(p.date)}</time></p></header>
+<div class="ledger-desk" id="workbench"><div class="ledger-actions"><button type="button" class="btn primary" id="ledger-run" hidden>Run this file</button>
+<button type="button" class="btn" id="ledger-stop" hidden>Stop</button>
+<a class="btn" id="ledger-download" href="${name}" download="${name}">Download .hz</a><span role="status" id="ledger-status"></span></div>
+<details class="ledger-raw"><summary>View or edit the source</summary>${prose(p.usage)}<label class="sr-only" for="ledger-input">Haze source to run</label>
+<textarea id="ledger-input" spellcheck="false" autocapitalize="off" wrap="off">${esc(code)}</textarea></details>
+<details class="ledger-console" id="ledger-console" hidden><summary>Output from this run</summary><pre></pre></details>
+<noscript>Download the file to run it without JavaScript. Each till slip below shows the recorded output.</noscript></div>
+<nav class="ledger-index" aria-label="Ledger entries"><ol>${p.entries.map((e) => `<li><a href="#${slug(e.title)}">${esc(e.title)}</a></li>`).join("")}</ol></nav>
+${entries}<a class="ledger-back" href="#workbench">Back to the source and runner ↑</a>${foot}</article>`;
+}
 
 // Posts use the documentation layout: the list of posts on the left, the post in the middle and its
 // sections on the right.
@@ -459,12 +509,18 @@ function blogNav(root, current) {
 for (const [i, p] of POSTS.entries()) {
   const root = "../../";
   const newer = POSTS[i - 1], older = POSTS[i + 1];
-  const toc = p.headings.length > 1 ? `<aside class="doc-toc" aria-label="On this page"><h4>On this page</h4>${p.headings.map(([hid, t]) => `<a href="#${hid}">${esc(t)}</a>`).join("")}</aside>` : "<aside class=\"doc-toc\"></aside>";
   const foot = `<nav class="doc-pager" aria-label="Older and newer posts">
     ${older ? `<a href="${root}blog/${older.slug}/"><span>Older</span>${esc(older.title)}</a>` : "<span></span>"}
     ${newer ? `<a class="next" href="${root}blog/${newer.slug}/"><span>Newer</span>${esc(newer.title)}</a>` : "<span></span>"}</nav>
     <p class="doc-meta"><a href="${GITHUB}/edit/main/${p.file}">Edit this post on GitHub</a></p>`;
-  page(`blog/${p.slug}`, layout({ root, path: "blog/", canonical: `blog/${p.slug}/`, title: `${p.title} · Haze`, script: "docs", description: p.summary, image: p.image,
+  const attrs = { root, path: "blog/", canonical: `blog/${p.slug}/`, title: `${p.title} · Haze`, description: p.summary, image: p.image };
+  if (p.example) {
+    page(`blog/${p.slug}`, layout({ ...attrs, script: "ledger", body: ledger(p, root, foot) }));
+    writeFileSync(join(DIST, "blog", p.slug, posix.basename(p.example.path)), p.example.code);
+    continue;
+  }
+  const toc = p.headings.length > 1 ? `<aside class="doc-toc" aria-label="On this page"><h4>On this page</h4>${p.headings.map(([hid, t]) => `<a href="#${hid}">${esc(t)}</a>`).join("")}</aside>` : "<aside class=\"doc-toc\"></aside>";
+  page(`blog/${p.slug}`, layout({ ...attrs, script: "docs",
     body: `<div class="wrap docs"><nav class="docs-nav" aria-label="Posts">${blogNav(root, p.slug)}</nav>
 <article class="prose"><div class="eyebrow">Blog</div><h1>${esc(p.title)}</h1>
 <p class="post-meta">${esc(p.author)}, ${dayMonthYear(p.date)}</p>
@@ -500,7 +556,7 @@ writeFileSync(join(DIST, "sitemap.xml"), `<?xml version="1.0" encoding="UTF-8"?>
 writeFileSync(join(DIST, "robots.txt"), `User-agent: *\nAllow: /\nSitemap: ${SITE_URL}sitemap.xml\n`);
 
 await build({
-  entryPoints: Object.fromEntries(["home", "play", "tour", "gallery", "docs"].map((n) => [n, join(SITE, "src", "pages", `${n}.ts`)])),
+  entryPoints: Object.fromEntries(["home", "play", "tour", "gallery", "docs", "ledger"].map((n) => [n, join(SITE, "src", "pages", `${n}.ts`)])),
   outdir: join(DIST, "assets"), bundle: true, format: "esm", splitting: true, minify: true, sourcemap: false, target: "es2022",
   logLevel: "warning",
 });
