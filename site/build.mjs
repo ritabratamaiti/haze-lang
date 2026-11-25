@@ -98,6 +98,7 @@ const EXAMPLES = [
   ["examples/Tutorial/JobWorker.hz", "Tutorial", "Tutorial: a job worker", "The language step by step, from one random value to a full system."],
   ["examples/probability_classics.hz", "Probability", "Probability classics", "The birthday problem, gambler's ruin, the boy-or-girl paradox and more, with known answers."],
   ["examples/Gallery/games.hz", "Games", "Craps, tennis and Penney's game", "The odds in craps (244/495), winning a game of tennis from deuce, and Penney's coin game."],
+  ["examples/Gallery/bold_play.hz", "Games", "Bold play", "Why one $50 bet at roulette doubles your money far more often than fifty $1 bets, and how a real edge reverses that."],
   ["examples/Gallery/security.hz", "Security", "PIN guessing and intrusion alarms", "Leaked PIN frequencies against lockout limits, and why most intrusion alarms are false."],
   ["examples/Gallery/production_test.hz", "Electronics test", "Guard bands in production test", "How often a noisy meter ships out-of-spec parts, why retesting makes it worse, and the guard band that fixes it."],
   ["examples/Gallery/chip_design.hz", "Chip design", "Why big GPUs disable cores", "The yield of NVIDIA's 814 mm² GH100 die at TSMC's reported defect density, with and without spare SMs."],
@@ -165,7 +166,7 @@ function renderDoc(src, path) {
   const firstPara = body.trim().split(/\n\s*\n/)[0].replace(/\n/g, " ");
   const blurb = firstPara.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1").replace(/[`*_]/g, "");
   let html = marked.parse(body);
-  html = html.replace(/<h([23])>(.*?)<\/h\1>/g, (_, n, t) => `<h${n} id="${slug(t)}">${t}</h${n}>`);
+  html = html.replace(/<h([23])>(.*?)<\/h\1>/g, (_, n, t) => `<h${n} id="${slug(unescapeHtml(t))}">${t}</h${n}>`);
   // links to the website become relative; links between documents stay on the site; the rest go to GitHub
   html = html.replace(/(href|src)="https:\/\/haze-lang\.pages\.dev\/([^"]*)"/g, (m, attr, rest) => `${attr}="@ROOT@${rest}"`);
   html = html.replace(/(href|src)="([^"#:@]+)(#[^"]*)?"/g, (m, attr, target, hash = "") => {
@@ -184,13 +185,14 @@ function renderDoc(src, path) {
       (runs ? `<a class="btn small" href="@ROOT@play/#code=${playHash(code)}">Open in the playground</a>` : "") + "</div>";
     return `<div class="code-block"><pre class="code" id="${id}"><code>${highlightHaze(code)}</code></pre>${actions}</div>`;
   });
-  const headings = [...html.matchAll(/<h2 id="([^"]+)">(.*?)<\/h2>/g)].map(([, id, t]) => [id, t.replace(/<[^>]+>/g, "")]);
+  // heading text comes out of marked HTML-escaped; unescape it so the table of contents escapes it once
+  const headings = [...html.matchAll(/<h2 id="([^"]+)">(.*?)<\/h2>/g)].map(([, id, t]) => [id, unescapeHtml(t.replace(/<[^>]+>/g, ""))]);
   return { title, html, headings, blurb };
 }
 
 // ---- pages -------------------------------------------------------------------------------
 const NAV = [["play/", "Playground"], ["tour/", "Tour"], ["gallery/", "Gallery"], ["docs/", "Docs"], ["blog/", "Blog"]];
-function layout({ root, path, title, description, body, script, data, wide, canonical }) {
+function layout({ root, path, title, description, body, script, data, wide, canonical, image }) {
   const nav = NAV.map(([href, label]) => `<a href="${root}${href}"${path.startsWith(href) ? ' class="active" aria-current="page"' : ""}>${label}</a>`).join("");
   return `<!doctype html>
 <html lang="en">
@@ -202,7 +204,7 @@ function layout({ root, path, title, description, body, script, data, wide, cano
 <meta name="description" content="${esc(description)}">
 ${canonical !== undefined ? `<link rel="canonical" href="${SITE_URL}${canonical}">\n<meta property="og:url" content="${SITE_URL}${canonical}">\n` : ""}<meta property="og:title" content="${esc(title)}">
 <meta property="og:description" content="${esc(description)}">
-<meta property="og:image" content="${SITE_URL}images/social-preview.png">
+<meta property="og:image" content="${SITE_URL}${image ?? "images/social-preview.png"}">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="${root}images/icon-dark.svg" type="image/svg+xml">
 <link rel="stylesheet" href="${root}assets/styles.css">
@@ -425,8 +427,10 @@ page("docs", layout({ root: "../", path: "docs/", canonical: "docs/", title: "Do
   </div>` }));
 
 // ---- blog --------------------------------------------------------------------------------
-// Each post is site/content/blog/SLUG.md: a front matter block (title, date, author, summary and
-// optionally an order for posts on the same day), then the post in Markdown, starting with `# Title`.
+// Each post is site/content/blog/SLUG.md: a front matter block (title, date, author, summary,
+// optionally an order for posts on the same day and an image for link previews, given as a path
+// under the site root), then the post in Markdown, starting with `# Title`. Images for posts live
+// in site/content/blog/images and are served from /blog/images/.
 function frontMatter(src, file) {
   const m = src.match(/^---\n([\s\S]*?)\n---\n/);
   if (!m) throw new Error(`${file}: a blog post must start with a front matter block`);
@@ -460,7 +464,7 @@ for (const [i, p] of POSTS.entries()) {
     ${older ? `<a href="${root}blog/${older.slug}/"><span>Older</span>${esc(older.title)}</a>` : "<span></span>"}
     ${newer ? `<a class="next" href="${root}blog/${newer.slug}/"><span>Newer</span>${esc(newer.title)}</a>` : "<span></span>"}</nav>
     <p class="doc-meta"><a href="${GITHUB}/edit/main/${p.file}">Edit this post on GitHub</a></p>`;
-  page(`blog/${p.slug}`, layout({ root, path: "blog/", canonical: `blog/${p.slug}/`, title: `${p.title} · Haze`, script: "docs", description: p.summary,
+  page(`blog/${p.slug}`, layout({ root, path: "blog/", canonical: `blog/${p.slug}/`, title: `${p.title} · Haze`, script: "docs", description: p.summary, image: p.image,
     body: `<div class="wrap docs"><nav class="docs-nav" aria-label="Posts">${blogNav(root, p.slug)}</nav>
 <article class="prose"><div class="eyebrow">Blog</div><h1>${esc(p.title)}</h1>
 <p class="post-meta">${esc(p.author)}, ${dayMonthYear(p.date)}</p>
@@ -481,6 +485,7 @@ ${POSTS.map((p) => `<item><title>${xml(p.title)}</title><link>${SITE_URL}blog/${
 </channel></rss>
 `);
 cpSync(join(SITE, "styles.css"), join(DIST, "assets", "styles.css"));
+if (existsSync(join(BLOG_DIR, "images"))) cpSync(join(BLOG_DIR, "images"), join(DIST, "blog", "images"), { recursive: true });
 mkdirSync(join(DIST, "images"), { recursive: true });
 for (const f of ["icon-dark.svg", "icon-light.svg", "logo-dark.svg", "logo-light.svg", "logo-dark.png", "social-preview.png"]) cpSync(join(REPO, "docs", "images", f), join(DIST, "images", f));
 mkdirSync(join(DIST, "engine"), { recursive: true });
