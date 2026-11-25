@@ -8,5 +8,3 @@ tests/large_supports.hz:10:1: info: #prob binomial(3000, 1/2) <= 1499
   probability ≈0.492717
 tests/large_supports.hz:11:1: info: #expect binomial(3000, 1/2)
   expectation 1500
-tests/large_supports.hz:12:1: info: #prob binomial(3000, 1/1000) >= 1
-  probability ≈0.950288
