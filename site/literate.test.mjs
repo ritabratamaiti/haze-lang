@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isSourceExcerpt, readEssay } from "./literate.mjs";
+import { isSourceExcerpt, readEssay, readSigns, signEquation } from "./literate.mjs";
 
 test("pairs each scene with its code and original diagnostic lines", () => {
   const src = [
@@ -31,4 +31,13 @@ test("accepts a dedented quotation, but not changed, partial or spliced lines", 
   assert.equal(isSourceExcerpt("let stake := money", source), false);
   assert.equal(isSourceExcerpt("let before", source), false);
   assert.equal(isSourceExcerpt("let stake := min(money, 100 - money)\nmoney := money + stake", source), false);
+});
+
+test("the matrix example distinguishes flipping a sign from squaring each product", () => {
+  const entries = readSigns("+1 +1\n+1 +1\n");
+  assert.equal(signEquation(entries), "det² = (1 − 1)² = 0");
+  entries[3] = -1;
+  assert.equal(signEquation(entries), "det² = ((−1) − 1)² = 4");
+  assert.throws(() => readSigns("1 1 1 1"), /two rows/);
+  assert.throws(() => readSigns("1 1\n1 0"), /entries/);
 });

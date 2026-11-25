@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="208" viewBox="0 0 520 208" role="img" aria-labelledby="title desc">
+  <title id="title">Two diagonal blocks of ones</title>
+  <desc id="desc">The four by four matrix has ones in the top left and bottom right two by two blocks. Within either block the rows may match the columns straight across or crossed.</desc>
+  <style>
+    svg { --ink:#25323a; --quiet:#586875; --zero:#667785; --edge:#255d89; --block:#e9f1f7 }
+    @media (prefers-color-scheme:dark) { svg { --ink:#e7edf1; --quiet:#b6c2ca; --zero:#a2afb9; --edge:#9bc9ec; --block:#233443 } }
+    text { fill:var(--ink); font:16px system-ui,sans-serif }
+    .entry { font:21px ui-monospace,monospace; text-anchor:middle }
+    .zero { fill:var(--zero) }
+    .hint { fill:var(--quiet); text-anchor:middle }
+    .bracket,.edge { fill:none; stroke:var(--ink); stroke-width:1.6 }
+    .edge { stroke:var(--edge); stroke-width:2 }
+    .node { fill:var(--ink) }
+    .wash { fill:var(--block) }
+    @media (max-width:460px) { text { font-size:19px } .entry { font-size:22px } }
+  </style>
+  <text x="12" y="24">Two blocks</text>
+  <rect class="wash" x="21" y="41" width="67" height="67"/>
+  <rect class="wash" x="89" y="109" width="67" height="67"/>
+  <path class="bracket" d="M22 40H15V177H22 M155 40H162V177H155"/>
+  <g class="entry">
+    <text class="entry" x="38" y="66">1</text><text class="entry" x="72" y="66">1</text><text class="entry zero" x="106" y="66">0</text><text class="entry zero" x="140" y="66">0</text>
+    <text class="entry" x="38" y="100">1</text><text class="entry" x="72" y="100">1</text><text class="entry zero" x="106" y="100">0</text><text class="entry zero" x="140" y="100">0</text>
+    <text class="entry zero" x="38" y="134">0</text><text class="entry zero" x="72" y="134">0</text><text class="entry" x="106" y="134">1</text><text class="entry" x="140" y="134">1</text>
+    <text class="entry zero" x="38" y="168">0</text><text class="entry zero" x="72" y="168">0</text><text class="entry" x="106" y="168">1</text><text class="entry" x="140" y="168">1</text>
+  </g>
+  <text x="219" y="24">Choices within either block</text>
+  <g class="edge"><path d="M248 70H305 M248 133H305 M400 70L457 133 M400 133L457 70"/></g>
+  <g class="node">
+    <circle cx="248" cy="70" r="3.5"/><circle cx="248" cy="133" r="3.5"/><circle cx="305" cy="70" r="3.5"/><circle cx="305" cy="133" r="3.5"/>
+    <circle cx="400" cy="70" r="3.5"/><circle cx="400" cy="133" r="3.5"/><circle cx="457" cy="70" r="3.5"/><circle cx="457" cy="133" r="3.5"/>
+  </g>
+  <g class="hint">
+    <text x="231" y="76">1</text><text x="231" y="139">2</text><text x="320" y="76">a</text><text x="320" y="139">b</text>
+    <text x="383" y="76">1</text><text x="383" y="139">2</text><text x="472" y="76">a</text><text x="472" y="139">b</text>
+    <text class="hint" x="276" y="176">straight</text><text class="hint" x="428" y="176">crossed</text>
+  </g>
+</svg>

@@ -34,3 +34,15 @@ export function isSourceExcerpt(quote, source) {
   const want = lines(quote), have = lines(source);
   return quote.trim() !== "" && have.some((_, i) => want.every((line, j) => line === have[i + j]));
 }
+
+export function readSigns(code) {
+  const rows = code.trim().split(/\r?\n/).map((row) => row.trim().split(/\s+/));
+  if (rows.length !== 2 || rows.some((row) => row.length !== 2 || row.some((v) => !/^[+-]?1$/.test(v))))
+    throw new Error("A signs example must have two rows of two +1 or -1 entries.");
+  return rows.flat().map(Number);
+}
+
+export function signEquation([a, b, c, d]) {
+  const term = (v) => v < 0 ? "(−1)" : "1";
+  return `det² = (${term(a * d)} − ${term(b * c)})² = ${(a * d - b * c) ** 2}`;
+}

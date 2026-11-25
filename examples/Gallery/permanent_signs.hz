@@ -1,0 +1,192 @@
+/-
+# Counting a million matchings and getting zero
+
+The matrix in this example has exactly 1,048,576 perfect matchings. A randomized
+algorithm for counting them can return zero or 1,099,511,627,776. It never
+returns 1,048,576. Its mean is exactly right.
+
+Run `haze permanent_signs.hz` to get the distributions. All checks use the
+integers and exact rational probabilities; this file does not run or check
+either VP/VNP proof.
+-/
+
+/-
+## Two choices per pair
+
+Take a square matrix of zeros and ones. A one means that a row can be paired
+with that column. The permanent counts how many ways there are to pair every
+row with a different column. On a two-by-two matrix there are only two terms:
+`ad + bc`. The determinant uses `ad - bc`. On a block of four ones the permanent
+is two and the determinant is zero.
+
+![A block diagonal matrix with two pairs of rows. Within each pair, the rows can take the columns in either order; all entries between pairs are zero.](https://haze-lang.pages.dev/blog/images/permanent-pairs.svg)
+Two blocks give four matchings. Twenty blocks give a 40 by 40 matrix with 2^20 matchings.
+
+The [Anthropic preprint](https://github.com/anthropics/formal-math/tree/main/vp-vnp)
+that circulated [on X](https://x.com/Liam06972452/status/2124990562906304556)
+and [Hacker News](https://news.ycombinator.com/item?id=50620102), and a
+[separate OpenAI preprint](https://github.com/openai/math/tree/main/preprints/VP-and-VNP-are-different-November-23-2026),
+claim VP ≠ VNP. Their lower bounds concern circuits that must compute the
+permanent on arbitrary inputs. This particular matrix is easy. We know the
+answer before trying a shortcut that uses a determinant.
+-/
+
+def perm2(a : Num, b : Num, c : Num, d : Num) : Num := a*d + b*c
+def det2(a : Num, b : Num, c : Num, d : Num) : Num := a*d - b*c
+
+#eval perm2(1, 1, 1, 1)
+#eval det2(1, 1, 1, 1)
+
+/-
+## Give each one a random sign
+
+Leave the zeros alone. Give every one an independent sign, either +1 or -1
+with equal probability. Compute the determinant of the signed matrix and square
+it. This is Godsil and Gutman's estimator for a zero-one permanent.
+
+```signs
++1  +1
++1  +1
+```
+
+Changing the bottom right sign from +1 to -1 sends `ad - bc` from zero to
+-2. Squaring gives four. Of the sixteen ways to fill the block, eight give
+zero and eight give four. The average is two. In Haze the four calls to
+`sign()` are separate draws; `square` gets the value of one determinant:
+
+```haze
+def fresh() : Num := square(det2(sign(), sign(), sign(), sign()))
+```
+
+The same averaging trick works for a general zero-one matrix. Expand the
+squared determinant and pick two *different* matchings. At least one edge
+belongs to just one of them. Flipping that edge's sign negates their cross
+term, so the two signs cancel in the average. A matching paired with itself
+contributes one. Adding up those ones gives the permanent.
+-/
+
+def sign() : Num := if flip(1/2) then 1 else -1
+def square(x : Num) : Num := x*x
+def fresh() : Num := square(det2(sign(), sign(), sign(), sign()))
+
+#eval fresh()
+#expect fresh()
+
+/-
+## What comes out of the 40 by 40 matrix
+
+The determinant of a block diagonal matrix is the product of its block
+determinants. One zero wipes out the product. A nonzero estimate requires all
+twenty blocks to give four after squaring. With independent signs the whole
+distribution fits on two lines. You can ask the checker for both the
+distribution and its mean:
+
+```haze
+#eval Blocks(Independent) |= after[20] estimate
+#expect Blocks(Independent) |= after[20] estimate
+```
+
+| Estimate | Probability |
+|---:|---:|
+| 0 | 1,048,575 / 1,048,576 |
+| 1,099,511,627,776 | 1 / 1,048,576 |
+
+That last number in the left column is 4^20. Divide it by 2^20 and you have
+the exact mean, 1,048,576. Haze checks this by multiplying one signed block
+at a time. It keeps two possible products after each block instead of storing
+all the sign assignments.
+
+Now run the estimator 1,048,576 times independently and take the average.
+Each nonzero result adds *one entire permanent* to that average. If you see
+one, your answer is exactly right. See two and your answer is double. See none
+and your answer is still zero, which happens with probability
+`(1 - 1/1048576)^1048576`, about 36.8%. That's a calculation from the one-draw
+distribution above, not a count from a simulation.
+
+This sparse example is an old objection to the sign estimator. Costello and Vu
+[credit Barvinok for it](https://arxiv.org/abs/0905.1909) in section 2 of
+their paper. The zeros between the blocks matter here.
+-/
+
+enum Wiring = Independent | Parity
+
+def tied(a : Num, b : Num, c : Num) : Num := square(det2(a, b, c, a*b*c))
+def block(w : Wiring) : Num :=
+  if w == Independent then fresh() else tied(sign(), sign(), sign())
+
+system Blocks(w : Wiring) {
+  var estimate : Num := 1
+  step { if estimate != 0 { estimate := estimate * block(w) } }
+}
+
+#eval Blocks(Independent) |= after[20] estimate
+#expect Blocks(Independent) |= after[20] estimate
+#prob Blocks(Independent) |= after[20] estimate != 0
+
+/-
+## Save one random bit
+
+Suppose someone implements a block with three coin flips. They draw `a`, `b`
+and `c`, then set `d = a*b*c`. Every entry is still a fair sign. Even a test of
+*any three* entries gives exactly the independent distribution: if `d` is among
+the three observed signs, the other two and `d` determine the missing one.
+Every triple occurs once among the eight possible inputs.
+
+But `a*d = a*a*b*c = b*c`. The determinant is zero on every draw. Now even the
+mean is wrong. There's a cheap test that does catch this: multiply all four
+signs. With independent draws that product is negative half the time. With
+the shortcut it's always positive.
+
+In [ACX's forecasting discussion](https://www.astralcodexten.com/p/the-ai-forecasting-agenda),
+Scott Alexander considers treating several misses on AI capabilities as one
+error about the pace of progress. With the sign generator we can inspect the
+dependence directly: four fair signs came from only three random bits.
+
+If all you know about the implementation is that it uses one of these two
+generators, you needn't invent odds that the author picked the good one. Leave
+both possible and keep the choice fixed across the matrix:
+
+```haze
+param wiring : Wiring ~= {Independent: 1, Parity: 1}
+```
+
+With these weights Haze gives a lower expected estimate of zero and an upper
+one of 1,048,576. Actually toss a fair coin to pick the generator once per
+matrix and the mean is 524,288; `lottery` in the file does that experiment.
+No coin was tossed in the first version. In the [source](#workbench), try giving
+`Parity` weight zero. The two bounds then meet at 1,048,576.
+-/
+
+param wiring : Wiring ~= {Independent: 1, Parity: 1}
+theorem parity_always_cancels : block(Parity) == 0
+
+#expect Blocks(wiring) |= after[20] estimate
+#prob Blocks(wiring) |= after[20] estimate != 0
+
+input lottery : Wiring ~ {Independent: 1/2, Parity: 1/2}
+#expect Blocks(lottery) |= after[20] estimate
+
+/-
+## An arithmetic circuit for the mean
+
+The determinant has polynomial-size arithmetic circuits. For a zero-one input
+with `m` ones, the averaging identity can involve `2^m` signings. Having a small
+circuit for each summand doesn't tell you how to compute their exact sum.
+An arithmetic circuit for the permanent has to output the polynomial itself.
+VP allows polynomial-size circuits for polynomial families of polynomially
+bounded degree and number of variables. VNP also allows a sum over all settings
+of polynomially many extra Boolean inputs. Outside characteristic two the
+permanent is VNP-complete. In characteristic two the plus and minus signs
+coincide, so there the permanent equals the determinant; the papers use the
+Hamiltonian cycle polynomial for the all-fields statement. None of this settles
+Boolean P versus NP. [Lance Fortnow's explanation](https://blog.computationalcomplexity.org/2026/11/vp-vnp.html)
+sets out the distinction.
+
+The bad samples here don't rule out a good approximation algorithm.
+[Jerrum, Sinclair and Vigoda](https://people.eecs.berkeley.edu/~sinclair/perm2.pdf)
+gave a randomized polynomial-time approximation scheme for nonnegative
+matrices by a different method. For the matrix on this page you wouldn't use
+either algorithm. Count the blocks.
+-/
+
+#prob Blocks(Independent) |= after[20] estimate == 1048576

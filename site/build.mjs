@@ -15,7 +15,7 @@ import { deflateRawSync } from "node:zlib";
 import { createServer } from "node:http";
 import { join, dirname, relative, extname, posix } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { isSourceExcerpt, readEssay } from "./literate.mjs";
+import { isSourceExcerpt, readEssay, readSigns, signEquation } from "./literate.mjs";
 
 const SITE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(SITE, "..");
@@ -100,6 +100,7 @@ const EXAMPLES = [
   ["examples/probability_classics.hz", "Probability", "Probability classics", "The birthday problem, gambler's ruin, the boy-or-girl paradox and more, with known answers."],
   ["examples/Gallery/games.hz", "Games", "Craps, tennis and Penney's game", "The odds in craps (244/495), winning a game of tennis from deuce, and Penney's coin game."],
   ["examples/Gallery/bold_play.hz", "Games", "Bold play", "The odds of turning $50 into $100 on one spin or $1 at a time, on a roulette wheel and in a game with uncertain odds."],
+  ["examples/Gallery/permanent_signs.hz", "Probability", "Estimating a permanent", "Count the perfect matchings of a block diagonal matrix, then check the distribution of a random signed determinant."],
   ["examples/Gallery/security.hz", "Security", "PIN guessing and intrusion alarms", "Leaked PIN frequencies against lockout limits, and why most intrusion alarms are false."],
   ["examples/Gallery/production_test.hz", "Electronics test", "Guard bands in production test", "How often a noisy meter ships out-of-spec parts, why retesting makes it worse, and the guard band that fixes it."],
   ["examples/Gallery/chip_design.hz", "Chip design", "Why big GPUs disable cores", "The yield of NVIDIA's 814 mm² GH100 die at TSMC's reported defect density, with and without spare SMs."],
@@ -464,7 +465,13 @@ function runnablePost(p, root, foot) {
   const { code, records, path } = p.example;
   const name = posix.basename(path);
   const prose = (s, source) => renderDoc(s, path, source).html.replaceAll("@ROOT@", root)
-    .replace(/<p>(<img [^>]+>)\s+([^<]+)<\/p>/g, "<figure>$1<figcaption>$2</figcaption></figure>");
+    .replace(/<p>(<img [^>]+>)\s+([^<]+)<\/p>/g, "<figure>$1<figcaption>$2</figcaption></figure>")
+    .replace(/<pre><code class="language-signs">([\s\S]*?)<\/code><\/pre>/g, (_, text) => {
+      const signs = readSigns(unescapeHtml(text));
+      return `<figure class="sign-example"><div class="sign-matrix" role="group" aria-label="Signed two by two matrix">${
+        signs.map((v) => `<span data-value="${v}">${v < 0 ? "−1" : "+1"}</span>`).join("")
+      }</div><output aria-live="polite">${signEquation(signs)}</output><figcaption hidden>Select an entry to change its sign.</figcaption></figure>`;
+    });
   const sections = p.entries.map((entry) => {
     const body = prose(entry.story, entry.source).replaceAll('href="#workbench"', `href="#workbench" data-edit-line="${entry.line}"`);
     return `<section><h2 id="${slug(entry.title)}">${esc(entry.title)}</h2>${body}</section>`;

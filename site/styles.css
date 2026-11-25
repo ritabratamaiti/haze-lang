@@ -319,6 +319,16 @@ pre.code { background: var(--code-bg); border: 1px solid var(--line); border-rad
 .essay textarea { height: 22rem; resize: vertical; }
 .essay details pre { overflow: auto; max-height: 25rem; }
 .essay .doc-pager a { padding: 0; border: 0; background: none; }
+.sign-example { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 26px; }
+.sign-example figcaption { flex-basis: 100%; }
+.sign-example output { font: 1.15rem/1.5 Georgia, serif; }
+.sign-matrix { display: inline-grid; grid-template-columns: repeat(2, 44px); padding: 0 6px; position: relative; }
+.sign-matrix::before, .sign-matrix::after { content: ""; position: absolute; top: 2px; bottom: 2px; width: 5px; border-block: 1px solid currentColor; pointer-events: none; }
+.sign-matrix::before { left: 0; border-left: 1px solid currentColor; }
+.sign-matrix::after { right: 0; border-right: 1px solid currentColor; }
+.sign-matrix > span { display: grid; place-items: center; min-height: 44px; font: 1.15rem var(--mono); }
+.sign-matrix button { min-height: 44px; padding: 0; border: 0; color: var(--text); background: transparent; cursor: pointer; font: 1.15rem var(--mono); }
+.sign-matrix button:hover, .sign-matrix button:focus-visible { background: var(--surface-2); }
 /* footer */
 footer { border-top: 1px solid var(--line); padding: 40px 0; color: var(--muted); font-size: 0.9rem; }
 footer .wrap { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 24px; }

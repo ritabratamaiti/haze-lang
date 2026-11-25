@@ -1,8 +1,10 @@
 import { common, root } from "../common";
 import { Engine } from "../engine";
 import { renderText } from "../render";
+import { mountSignMatrix } from "../sign-matrix";
 
 common();
+document.querySelectorAll<HTMLElement>(".essay .sign-example").forEach(mountSignMatrix);
 const source = document.querySelector<HTMLTextAreaElement>("#model-input")!;
 const download = document.querySelector<HTMLAnchorElement>("#model-download")!;
 const run = document.querySelector<HTMLButtonElement>("#model-run")!;

@@ -236,6 +236,19 @@ def penney(s):
     return out
 check(b, "claim hht_first", F(2, 3), name="Penney: HHT before HTT (2/3)")
 
+# ---- random determinant estimate of a permanent -----------------------------
+permanent = blocks("examples/Gallery/permanent_signs.hz")
+signed = [(a*d - b*c)**2 for a, b, c, d in itertools.product((-1, 1), repeat=4)]
+survives = F(sum(v != 0 for v in signed), len(signed))
+large = max(signed)**20
+hit = survives**20
+check_line(permanent, "#eval Blocks(Independent) |= after[20] estimate", "0", 1-hit, "permanent: probability of a zero estimate")
+check_line(permanent, "#eval Blocks(Independent) |= after[20] estimate", str(large), hit, "permanent: return when every block survives")
+check(permanent, "#expect Blocks(Independent) |= after[20] estimate", hit*large)
+tied = [(a*(a*b*c) - b*c)**2 for a, b, c in itertools.product((-1, 1), repeat=3)]
+tied_mean = F(sum(tied), len(tied))**20
+check(permanent, "#expect Blocks(wiring) |= after[20] estimate", *interval([(1, tied_mean), (1, hit*large)]))
+
 # ---- queueing ---------------------------------------------------------------
 b = blocks("examples/Gallery/queueing.hz")
 def buffer(lam):
