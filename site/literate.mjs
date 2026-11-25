@@ -28,8 +28,9 @@ export function readEssay(code, file) {
     usage: usage.join("\n\n"), entries };
 }
 
-// Haze supplies exact fractions. Round only the printed percentage, even for very large denominators.
-export function percent(q) {
-  const [n, den = 1n] = q.split("/").map(BigInt);
-  return `${Number((2n * n * 10000n + den) / (2n * den)) / 100}%`;
+// Quoted Haze in the prose must be real, consecutive lines from the executable part of that section.
+export function isSourceExcerpt(quote, source) {
+  const lines = (s) => s.trim().split(/\r?\n/).map((l) => l.trim());
+  const want = lines(quote), have = lines(source);
+  return quote.trim() !== "" && have.some((_, i) => want.every((line, j) => line === have[i + j]));
 }

@@ -3,12 +3,12 @@ import { Engine } from "../engine";
 import { renderText } from "../render";
 
 common();
-const source = document.querySelector<HTMLTextAreaElement>("#ledger-input")!;
-const download = document.querySelector<HTMLAnchorElement>("#ledger-download")!;
-const run = document.querySelector<HTMLButtonElement>("#ledger-run")!;
-const stop = document.querySelector<HTMLButtonElement>("#ledger-stop")!;
-const status = document.getElementById("ledger-status")!;
-const consoleBox = document.querySelector<HTMLDetailsElement>("#ledger-console")!;
+const source = document.querySelector<HTMLTextAreaElement>("#model-input")!;
+const download = document.querySelector<HTMLAnchorElement>("#model-download")!;
+const run = document.querySelector<HTMLButtonElement>("#model-run")!;
+const stop = document.querySelector<HTMLButtonElement>("#model-stop")!;
+const status = document.getElementById("model-status")!;
+const consoleBox = document.querySelector<HTMLDetailsElement>("#model-console")!;
 const output = consoleBox.querySelector("pre")!;
 // The full essay solves several 101-state chains; it takes longer than one playground snippet.
 const engine = new Engine(new URL(`${root()}engine/worker.js`, document.baseURI), 180_000);
@@ -41,7 +41,7 @@ stop.addEventListener("click", () => engine.stop());
 source.addEventListener("input", () => {
   consoleBox.hidden = true;
   const edited = source.value !== source.defaultValue;
-  download.textContent = edited ? "Download edited .hz" : "Download .hz";
+  download.textContent = edited ? "Download edited file" : `Download ${download.download}`;
   status.textContent = edited ? "Edited. Run to check your changes." : "";
 });
 download.addEventListener("click", (e) => {
@@ -55,10 +55,11 @@ download.addEventListener("click", (e) => {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
 
-for (const button of document.querySelectorAll<HTMLButtonElement>("[data-edit-line]")) {
-  button.hidden = false;
-  button.addEventListener("click", () => {
-    const line = source.defaultValue.split("\n")[Number(button.dataset.editLine) - 1];
+for (const link of document.querySelectorAll<HTMLAnchorElement>("a[data-edit-line]")) {
+  link.addEventListener("click", (e) => {
+    if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || e.button !== 0) return;
+    e.preventDefault();
+    const line = source.defaultValue.split("\n")[Number(link.dataset.editLine) - 1];
     const needle = line.match(/^(?:system|param|def) \w+/)?.[0] ?? line;
     const pos = source.value.indexOf(needle);
     source.closest("details")!.open = true;

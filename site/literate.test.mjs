@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { percent, readEssay } from "./literate.mjs";
+import { isSourceExcerpt, readEssay } from "./literate.mjs";
 
 test("pairs each scene with its code and original diagnostic lines", () => {
   const src = [
@@ -25,9 +25,10 @@ test("doesn't silently discard executable code in a comment header", () => {
   assert.throws(() => readEssay("/-\n# Report\nIntro\n-/\n/-\n## Open\n", "a.hz"), /a\.hz:5: unclosed story block/);
 });
 
-test("prints slip percentages from exact fractions without floating-point overflow", () => {
-  assert.equal(percent("9/19"), "47.37%");
-  assert.equal(percent("1"), "100%");
-  const k = 10n ** 400n;
-  assert.equal(percent(`${k}/${8n * k}`), "12.5%");
+test("accepts a dedented quotation, but not changed, partial or spliced lines", () => {
+  const source = "    let stake := min(money, 100 - money)\n    let before := money\n    money := money + stake";
+  assert.ok(isSourceExcerpt("let stake := min(money, 100 - money)\nlet before := money", source));
+  assert.equal(isSourceExcerpt("let stake := money", source), false);
+  assert.equal(isSourceExcerpt("let before", source), false);
+  assert.equal(isSourceExcerpt("let stake := min(money, 100 - money)\nmoney := money + stake", source), false);
 });

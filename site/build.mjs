@@ -15,7 +15,7 @@ import { deflateRawSync } from "node:zlib";
 import { createServer } from "node:http";
 import { join, dirname, relative, extname, posix } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { percent, readEssay } from "./literate.mjs";
+import { isSourceExcerpt, readEssay } from "./literate.mjs";
 
 const SITE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(SITE, "..");
@@ -161,7 +161,7 @@ const playHash = (code) => "z" + deflateRawSync(Buffer.from(code, "utf8")).toStr
 const unescapeHtml = (s) => s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&");
 
 let blockId = 0;
-function renderDoc(src, path) {
+function renderDoc(src, path, excerptSource) {
   const title = src.match(/^# (.*)$/m)?.[1] ?? "";
   const body = src.replace(/^# .*\n/, "");
   const firstPara = body.trim().split(/\n\s*\n/)[0].replace(/\n/g, " ");
@@ -179,6 +179,10 @@ function renderDoc(src, path) {
   });
   html = html.replace(/<pre><code class="language-haze">([\s\S]*?)<\/code><\/pre>/g, (_, escaped) => {
     const code = unescapeHtml(escaped);
+    if (excerptSource !== undefined) {
+      if (!isSourceExcerpt(code, excerptSource)) throw new Error(`${path}: quoted Haze does not match the model:\n${code}`);
+      return `<pre class="essay-code"><code>${highlightHaze(code.trimEnd())}</code></pre>`;
+    }
     const id = `code-${++blockId}`;
     // complete examples, the ones that check without errors, get a link to the playground
     const runs = !check(code).some((r) => r.severity === "error");
@@ -456,47 +460,28 @@ const POSTS = (existsSync(BLOG_DIR) ? readdirSync(BLOG_DIR).filter((f) => f.ends
   return { ...post, file: example.path, example, ...readEssay(example.code, example.path) };
 }).sort((a, b) => b.date.localeCompare(a.date) || (Number(a.order ?? 0) - Number(b.order ?? 0)));
 
-function ledger(p, root, foot) {
+function runnablePost(p, root, foot) {
   const { code, records, path } = p.example;
   const name = posix.basename(path);
-  const prose = (s) => renderDoc(s, path).html.replaceAll("@ROOT@", root)
-    .replace(/<p>(<img [^>]+>)\s*(Figure \d+\.[^<]+)<\/p>/g, "<figure>$1<figcaption>$2</figcaption></figure>");
-  const entries = p.entries.map((entry, i) => {
-    const serial = String(i + 1).padStart(2, "0");
-    const figures = [];
-    const scene = prose(entry.story).replace(/<figure>[\s\S]*?<\/figure>/g, (f) => { figures.push(f); return ""; });
-    const rows = records.filter((r) => r.line >= entry.line && r.line <= entry.endLine);
-    const lines = entry.source.split("\n");
-    const slip = rows.map((r) => {
-      const k = r.line - entry.line;
-      const label = lines[k].match(/\s+-- (.+)$/);
-      if (label) lines[k] = lines[k].slice(0, label.index);
-      let value;
-      if (r.kind === "prob" && r.belief === r.plausibility) value = percent(r.belief);
-      else if (r.kind === "claim" && typeof r.accepted === "boolean")
-        value = `${r.accepted ? "Pass" : "Fail"} · ${percent(r.belief)} belief`;
-      else value = r.message.split("\n")[1]?.trim().replace(/^expected steps /, "") ?? r.message;
-      return `<div><dt>${esc(label?.[1] ?? r.name ?? r.kind ?? "Diagnostic")}</dt><dd>${esc(value)}</dd></div>`;
-    }).join("");
-    const ticket = rows.length ? `<div class="ledger-ticket"><div class="ledger-line">TILL SLIP ${serial} &nbsp; / &nbsp; RECORDED RUN</div><dl>${slip}</dl>
-<details class="ledger-receipt"><summary>Full checker output (${rows.length})</summary>
-<pre>${rows.map((r) => `L${r.line}  ${esc(r.message)}`).join("\n\n")}</pre></details></div>` : "";
-    return `<section class="ledger-entry" id="${slug(entry.title)}"><header><span class="ledger-folio">${serial}</span><h2>${esc(entry.title)}</h2></header>
-<div class="ledger-spread"><div class="ledger-scene">${scene}</div><div class="ledger-code"><div class="ledger-code-head"><span class="ledger-line">HAZE &nbsp; / &nbsp; L${entry.line}</span><button type="button" class="ledger-edit" data-edit-line="${entry.line}" hidden>Edit in source</button></div>
-<pre><code>${highlightHaze(lines.join("\n"))}</code></pre></div>${ticket}</div>${figures.join("")}</section>`;
+  const prose = (s, source) => renderDoc(s, path, source).html.replaceAll("@ROOT@", root)
+    .replace(/<p>(<img [^>]+>)\s+([^<]+)<\/p>/g, "<figure>$1<figcaption>$2</figcaption></figure>");
+  const sections = p.entries.map((entry) => {
+    const body = prose(entry.story, entry.source).replaceAll('href="#workbench"', `href="#workbench" data-edit-line="${entry.line}"`);
+    return `<section><h2 id="${slug(entry.title)}">${esc(entry.title)}</h2>${body}</section>`;
   }).join("\n");
-  return `<article class="ledger wrap"><header class="ledger-cover"><div class="ledger-mast"><a href="../">Haze blog</a><span>TABLE LEDGER &nbsp; / &nbsp; ${esc(name)}</span></div>
-<h1>${esc(p.title)}</h1><p class="ledger-deck">${esc(p.summary)}</p>
-<p class="ledger-credit">${esc(p.author)} &nbsp; / &nbsp; <time datetime="${p.date}">${dayMonthYear(p.date)}</time></p></header>
-<div class="ledger-desk" id="workbench"><div class="ledger-actions"><button type="button" class="btn primary" id="ledger-run" hidden>Run this file</button>
-<button type="button" class="btn" id="ledger-stop" hidden>Stop</button>
-<a class="btn" id="ledger-download" href="${name}" download="${name}">Download .hz</a><span role="status" id="ledger-status"></span></div>
-<details class="ledger-raw"><summary>View or edit the source</summary>${prose(p.usage)}<label class="sr-only" for="ledger-input">Haze source to run</label>
-<textarea id="ledger-input" spellcheck="false" autocapitalize="off" wrap="off">${esc(code)}</textarea></details>
-<details class="ledger-console" id="ledger-console" hidden><summary>Output from this run</summary><pre></pre></details>
-<noscript>Download the file to run it without JavaScript. Each till slip below shows the recorded output.</noscript></div>
-<nav class="ledger-index" aria-label="Ledger entries"><ol>${p.entries.map((e) => `<li><a href="#${slug(e.title)}">${esc(e.title)}</a></li>`).join("")}</ol></nav>
-${entries}<a class="ledger-back" href="#workbench">Back to the source and runner ↑</a>${foot}</article>`;
+  const published = records.map((r) => `${name}:${r.line}:${r.column}: ${r.severity}: ${r.message}`).join("\n");
+  return `<article class="essay wrap"><header><h1>${esc(p.title)}</h1>
+<p class="essay-byline">${esc(p.author)} · <time datetime="${p.date}">${dayMonthYear(p.date)}</time></p></header>
+<p>${esc(p.summary)}</p>${sections}
+<section id="workbench"><h2>Run the model</h2>${prose(p.usage)}
+<div class="essay-actions"><button type="button" id="model-run" hidden>Run in this browser</button>
+<button type="button" id="model-stop" hidden>Stop</button>
+<a id="model-download" href="${name}" download="${name}">Download ${esc(name)}</a><span role="status" id="model-status"></span></div>
+<details><summary>Read or edit the source</summary>
+<textarea id="model-input" aria-label="Haze source to run" spellcheck="false" autocapitalize="off" wrap="off">${esc(code)}</textarea></details>
+<details id="model-console" hidden><summary>Output from your run</summary><pre></pre></details>
+<details><summary>Output for the published file</summary><pre>${esc(published)}</pre></details>
+<noscript>To run this without JavaScript, download the file and use the Haze command above.</noscript></section>${foot}</article>`;
 }
 
 // Posts use the documentation layout: the list of posts on the left, the post in the middle and its
@@ -515,7 +500,7 @@ for (const [i, p] of POSTS.entries()) {
     <p class="doc-meta"><a href="${GITHUB}/edit/main/${p.file}">Edit this post on GitHub</a></p>`;
   const attrs = { root, path: "blog/", canonical: `blog/${p.slug}/`, title: `${p.title} · Haze`, description: p.summary, image: p.image };
   if (p.example) {
-    page(`blog/${p.slug}`, layout({ ...attrs, script: "ledger", body: ledger(p, root, foot) }));
+    page(`blog/${p.slug}`, layout({ ...attrs, script: "essay", body: runnablePost(p, root, foot) }));
     writeFileSync(join(DIST, "blog", p.slug, posix.basename(p.example.path)), p.example.code);
     continue;
   }
@@ -556,7 +541,7 @@ writeFileSync(join(DIST, "sitemap.xml"), `<?xml version="1.0" encoding="UTF-8"?>
 writeFileSync(join(DIST, "robots.txt"), `User-agent: *\nAllow: /\nSitemap: ${SITE_URL}sitemap.xml\n`);
 
 await build({
-  entryPoints: Object.fromEntries(["home", "play", "tour", "gallery", "docs", "ledger"].map((n) => [n, join(SITE, "src", "pages", `${n}.ts`)])),
+  entryPoints: Object.fromEntries(["home", "play", "tour", "gallery", "docs", "essay"].map((n) => [n, join(SITE, "src", "pages", `${n}.ts`)])),
   outdir: join(DIST, "assets"), bundle: true, format: "esm", splitting: true, minify: true, sourcemap: false, target: "es2022",
   logLevel: "warning",
 });
