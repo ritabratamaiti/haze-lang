@@ -1,0 +1,12 @@
+-- Large supports: quantifiers over up to 100,000 values and binomial(3000, q). Both are evaluated
+-- with loops that don't grow the stack, so the WebAssembly build gives the same answers as the
+-- native one.
+
+#eval forall x in 0..99999, x >= 0
+#eval exists x in 0..99999, x == 99999
+#eval forall x in 1..50000, x * x > 0 and x <= 50000
+
+-- binomial(3000, 1/2) is symmetric about 1500, and its mean is n · q exactly.
+#prob binomial(3000, 1/2) <= 1499
+#expect binomial(3000, 1/2)
+#prob binomial(3000, 1/1000) >= 1

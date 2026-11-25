@@ -262,14 +262,16 @@ def evalRand (r : RandPrim) (vs : List Value) : M Value := do
     if q == 0 || q == 1 then
       return .num (if q == 0 then 0 else (n : Rat))
     -- P(k + 1) = P(k) · (n - k) / (k + 1) · q / (1 - q), which avoids raising exact fractions to
-    -- large powers for every k
+    -- large powers for every k. The loop runs in `Id`, not `M`: a loop in `M` uses one stack frame
+    -- per iteration, which overflows the WebAssembly build's stack for large `n`.
     let r := q / (1 - q)
-    let mut p := (1 - q) ^ n
-    let mut out : Array (Value × Rat) := #[]
-    for k in [0:n + 1] do
-      out := out.push (.num (k : Rat), p)
-      p := p * ((n - k : Nat) : Rat) / ((k + 1 : Nat) : Rat) * r
-    M.ofList out.toList
+    M.ofList <| Id.run do
+      let mut p := (1 - q) ^ n
+      let mut out : Array (Value × Rat) := #[]
+      for k in [0:n + 1] do
+        out := out.push (.num (k : Rat), p)
+        p := p * ((n - k : Nat) : Rat) / ((k + 1 : Nat) : Rat) * r
+      return out.toList
   | _, _ => M.fail "runtime: bad random primitive application"
 
 mutual
@@ -338,20 +340,23 @@ partial def eval (c : ECtx) : Expr → M Value
     if n > maxSupport then M.fail s!"runtime: quantifier range of {n} values too large" else
     -- Start from the unit of the aggregation: vacuous truth for ∀ and falsity for ∃.
     let unit : Value := if isDeg then .deg (if all then 1 else 0) else .bool all
-    let mut acc : M Value := pure unit
-    for i in [0:n] do
-      let x : Value := .num ((a + i : Int) : Rat)
-      acc := M.compact do
-        let prev ← acc
-        -- Once the aggregate reaches its absorbing value (false or 0 for ∀, true or 1 for ∃),
-        -- further values can't change it, so skip evaluating the body.
-        if prev == (if isDeg then .deg (if all then 0 else 1) else .bool (!all)) then pure prev else
-        let v ← eval { c with locals := x :: c.locals } body
-        match prev, v with
-        | .bool p, .bool q => pure (.bool (if all then p && q else p || q))
-        | .deg p, .deg q => pure (.deg (if all then qmin p q else qmax p q))
-        | _, _ => M.fail "runtime: ill-typed quantifier body"
-    acc
+    -- Each `acc` is computed when it is built, so the loop runs in `Id`; a loop in `M` would use
+    -- one stack frame per value, which overflows the WebAssembly build's stack for large ranges.
+    Id.run do
+      let mut acc : M Value := pure unit
+      for i in [0:n] do
+        let x : Value := .num ((a + i : Int) : Rat)
+        acc := M.compact do
+          let prev ← acc
+          -- Once the aggregate reaches its absorbing value (false or 0 for ∀, true or 1 for ∃),
+          -- further values can't change it, so skip evaluating the body.
+          if prev == (if isDeg then .deg (if all then 0 else 1) else .bool (!all)) then pure prev else
+          let v ← eval { c with locals := x :: c.locals } body
+          match prev, v with
+          | .bool p, .bool q => pure (.bool (if all then p && q else p || q))
+          | .deg p, .deg q => pure (.deg (if all then qmin p q else qmax p q))
+          | _, _ => M.fail "runtime: ill-typed quantifier body"
+      return acc
   | .matchE s arms dflt => do
     match ← eval c s with
     | .tag _ i => match arms.find? (·.1 == i) with

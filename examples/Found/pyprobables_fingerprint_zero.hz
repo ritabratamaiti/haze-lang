@@ -24,12 +24,15 @@
 --
 -- Abstraction. Two keys are added to an empty filter. A key is represented by h, the low f bits of
 -- its hash, uniform on 0..F-1 with F = 8 (f = 3). The real F is 2^13 for init_error_rate(0.001) and
--- 2^32 for CuckooFilter(); that changes only how often h is 0 (part 4). Bucket positions are left
--- out: export() and the parsers go slot by slot and keep the nonzero values in order, so a stored
--- value comes back in the bucket it was written from, and check() only asks whether the value is
--- there. One bucket of bucket_size = 3 slots then holds the first key's fingerprint, the second
--- key's (left empty when the two are equal, because add() skips it) and one unused slot. written()
--- and loaded() also describe the fingerprint field of the counting filter's pairs.
+-- 2^32 for CuckooFilter(); that changes only how often h is 0. With f = 13, part 3 makes each key
+-- lost with probability 2^-13, so among 10,000 keys at least one is lost with probability
+-- 1 - (1 - 2^-13)^10000, about 0.705, and 10000/8192 = 625/512 keys are lost on average.
+-- Bucket positions are left out: export() and the parsers go slot by slot and keep the nonzero
+-- values in order, so a stored value comes back in the bucket it was written from, and check()
+-- only asks whether the value is there. One bucket of bucket_size = 3 slots then holds the first
+-- key's fingerprint, the second key's (left empty when the two are equal, because add() skips it)
+-- and one unused slot. written() and loaded() also describe the fingerprint field of the counting
+-- filter's pairs.
 --
 -- The fix (remap = true) never produces fingerprint 0: a key whose low f bits are 0 gets fingerprint
 -- 1, as efficient/cuckoofilter's TagHash does (tag += (tag == 0)).
@@ -75,8 +78,3 @@ theorem shipped_lost_iff_zero :
   ((not found_after(h1, false)) == (h1 == 0)) and ((not found_after(h2, false)) == (h2 == 0))
 
 #prob not found_after(h1, false)
-
--- 4. With init_error_rate(0.001) (f = 13) and 10,000 random keys, each key's fingerprint is 0 with
---    probability 2^-13, so by part 3 the number of lost keys is binomial(10000, 1/8192).
-#prob binomial(10000, 1/8192) >= 1
-#expect binomial(10000, 1/8192)
