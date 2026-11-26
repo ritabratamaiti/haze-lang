@@ -1,0 +1,122 @@
+/-
+# One click, no receipt. Did the server save it?
+
+A local form showed the same error after two different requests. In one run
+the server had saved nothing. In the other it had already saved the draft.
+Clicking Save again fixed the first run and made a duplicate in the second.
+
+Run `haze submit_receipt.hz` for the whole model. Each block on this page is
+editable and runs with the code above it.
+-/
+
+/-
+## What the button knows
+
+The [test form](../Conformance/submit_receipt.py) makes an ordinary `fetch`
+request when you click **Save draft**. On the first request its server closes
+the connection without sending any HTTP response. Start it with `before` to
+cut the connection before writing the row, or `after` to cut it just after.
+The form gets no receipt either way. The test server has a separate `/audit`
+endpoint so the person running the experiment can see what really happened.
+
+| Where the first connection closed | What the form showed | Rows after one click | Rows after a second click |
+|---|---|---:|---:|
+| Before the write | No receipt (TypeError) | 0 | 1 |
+| After the write | No receipt (TypeError) | 1 | 2 |
+
+Those are browser results from an unkeyed server, not simulated loss rates.
+To repeat either run, use `python examples/Conformance/submit_receipt.py before`
+or replace `before` with `after`. Open the loopback address it prints and
+check the count after each click. Restart the script for a fresh run.
+
+Here is the decision in Haze. A `param` lists the two histories the form
+cannot distinguish. Both have full support. Nothing in that error tells
+us that the two histories are equally *likely*. For now, give the retry
+every advantage: if sent, it gets through.
+
+<!-- run -->
+
+Treating a failed `fetch` as a failed write is the mistake. In this example
+the browser knows the response failed. It does not know the row count.
+-/
+
+enum Cut = BeforeWrite | AfterWrite
+param cut : Cut ~= {BeforeWrite: 1, AfterWrite: 1}
+
+def copies(retry : Bool) : Num :=
+  (if cut == AfterWrite then 1 else 0) + (if retry then 1 else 0)
+
+#eval copies(false)
+#eval copies(true)
+
+/-
+## What if we retry some of the time?
+
+Suppose the goal is exactly one saved copy. The client can stop or send
+one more request. It can't read back the result, ask a person, or supply
+a key that the server honors. Let `p` be the chance it retries when it
+sees that error. This is the client's choice, not a guess about network
+reliability. Try `0.9` and then `0.5`:
+
+<!-- run -->
+
+If the first write didn't happen, the success probability is `p`. If it did,
+the success probability is `1 - p`. The same observation has to produce
+the same retry policy in both cases. Its guarantee across the two histories
+is therefore the smaller of those numbers. No choice of `p` gets it above
+one half. That's a limit on this client's information, not a recommendation
+to flip a coin before saving a real form.
+
+![For retry chance p, success rises from zero to one if the first write was lost and falls from one to zero if it was saved. The two lines meet at one half.](https://haze-lang.pages.dev/blog/images/submit-retry.svg)
+At a 90% retry rate, one history gets 90% success and the other gets 10%.
+-/
+
+def exactly_one(p : Num) : Bool := copies(flip(p)) == 1
+
+#prob exactly_one(0.9)
+#prob exactly_one(0.5)
+
+/-
+## Give the server one fact to remember
+
+Run the same form with `after --keyed`. The first click still shows the
+error. The second gets a receipt, but the count stays at one. Both clicks
+carry the key `draft-1`; this time the server checks it and records the
+write and the key under the same lock. The fixture keeps both in memory
+for one process. A production service would have to keep the key and its
+effect together for the entire retry window, including through restarts.
+
+We can now give two different specifications. No retry may create a second
+copy. Separately, we'd like a copy to exist by the end of two retries. Give
+each retry an independent 90% chance of reaching the server. That's an
+assumption you can edit, not a rate measured by this test.
+
+<!-- run -->
+
+Haze accepts the at-most-one theorem even with no time limit. After two
+retries the probability that a copy exists is between 99% and 100%: if the
+original write was lost, both retries have to miss for the count to stay
+zero. Change `0.9` to `0.5` in the last query. The lower end becomes 75%;
+the no-duplicates rule hasn't changed.
+
+A browser agent makes the distinction concrete. [Browy](https://browyhq.github.io/blog/how-i-built-browy/)
+works in a signed-in tab and is designed to stop before Submit unless the
+user asks it to submit. Permission to click once answers a different
+question from whether that click took effect. This experiment ran the local
+form, not Browy's retry policy. On a site you don't control, look for a
+receipt or an authoritative readback before treating the first click as lost.
+-/
+
+system Save(dedup : Bool, delivery : Num) {
+  var seen_key : Bool := cut == AfterWrite
+  var rows : Num := if cut == AfterWrite then 1 else 0
+  step {
+    if flip(delivery) {
+      if not (dedup and seen_key) { rows := rows + 1 }
+      seen_key := true
+    }
+  }
+}
+
+theorem no_duplicate : Save(true, 0.9) |= always rows <= 1
+#prob Save(true, 0.9) |= after[2] rows == 1

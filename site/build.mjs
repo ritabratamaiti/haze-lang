@@ -91,6 +91,7 @@ const TOUR = read(join(SITE, "content", "tour.md")).split(/^## /m).filter((s) =>
 
 const EXAMPLES = [
   ["examples/payments_retry.hz", "Software", "Payment retries", "Retries after a lost reply charge the customer twice, and idempotency keys prevent it."],
+  ["examples/Gallery/submit_receipt.hz", "Software", "A form with no receipt", "The same failed browser request can leave zero or one saved drafts. Check the retry policy against both histories."],
   ["examples/quorum_replication.hz", "Software", "Quorum replication", "Reads see the latest write when R + W > N, and can be stale when R = 1."],
   ["examples/circuit_breaker.hz", "Software", "Circuit breaker", "A circuit breaker's invariants, how fast it trips, and how much load it sheds."],
   ["examples/canary_rollout.hz", "Software", "Canary rollout", "Whether a defective build can reach all traffic during a staged rollout."],

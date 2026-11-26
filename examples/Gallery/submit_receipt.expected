@@ -1,0 +1,26 @@
+examples/Gallery/submit_receipt.hz:49:1: info: #eval copies(false)
+  when cut = BeforeWrite (π 1):
+    0
+  when cut = AfterWrite (π 1):
+    1
+examples/Gallery/submit_receipt.hz:50:1: info: #eval copies(true)
+  when cut = BeforeWrite (π 1):
+    1
+  when cut = AfterWrite (π 1):
+    2
+examples/Gallery/submit_receipt.hz:76:1: info: #prob exactly_one(0.9)
+  belief 0.1 · plausibility 0.9
+  by fuzzy parameter (π = possibility):
+    cut = BeforeWrite  π 1       0.9
+    cut = AfterWrite   π 1       0.1
+examples/Gallery/submit_receipt.hz:77:1: info: #prob exactly_one(0.5)
+  probability 0.5
+examples/Gallery/submit_receipt.hz:121:1: info: theorem no_duplicate
+  probability 1 · holds with certainty
+  grade prob+fuzzy · 2 parameter assignment(s) · 2 reachable states
+  theorem accepted
+examples/Gallery/submit_receipt.hz:122:1: info: #prob Save(true, 0.9) |= after[2] rows == 1
+  belief 0.99 · plausibility 1
+  by fuzzy parameter (π = possibility):
+    cut = BeforeWrite  π 1       0.99
+    cut = AfterWrite   π 1       1
