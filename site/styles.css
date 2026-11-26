@@ -309,6 +309,11 @@ pre.code { background: var(--code-bg); border: 1px solid var(--line); border-rad
 .essay summary { cursor: pointer; padding: 5px 0; }
 .essay textarea, .essay details pre { display: block; width: 100%; padding: 12px; font: 0.85rem/1.5 var(--mono); color: var(--text); background: var(--code-bg); border: 1px solid var(--line); }
 .essay textarea { height: 22rem; resize: vertical; }
+.essay-cell { margin: 1em 0 1.4em; }
+.essay-cell textarea { height: auto; max-height: 24rem; border-radius: 4px; }
+.essay-cell .essay-actions { margin: 6px 0; }
+.essay-cell .cell-output { margin: 0; padding: 6px 0 6px 1em; border-left: 2px solid var(--line); white-space: pre-wrap; overflow-wrap: anywhere; }
+.essay-cell .cell-reset { border-color: transparent; }
 .essay details pre { overflow: auto; max-height: 25rem; }
 .essay .doc-pager a { padding: 0; border: 0; background: none; }
 .sign-example { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 26px; }

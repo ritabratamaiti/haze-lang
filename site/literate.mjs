@@ -35,6 +35,27 @@ export function isSourceExcerpt(quote, source) {
   return quote.trim() !== "" && have.some((_, i) => want.every((line, j) => line === have[i + j]));
 }
 
+// Keep the downloadable story and diagnostic line numbers in step with the inline editors.
+export function assembleEssay(original, edits) {
+  const lines = original.split("\n"), out = [], ranges = [];
+  let next = 0;
+  for (const { line, originalLength, value } of edits) {
+    out.push(...lines.slice(next, line - 1));
+    const first = out.length + 1;
+    for (const part of value.split("\n")) out.push(part);
+    ranges.push({ first, last: out.length });
+    next = line - 1 + originalLength;
+  }
+  return { code: out.concat(lines.slice(next)).join("\n"), ranges };
+}
+
+export function blockOutput(records, firstLine) {
+  const messages = records.filter((r) => r.line >= firstLine || r.severity === "error")
+    .map((r) => r.line < firstLine ? `Earlier block, file line ${r.line}: ${r.message}`
+      : r.severity === "error" ? `Line ${r.line - firstLine + 1}: ${r.message}` : r.message);
+  return messages.join("\n\n") || "No queries or claims in this block.";
+}
+
 export function readSigns(code) {
   const rows = code.trim().split(/\r?\n/).map((row) => row.trim().split(/\s+/));
   if (rows.length !== 2 || rows.some((row) => row.length !== 2 || row.some((v) => !/^[+-]?1$/.test(v))))

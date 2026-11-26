@@ -15,7 +15,7 @@ import { deflateRawSync } from "node:zlib";
 import { createServer } from "node:http";
 import { join, dirname, relative, extname, posix } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { isSourceExcerpt, readEssay, readSigns, signEquation } from "./literate.mjs";
+import { blockOutput, isSourceExcerpt, readEssay, readSigns, signEquation } from "./literate.mjs";
 
 const SITE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(SITE, "..");
@@ -456,6 +456,7 @@ const POSTS = (existsSync(BLOG_DIR) ? readdirSync(BLOG_DIR).filter((f) => f.ends
 function runnablePost(p, root, foot) {
   const { code, records, path } = p.example;
   const name = posix.basename(path);
+  const inline = p.inline === "true";
   const prose = (s, source) => renderDoc(s, path, source).html.replaceAll("@ROOT@", root)
     .replace(/<p>(<img [^>]+>)\s+([^<]+)<\/p>/g, "<figure>$1<figcaption>$2</figcaption></figure>")
     .replace(/<pre><code class="language-signs">([\s\S]*?)<\/code><\/pre>/g, (_, text) => {
@@ -465,7 +466,20 @@ function runnablePost(p, root, foot) {
       }</div><output aria-live="polite">${signEquation(signs)}</output><figcaption hidden>Select an entry to change its sign.</figcaption></figure>`;
     });
   const sections = p.entries.map((entry) => {
-    const body = prose(entry.story, entry.source).replaceAll('href="#workbench"', `href="#workbench" data-edit-line="${entry.line}"`);
+    let body = prose(entry.story, entry.source).replaceAll('href="#workbench"', `href="#workbench" data-edit-line="${entry.line}"`);
+    if (inline) {
+      const marker = "<!-- run -->";
+      if (body.split(marker).length !== 2) throw new Error(`${path}:${entry.line}: expected one inline run marker`);
+      const results = records.filter((r) => r.line >= entry.line && r.line <= entry.endLine);
+      if (!results.length || results.some((r) => r.severity === "error"))
+        throw new Error(`${path}:${entry.line}: inline example did not check: ${results.map((r) => r.message).join("\n")}`);
+      const label = esc(entry.title);
+      body = body.replace(marker, () => `<div class="essay-cell" data-line="${entry.line}">
+<textarea aria-label="Haze code: ${label}" rows="${entry.source.split("\n").length}" spellcheck="false" autocapitalize="off" readonly>${esc(entry.source)}</textarea>
+<div class="essay-actions"><button type="button" class="cell-run" hidden>Run this block</button><button type="button" class="cell-stop" hidden>Stop</button>
+<button type="button" class="cell-reset" hidden>Reset edits</button><span role="status">Output for the published code</span></div>
+<pre class="cell-output" aria-label="Output: ${label}">${esc(blockOutput(results, entry.line))}</pre></div>`);
+    }
     return `<section><h2 id="${slug(entry.title)}">${esc(entry.title)}</h2>${body}</section>`;
   }).join("\n");
   const published = records.map((r) => `${name}:${r.line}:${r.column}: ${r.severity}: ${r.message}`).join("\n");
@@ -476,8 +490,8 @@ function runnablePost(p, root, foot) {
 <div class="essay-actions"><button type="button" id="model-run" hidden>Run in this browser</button>
 <button type="button" id="model-stop" hidden>Stop</button>
 <a id="model-download" href="${name}" download="${name}">Download ${esc(name)}</a><span role="status" id="model-status"></span></div>
-<details><summary>Read or edit the source</summary>
-<textarea id="model-input" aria-label="Haze source to run" spellcheck="false" autocapitalize="off" wrap="off">${esc(code)}</textarea></details>
+<details><summary>${inline ? "Read the complete source" : "Read or edit the source"}</summary>
+<textarea id="model-input" aria-label="Haze source to run" spellcheck="false" autocapitalize="off" wrap="off"${inline ? " readonly" : ""}>${esc(code)}</textarea></details>
 <details id="model-console" hidden><summary>Output from your run</summary><pre></pre></details>
 <details><summary>Output for the published file</summary><pre>${esc(published)}</pre></details>
 <noscript>To run this without JavaScript, download the file and use the Haze command above.</noscript></section>${foot}</article>`;

@@ -1,34 +1,38 @@
-examples/Gallery/permanent_signs.hz:37:1: info: #eval perm2(1, 1, 1, 1)
+examples/Gallery/permanent_signs.hz:40:1: info: #eval perm2(1, 1, 1, 1)
   2
-examples/Gallery/permanent_signs.hz:38:1: info: #eval det2(1, 1, 1, 1)
+examples/Gallery/permanent_signs.hz:41:1: info: #eval det2(1, 1, 1, 1)
   0
-examples/Gallery/permanent_signs.hz:72:1: info: #eval fresh()
+examples/Gallery/permanent_signs.hz:74:1: info: #eval fresh()
   0  ↦ 0.5
   4  ↦ 0.5
-examples/Gallery/permanent_signs.hz:73:1: info: #expect fresh()
+examples/Gallery/permanent_signs.hz:75:1: info: #expect fresh()
   expectation 2
-examples/Gallery/permanent_signs.hz:122:1: info: #eval Blocks(Independent) |= after[20] estimate
-  0              ↦ ≈0.999999
-  1099511627776  ↦ ≈9.53674e-7 (=1/1048576)
-examples/Gallery/permanent_signs.hz:123:1: info: #expect Blocks(Independent) |= after[20] estimate
-  expectation 1048576
-examples/Gallery/permanent_signs.hz:124:1: info: #prob Blocks(Independent) |= after[20] estimate != 0
-  probability ≈9.53674e-7 (=1/1048576)
-examples/Gallery/permanent_signs.hz:161:1: info: theorem parity_always_cancels
+examples/Gallery/permanent_signs.hz:102:1: info: theorem parity_always_cancels
   probability 1 · holds with certainty
   grade prob · 1 parameter assignment(s) · ≤1 states/step
   theorem accepted
-examples/Gallery/permanent_signs.hz:163:1: info: #expect Blocks(wiring) |= after[20] estimate
+examples/Gallery/permanent_signs.hz:130:1: info: #eval Blocks(Independent) |= after[20] estimate
+  0              ↦ ≈0.999999
+  1099511627776  ↦ ≈9.53674e-7 (=1/1048576)
+examples/Gallery/permanent_signs.hz:131:1: info: #expect Blocks(Independent) |= after[20] estimate
+  expectation 1048576
+examples/Gallery/permanent_signs.hz:132:1: info: #prob Blocks(Independent) |= after[20] estimate != 0
+  probability ≈9.53674e-7 (=1/1048576)
+examples/Gallery/permanent_signs.hz:167:1: info: #eval Misses |= after[20] 100 * lo
+  ≈36.786598
+examples/Gallery/permanent_signs.hz:168:1: info: #eval Misses |= after[20] 100 * hi
+  ≈36.79044
+examples/Gallery/permanent_signs.hz:192:1: info: #expect Blocks(wiring) |= after[20] estimate
   lower expectation 0 · upper expectation 1048576
   by fuzzy parameter (π = possibility):
     wiring = Independent  π 1       E 1048576
     wiring = Parity       π 1       E 0
-examples/Gallery/permanent_signs.hz:164:1: info: #prob Blocks(wiring) |= after[20] estimate != 0
+examples/Gallery/permanent_signs.hz:193:1: info: #prob Blocks(wiring) |= after[20] estimate != 0
   belief 0 · plausibility ≈9.53674e-7 (=1/1048576)
   by fuzzy parameter (π = possibility):
     wiring = Independent  π 1       ≈9.53674e-7 (=1/1048576)
     wiring = Parity       π 1       0
-examples/Gallery/permanent_signs.hz:167:1: info: #expect Blocks(lottery) |= after[20] estimate
+examples/Gallery/permanent_signs.hz:196:1: info: #expect Blocks(lottery) |= after[20] estimate
   expectation 524288
-examples/Gallery/permanent_signs.hz:192:1: info: #prob Blocks(Independent) |= after[20] estimate == 1048576
+examples/Gallery/permanent_signs.hz:232:1: info: #prob Blocks(Independent) |= after[20] estimate == 1048576
   probability 0

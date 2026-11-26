@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isSourceExcerpt, readEssay, readSigns, signEquation } from "./literate.mjs";
+import { assembleEssay, blockOutput, isSourceExcerpt, readEssay, readSigns, signEquation } from "./literate.mjs";
 
 test("pairs each scene with its code and original diagnostic lines", () => {
   const src = [
@@ -40,4 +40,19 @@ test("the matrix example distinguishes flipping a sign from squaring each produc
   assert.equal(signEquation(entries), "det² = ((−1) − 1)² = 4");
   assert.throws(() => readSigns("1 1 1 1"), /two rows/);
   assert.throws(() => readSigns("1 1\n1 0"), /entries/);
+});
+
+test("editing one block preserves prose and moves the next block's diagnostic lines", () => {
+  const original = "-- story\n#eval 1\n\n-- more story\n#eval 2\n";
+  const { code, ranges } = assembleEssay(original, [
+    { line: 2, originalLength: 1, value: "def n : Num := 3\n#eval n" },
+    { line: 5, originalLength: 1, value: "#eval n + 2" },
+  ]);
+  assert.equal(code, "-- story\ndef n : Num := 3\n#eval n\n\n-- more story\n#eval n + 2\n");
+  assert.deepEqual(ranges, [{ first: 2, last: 3 }, { first: 6, last: 6 }]);
+  assert.equal(blockOutput([
+    { line: 2, severity: "error", message: "missing definition" },
+    { line: 3, severity: "info", message: "old query" },
+    { line: 6, severity: "error", message: "unknown name" },
+  ], ranges[1].first), "Earlier block, file line 2: missing definition\n\nLine 1: unknown name");
 });
