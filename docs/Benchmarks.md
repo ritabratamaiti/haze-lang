@@ -1,10 +1,10 @@
 # Checking Haze against PRISM and Storm
 
-[PRISM](https://www.prismmodelchecker.org/) and [Storm](https://www.stormchecker.org/) are the
-established probabilistic model checkers. To check that Haze computes the same answers, the
-discrete-time Markov chains that ship with PRISM were translated to Haze and checked with all
-three tools. All 26 of Haze's answers agree with the exact values: 21 are the same fractions,
-and the other 5 are certified intervals, narrower than 10⁻¹¹ relative, that contain them.
+We checked 26 properties across 13 discrete-time model instances from
+[PRISM](https://www.prismmodelchecker.org/). Haze returned the exact reference fraction in 21
+cases. In the other five it returned certified intervals containing the reference value,
+each narrower than 10⁻¹¹ relative to that value. The comparison uses the exact engines of
+[Storm](https://www.stormchecker.org/) and PRISM, as described below.
 
 ## The models
 
@@ -61,15 +61,21 @@ PRISM and Storm.
 | Leader election N = 6, K = 4 | leader in the first round | 429/512 | 429/512 (same) | 0 | 0 |
 | Leader election N = 6, K = 4 | expected rounds | 512/429 | 1.193473193, certified to ±4e-13 | 8e-08 | 4e-10 |
 
-Haze's answers are exact fractions, the same as the exact engines'. When a strongly connected
-part of a model has more than 120 states, Haze solves it in floating point and then checks the
-bounds in exact arithmetic. That's where the intervals in the table come from: Herman's ring with
-9 processes and the larger leader elections.
+The five intervals come from unbounded expected-time queries on Herman's nine-process ring and
+the larger leader elections. When a strongly connected component has more than 120 states, Haze
+uses floating point to propose bounds and checks them in rational arithmetic. For example, the
+six-process leader election with four values takes exactly 512/429 rounds in expectation; the
+last row shows Haze's interval around that value.
 
-PRISM's default engine stops iterating when successive values differ by less than 10⁻⁶ relative,
-so its answers are accurate to about that, as designed; `-epsilon` or `-exact` gives more digits.
-Storm prints ten significant digits, which accounts for its differences of around 10⁻¹⁰. PRISM's
-`-exact` engine doesn't support step-bounded properties such as `F<=10`.
+The error columns compare *printed default-mode answers* with the exact reference, so both
+solver settings and output precision matter. PRISM 4.11 uses a default relative convergence
+tolerance of 10⁻⁶; this is a stopping criterion, not a guarantee of relative error. Storm 2.0.0
+prints ten significant digits by default. PRISM's `-exact` engine in this benchmark does not
+handle step-bounded properties such as `F<=10`.
+
+These runs compare numerical answers, not throughput, memory use or maximum model size. The
+[language reference](Language-Reference.md#limits) gives Haze's exploration budgets;
+[How Haze compares](Comparison.md#prism-and-storm) describes the model types and results.
 
 ## Reproducing
 

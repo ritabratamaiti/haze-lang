@@ -3,7 +3,7 @@
 -- Last week's logs show 12 timeouts in 4000 calls, so the timeout rate is learned from those
 -- counts with `likelihood`. A retry that follows a timeout sometimes lands on the same overloaded
 -- replica and times out again. How often is a judgment call: around 30%, at least 10%, at most
--- 60%, so it is a triangle. Haze checks every value of both rates, weighed by how possible it is.
+-- 60%, so it is a triangle. Haze bounds delivery over both ranges; each rate stays fixed during a run.
 
 param timeout : Num ~= likelihood(12, 4000)
 param same_replica : Num ~= tri(0.1, 0.3, 0.6)
@@ -34,8 +34,8 @@ system Client(budget : Num) {
   }
 }
 
--- The requirement: 99.9% of requests succeed. Three attempts aren't enough once the
--- correlated failures are taken into account; five are.
+-- The 99.9% belief target falls inside the three-attempt bracket at this resolution.
+-- Five attempts certify the target: even the lower bound on belief clears 0.999.
 claim three_attempts : Client(3) |= eventually phase == Done with prob >= 0.999
 claim five_attempts : Client(5) |= eventually phase == Done with prob >= 0.999
 

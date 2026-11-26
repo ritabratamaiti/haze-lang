@@ -45,8 +45,10 @@ logic lukasiewicz  -- max(0, a + b - 1) and min(1, a + b)
 explore 5000
 ```
 
-`levels N` sets how many possibility levels Haze uses for continuous fuzzy parameters (see
-[Fuzzy parameters](#fuzzy-parameters)), from that point in the file on. The default is 10.
+On the `continuous-params` branch, `levels N` sets the number of regular possibility levels
+for subsequent continuous checks (see [Fuzzy parameters](#fuzzy-parameters)). The default is
+10 and the allowed range is 1 through 1,000. Discrete possibilities and likelihood-tail
+levels can add further cuts.
 
 ```haze
 levels 20
@@ -75,10 +77,11 @@ The values must be literals of the declared type, none may be listed twice, and 
 must have possibility 1 (the parameter must be _normal_, meaning that at least one value is
 fully possible). Anything that depends on a fuzzy parameter has the grade `fuzzy`.
 
-A `Num` parameter can also range over an interval, with a possibility for every value in it:
+The `continuous-params` development build also accepts an interval for a `Num` parameter,
+with a possibility for every value in it. The listed form above works in v0.1.0.
 
 ```haze
-param loss : Num ~= tri(0.01, 0.02, 0.05)        -- 0.02 is fully possible, 0.01 and 0.05 barely
+param loss : Num ~= tri(0.01, 0.02, 0.05)        -- possibility 1 at 0.02; 0 at both endpoints
 param latency : Num ~= trap(80, 100, 150, 300)   -- 100 to 150 is fully possible
 param timeouts : Num ~= likelihood(3, 1000)      -- learned from 3 failures in 1000 calls
 ```
@@ -89,9 +92,10 @@ param timeouts : Num ~= likelihood(3, 1000)      -- learned from 3 failures in 1
   binomial likelihood `p^k (1 - p)^(n - k)`, scaled so that `k / n` has possibility 1.
 
 The arguments must be constant, the corners in increasing order, and `n` at most 100,000.
-Claims and `#prob` take every value in each range into account and give certified bounds (see
-[Fuzzy parameters](Fuzzy-Parameters.md#continuous-parameters)). The other queries use the most
-possible value and say so. An `observe` can't depend on a continuous parameter.
+Claims, theorems and `#prob` use certified bounds over the ranges (see
+[Checking a delivery target](Fuzzy-Parameters.md#checking-a-delivery-target)). `#eval`,
+`#expect`, `#outcomes` and `#tests` use a most possible value for each continuous parameter
+and report it. An `observe` cannot depend on a continuous parameter.
 
 ### Random inputs and derived values
 
@@ -272,9 +276,11 @@ must be possible for every parameter value.
 When a theorem or a `with prob >=` bound is rejected, Haze shows a counterexample: the parameter
 values, inputs and state at the first step where the property fails, and values for any leading
 `forall` variables that make it false. When a `with prob <=` bound is rejected, it shows a run
-where the property does hold, since that is what the bound was meant to rule out. Either way the
-example comes from a parameter value that breaks the bound. Variables that can't affect the
-property aren't shown.
+where the property does hold, since that is what the bound was meant to rule out. For a
+continuous parameter the checker looks for a witness at a concrete value; the verdict uses
+the bounds over the range. A failed check can mean the enclosure is too wide to certify the
+claim, even when a run at one rate is shown. Variables that can't affect the property aren't
+shown.
 
 ### Queries
 
@@ -323,8 +329,9 @@ fails the test with probability at most one in a million, while code that fails 
 (for `q ≥ 1/2`, with probability halfway between that and 1) is caught with probability at least 0.99. If `φ` never fails,
 one run is a deterministic test.
 
-With fuzzy parameters, the runs use the most possible parameter values, and the statistical
-test uses the possible values under which `φ` fails most often.
+With fuzzy parameters, the runs use a most possible assignment. The statistical test uses
+the most failure-prone discrete assignment checked; continuous parameters stay at their
+reported representative values. It is not a worst-case test over a continuous range.
 
 ## Expressions
 
@@ -425,10 +432,9 @@ much they move the result. That ranking says which estimate is worth improving f
 that a property can't read are left out.
 
 Results of unbounded properties can carry two notes. One says that exploration stopped at the
-`explore` limit, so the interval also accounts for the unexplored states. The other says that
-part of the state space was too large to solve exactly; Haze then solves it in floating point
-and checks the resulting bounds in exact arithmetic, so the interval is guaranteed to contain
-the true value but is no longer a single exact number.
+`explore` limit, so the interval also accounts for the unexplored states. The other identifies
+components solved with certified bounds: Haze proposes the bounds in floating point and checks
+them in rational arithmetic. The interval contains the true value.
 
 All numbers are exact. A number with a long decimal expansion is rounded and marked with `≈`,
 followed by the exact fraction when it's short, as in `0.666667 (=2/3)`. Numbers below 0.001 are
@@ -436,13 +442,15 @@ shown in scientific notation, as in `≈1.37018e-8 (=1/72982849)`.
 
 ## Limits
 
-Haze gets exact answers by enumerating every state, so models have to be finite and not too
-large. Temporal properties can look at most 100,000 steps ahead, `uniform` ranges and quantifier
-ranges can have at most 100,000 values, and `binomial` allows at most 10,000 trials. At most
+Haze enumerates the distinct configurations relevant to a property. A bounded temporal
+property can look at most 100,000 steps ahead, `uniform` ranges and quantifier ranges can
+have at most 100,000 values, and `binomial` allows at most 10,000 trials. At most
 2,000,000 distinct configurations are kept per step, after merging equal configurations and
 dropping variables the property can't read.
 
-Unbounded properties explore at most 100,000 states unless `explore` says otherwise.
+Unbounded `always`, `eventually` and expected-step queries have no step horizon. They explore
+up to 100,000 states by default; `explore N` or `--states N` changes that budget. If exploration
+stops there, the result accounts for unvisited states as unknown.
 Groups of states that can all reach each other are solved exactly when they have at most 120
 states, and with certified bounds when they are larger.
 
@@ -459,8 +467,8 @@ Two reductions keep this manageable. Each query builds only the inputs and param
 or an earlier observation, can read, so unrelated inputs don't multiply the number of worlds. And
 a state variable that can't influence the property, directly or through the variables it's
 computed from and the conditions around its assignments, isn't tracked at all. A clock or a
-counter that a property never reads doesn't split its states. For scale, the models in this repository have up to
-about a thousand states per step, and each file checks in well under a minute.
+counter that a property never reads doesn't split its states. The output reports the
+configuration count for the property being checked.
 
 The `haze` command's options, its exit status and its JSON output are described in
 [Command line and JSON](Command-Line.md).

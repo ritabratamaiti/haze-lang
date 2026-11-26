@@ -69,17 +69,17 @@ installs elan if you don't have it, fetches the source, and runs `lake build`. T
 downloads the Lean toolchain and takes a few minutes. Platforms without a prebuilt binary, such as
 Linux on ARM, are built from source automatically.
 
-To build a checkout by hand:
+For the [continuous delivery example](Fuzzy-Parameters.md#checking-a-delivery-target), build the
+development branch rather than installing v0.1.0:
 
 ```sh
-git clone https://github.com/ritabratamaiti/haze-lang
+git clone --branch continuous-params https://github.com/ritabratamaiti/haze-lang
 cd haze-lang
-lake build                              # the library, its theorems and the haze command
-lake exe haze examples/payments_retry.hz
-lake test                               # the test suite
+lake build haze
 ```
 
-The binary ends up in `.lake/build/bin/haze`.
+From that checkout, `lake exe haze FILE.hz` uses the branch's checker, even if a different
+version of `haze` is on your `PATH`.
 
 ## Docker
 

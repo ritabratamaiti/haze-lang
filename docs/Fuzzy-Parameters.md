@@ -39,18 +39,16 @@ a value occurs. A possibility says how acceptable a value is as an estimate:
 - A value you're sure is wrong should be left out.
 
 A practical way to choose them is to start from a statement like "the loss rate is around 2%,
-it's been as low as 1%, and it could reach 5% on a bad day; 10% would be surprising". The most
-likely value gets 1, the values you've seen get high possibilities, and the bad cases get lower
-ones:
+it's been as low as 1%, and it could reach 5% on a bad day; 10% would be surprising". Here
+2% gets possibility 1. The other rates get less support, with 10% getting the least:
 
 ```haze
 param loss : Num ~= {0.01: 0.6, 0.02: 1, 0.05: 0.5, 0.1: 0.2}
 ```
 
-The exact possibilities matter less than which values you include. Including a pessimistic value
-with a low possibility lowers the belief in a requirement, and leaving it out raises it. The
-table in the output shows the result for each value, so you can always see what a single value
-would give.
+Both the rates and their possibilities matter. A 10% loss rate with possibility 0.2 can
+affect the worst case in the bottom fifth of the possibility range. Give it possibility
+1 and it can affect the worst case at every level.
 
 ## What the answer means
 
@@ -93,56 +91,65 @@ The two numbers are checked differently, and each check is the cautious one:
 - A `theorem` passes only if the belief is 1. Since every listed value has a possibility above 0,
   this means the property holds for every value of every parameter.
 
-When a bound fails, the counterexample comes from a parameter value that breaks it.
+A witness explains a particular run at a particular parameter value. The probability bound
+is decided by the full calculation, not by that one run.
 
 ## Continuous parameters
 
-A list of values checks only the values you list. If the loss rate is "around 2%, somewhere
-between 1% and 5%", it could be 3.7%, and a list of four values wouldn't check that. A triangle
-covers every value in the range:
+If the loss rate is "around 2%, somewhere between 1% and 5%", it could be 3.7%. A triangle
+covers that rate without requiring it to appear in a list. Continuous parameter declarations
+are available on the `continuous-params` development branch, not in v0.1.0.
 
 ```haze
 param p : Num ~= tri(0.01, 0.02, 0.05)
 ```
 
 `tri(a, m, b)` gives `m` possibility 1 and falls linearly to 0 at `a` and `b`. `trap(a, b, c, d)`
-is fully possible from `b` to `c` instead of at one point. Here is a client that tries a request
-up to three times, with `p` the chance that one attempt fails, from
-[`tests/continuous.hz`](../tests/continuous.hz):
+is fully possible from `b` to `c` instead of at one point. In either case the same value of the
+parameter applies to every attempt; it isn't drawn again when the client retries.
 
+### Checking a delivery target
+
+The client sends until it succeeds. Check delivery after three steps, with a belief target
+of 0.999945. To run this example locally, save it as `delivery.hz` in a checkout of this
+[development branch](Installation.md#building-from-source) and run `lake exe haze delivery.hz`:
+
+```haze
+param p : Num ~= tri(0.01, 0.02, 0.05)
+
+system Send {
+  var delivered : Bool := false
+  step { if not delivered { delivered := not flip(p) } }
+}
+
+levels 10
+#prob Send |= after[3] delivered
+
+levels 50
+claim delivered_enough : Send |= after[3] delivered with prob >= 0.999945
 ```
-#prob Retry |= eventually phase == Done
-  belief ≈0.999943 · plausibility ≈0.999997
-  10 possibility levels: the exact belief is at most ≈0.999955, the exact plausibility at least ≈0.999996 (more with `levels N`)
-  at the most possible values, p = 0.02: 0.999992
-  by possibility level (lowest to highest over the values at least that possible):
-    π ≥ 0.9  p in [0.019, 0.023]   ≈0.999988 to ≈0.999993
-    π ≥ 0.5  p in [0.015, 0.035]   ≈0.999957 to ≈0.999997
-    all values  p in [0.01, 0.05]  0.999875 to 0.999999
-```
 
-The values with possibility at least some level form a range, which gets narrower as the level
-rises. For each level, Haze finds the lowest and the highest result over the whole range, and the
-belief and plausibility combine them as before. The table shows three of the levels.
+| Levels | Lower bound on belief | Upper bound on belief | Is 0.999945 certified? |
+|---:|---:|---:|---|
+| 10 | ≈0.999943 | ≈0.999955 | No: the target falls inside the bracket. |
+| 50 | ≈0.999948 | ≈0.999950 | Yes: the lower bound clears the target. |
 
-Haze doesn't sample the range. It checks the model once with `p` standing for the whole range,
-which gives bounds that hold for every value in it, and it checks single values, which show how
-close those bounds are. When the result moves the same way as the parameter, as it does here, the
-two meet at an end of the range, and that level is done. Otherwise Haze splits the range and
-checks the pieces, until the bounds meet the best values found or it has spent its budget. A
-range is split first at the constants the model compares the parameter with, so that a condition
-like `if p > 0.6` is decided on every piece. If some range can't be narrowed down, the result
-says the bounds are cautious. They are still guaranteed, just wider than the truth. This
-happens when one step uses the same parameter in two random choices whose effects pull in
-different directions.
+These are two bounds on **belief**, not the belief/plausibility pair. In the playground,
+open **Text** to see both bounds. The displayed decimals are rounded.
+At a fixed loss rate the chance of delivery is `1 - p³`. At possibility level
+`α`, the highest loss rate is `0.05 - 0.03α`, which gives the lowest delivery probability.
+Integrating `1 - (0.05 - 0.03α)³` from 0 to 1 gives the exact belief, 0.99994925.
 
-The levels are the one approximation. Haze uses 10 of them, plus the possibilities of any listed
-parameters, and between two levels it uses the wider range. So the belief it reports is at most
-the exact belief of the triangle, and the plausibility at least the exact plausibility, which
-keeps `with prob` checks on the cautious side. The note gives the other side of each: here the
-exact belief is between 0.999943 and 0.999955. `levels 50` narrows the gap.
+If you move the claim above `levels 50`, Haze prints `bound fails`: the 10-level lower
+bound didn't establish the requirement. That's not evidence that the exact belief missed
+it. Both runs describe the same client. Nor does the 50-level result mean every single
+rate meets the target: at 4% loss, delivery is 0.999936.
 
-A theorem with a continuous parameter has to hold for every value in its range.
+Haze bounds the result over the whole range at each level, not just at sampled points. It
+can split a range further; for example, a comparison with a constant gives a place to split.
+If the search budget is exhausted or the levels are coarse, the bounds may remain wide.
+An accepted theorem covers every possible parameter value. [Design and semantics](Design.md#continuous-parameters)
+describes the interval search and how the level bounds are combined.
 
 ## Parameters from data
 
@@ -152,11 +159,10 @@ If you have counts, Haze can turn them into a parameter. After 3 failures in 200
 param r : Num ~= likelihood(3, 200)
 ```
 
-The possibility of each failure rate is its likelihood, `r³ (1 - r)¹⁹⁷`, divided by the likelihood
-of the observed rate `3/200`. So `3/200` is fully possible, and rates that make the data unlikely
-have low possibility. The values with possibility at least 0.15 are close to a 95% confidence
-interval for the rate. More data gives a narrower distribution and a smaller gap between belief
-and plausibility.
+The possibility of each failure rate is its binomial likelihood, `r³ (1 - r)¹⁹⁷`, divided by
+the likelihood at the observed rate `3/200`. So `3/200` has possibility one. A cut at 0.5
+contains the rates whose likelihood is at least half the maximum. That level is neither a
+posterior probability nor a confidence level.
 
 ```
 #prob Learned |= after[1] ok
@@ -169,18 +175,25 @@ and plausibility.
     all values  r in [0, 1]               0 to 1
 ```
 
-Every rate from 0 to 1 has some possibility, so Haze adds a few levels close to 0, which keeps
-the extreme rates from weighing on the result more than their possibility says. The ends of each
-range are rounded outward and checked in exact arithmetic.
+For these counts every rate strictly between zero and one has positive likelihood; the two
+endpoints have zero. Haze includes the full closed interval in its outer bound and adds
+levels near zero for the tails. The ends of each range are rounded outward and checked in
+exact arithmetic.
+
+The [retry-budget model](../examples/Gallery/learned_rates.hz) combines 12 timeouts in 4,000
+calls with a triangular estimate for the chance that a retry hits the same overloaded replica.
+At the two best-supported rates, three attempts deliver with probability about 0.999726.
+Across the ranges, the three-attempt belief bracket straddles the 0.999 requirement
+(about 0.998931 to 0.999134). Five attempts certify it: the lower bound is about 0.999712.
+The [recorded output](../examples/Gallery/learned_rates.expected) shows both checks.
 
 ## Several parameters
 
-With more than one parameter, Haze checks every combination of their values. The possibility of
-a combination is the smallest possibility among its values. Four parameters with four values each
-make 256 combinations, and each one is a separate model check, run in parallel across your
-processor's cores.
+For listed parameters, Haze checks every relevant combination. The possibility of a
+combination is the smallest possibility among its values. Four parameters with four values
+each make 256 combinations before dropping any irrelevant to the query.
 
-Continuous parameters don't add combinations. They are searched together, one range of values per
+Continuous parameters are searched together as a box with one range per parameter at each
 level. When there is more than one parameter, the output also ranks them by how much the
 result moves when each one is varied alone over its range, with the others at their most possible
 values. [`proof_checkers.hz`](../examples/Gallery/proof_checkers.hz) is an example.
@@ -201,9 +214,10 @@ An observation can't depend on a continuous parameter yet. For counts of failure
 
 ## Tests
 
-`#tests` lists runs at the most possible parameter values, since those are the runs you most
-expect. Its statistical test is sized for the possible values under which the property fails
-most often, so that correct code passes it even in the pessimistic case.
+`#tests` generates runs at a most possible parameter assignment. Its statistical test uses
+the largest failure rate among the discrete assignments checked, with each continuous rate
+held at its reported representative value. It does not certify the test size over a continuous
+range. Use a probability claim or `#prob` for a bound over that range.
 
 ## Fuzzy sets are something else
 

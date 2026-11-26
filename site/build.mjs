@@ -21,6 +21,7 @@ const REPO = join(SITE, "..");
 const DIST = join(SITE, "dist");
 const ENGINE = join(SITE, "public", "engine");
 const GITHUB = "https://github.com/ritabratamaiti/haze-lang";
+const SOURCE_BRANCH = "continuous-params";
 const read = (p) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
@@ -58,7 +59,7 @@ function check(src, { native = false } = {}) {
 
 // ---- content -----------------------------------------------------------------------------
 const PRESETS = [
-  ["proof-checkers", "Five proof checkers, three votes", "How likely a false AI-written proof is to pass Lean's kernel, lean4lean, nanoda, con-leche and con-ron. The ports add almost nothing, and overruling one rejection in four makes it 240 times more likely."],
+  ["proof-checkers", "Five proof checkers, three votes", "Compare shared and independent checker implementations under assumed error rates. Change the assumptions or the rule for handling a rejection and recheck the model."],
   ["retry-bug", "Retry bug: a double charge", "A payment client retries when a message is lost. Haze rejects \"never charged twice\" and shows the run where it happens."],
   ["rough-numbers", "Rough numbers", "The loss rate is only known roughly, so the model lists the values it might have. The answer is a range: how strongly what you know guarantees the property, and how strongly it allows it."],
   ["forever", "Runs of any length: craps", "The game can last any number of rolls, and Haze still gets the exact answer: 244/495."],
@@ -94,8 +95,8 @@ const EXAMPLES = [
   ["examples/quorum_replication.hz", "Software", "Quorum replication", "Reads see the latest write when R + W > N, and can be stale when R = 1."],
   ["examples/circuit_breaker.hz", "Software", "Circuit breaker", "A circuit breaker's invariants, how fast it trips, and how much load it sheds."],
   ["examples/canary_rollout.hz", "Software", "Canary rollout", "Whether a defective build can reach all traffic during a staged rollout."],
-  ["examples/Gallery/proof_checkers.hz", "Formal verification", "Five proof checkers, three votes", "Why checkers that share code add little, and why overruling a rejection costs more than dropping a checker."],
-  ["examples/Gallery/learned_rates.hz", "Software", "Retry budgets from logs", "How many retries a client needs when one failure rate is learned from logs and another is a rough guess."],
+  ["examples/Gallery/proof_checkers.hz", "Formal verification", "Five proof checkers, three votes", "How sharing code or overruling a rejection affects agreement in a model with assumed error rates."],
+  ["examples/Gallery/learned_rates.hz", "Software", "Retry budgets from logs", "Do three attempts certify 99.9% delivery? How about five? Use the timeout counts and a range for the chance of hitting the same replica twice."],
   ["examples/incident_triage.hz", "Operations", "Incident triage", "The likely root cause of an incident, given which alerts fired."],
   ["examples/Conformance/payments/payments.hz", "Testing", "A specification for real code", "The model a Python client is tested against, with tests ranked by probability."],
   ["examples/Tutorial/JobWorker.hz", "Tutorial", "Tutorial: a job worker", "The language step by step, from one random value to a full system."],
@@ -116,7 +117,7 @@ const EXAMPLES = [
 const SLOW = new Set(["examples/Gallery/chip_design.hz", "examples/Gallery/production_test.hz"]);
 const GALLERY = EXAMPLES.map(([path, field, title, desc]) => {
   const code = read(join(REPO, path));
-  return { id: slug(path), path, field, title, desc, code, records: check(code, { native: true }), slow: SLOW.has(path) };
+  return { id: slug(path), path, sourceUrl: `${GITHUB}/blob/${SOURCE_BRANCH}/${path}`, field, title, desc, code, records: check(code, { native: true }), slow: SLOW.has(path) };
 });
 
 // ---- docs --------------------------------------------------------------------------------
@@ -136,8 +137,8 @@ const DOC_SECTIONS = [
     ["cli", "Command line and JSON", "docs/Command-Line.md", "The haze command's options and exit status, and the fields of its JSON records."]]],
   ["Background", [
     ["design", "Design and semantics", "docs/Design.md", "How Haze follows Lean's design, and the precise meaning of its results."],
-    ["comparison", "How Haze compares", "docs/Comparison.md", "PRISM, Storm, Lean, probabilistic programming and testing tools, and when to use each."],
-    ["prism", "Checking against PRISM and Storm", "docs/Benchmarks.md", "PRISM's example models checked with Haze, PRISM and Storm, and how the answers compare."],
+    ["comparison", "How Haze compares", "docs/Comparison.md", "What a Haze check establishes: uncertain rates, temporal properties, counterexamples and tests, alongside other approaches."],
+    ["prism", "Checking against PRISM and Storm", "docs/Benchmarks.md", "26 properties on PRISM's example models: 21 exact fractions and five certified intervals containing the reference values."],
     ["faq", "FAQ", "docs/FAQ.md", "Status, exact numbers, model size, licensing and other common questions."]]],
 ];
 const DOCS = DOC_SECTIONS.flatMap(([section, pages]) => pages.map(([id, label, path, summary]) => ({ id, label, path, summary, section })));
@@ -177,7 +178,7 @@ function renderDoc(src, path) {
     const doc = DOCS.find((d) => d.path === resolved);
     if (doc) return `${attr}="@ROOT@docs/${doc.id}/${hash}"`;
     const kind = attr === "src" ? "raw" : "blob";
-    return `${attr}="${GITHUB}/${kind}/main/${resolved}${hash}"`;
+    return `${attr}="${GITHUB}/${kind}/${SOURCE_BRANCH}/${resolved}${hash}"`;
   });
   html = html.replace(/<pre><code class="language-haze">([\s\S]*?)<\/code><\/pre>/g, (_, escaped) => {
     const code = unescapeHtml(escaped);
@@ -234,7 +235,7 @@ function footer(root) {
     <p>Haze is source-available under the <a href="${GITHUB}/blob/main/LICENSE.md">Functional Source License</a> (FSL-1.1-ALv2):
     free to use for anything, including at work, except offering it as a competing product or service.
     Each release becomes Apache-2.0 two years after it ships.</p>
-    <p>v0.1: the language may still change. © 2026 Ritabrata Maiti</p>
+    <p>Development build · <a href="${GITHUB}/releases">Release notes</a> · © 2026 Ritabrata Maiti</p>
   </div>
   <div><h4>Learn</h4><ul>
     <li><a href="${root}tour/">Tour</a></li><li><a href="${root}play/">Playground</a></li>
@@ -264,7 +265,7 @@ const INSTALL = [
   ["windows", "Windows", "irm https://raw.githubusercontent.com/ritabratamaiti/haze-lang/main/install.ps1 | iex"],
   ["docker", "Docker", 'docker run --rm -v "$PWD:/work" ghcr.io/ritabratamaiti/haze-lang model.hz'],
   ["action", "GitHub Action", "- uses: ritabratamaiti/haze-lang@v0.1.0\n  with:\n    files: models/*.hz"],
-  ["source", "From source", "git clone https://github.com/ritabratamaiti/haze-lang\ncd haze-lang && lake build\nlake exe haze examples/payments_retry.hz"],
+  ["source", "Development branch", `git clone --branch ${SOURCE_BRANCH} ${GITHUB}\ncd haze-lang\nlake build haze`],
 ];
 
 const fields = [...new Set(GALLERY.map((e) => e.field))];
@@ -276,16 +277,15 @@ const home = `
       <img class="hero-logo" src="images/logo-dark.svg" alt="Haze">
     </picture>
     <h1>Check software that <span class="glow">fails some of the time</span>.</h1>
-    <p class="lede">Haze is a language for modeling systems that can fail, like a client that
-    retries when a message is lost. You describe the system and what it should guarantee, and Haze
-    computes how likely each guarantee is to hold, with exact fractions rather than simulation. When
-    one can fail, Haze shows you a run where it does.</p>
+    <p class="lede">A payment client retries after a lost reply. Does the payment go through?
+    Can a retry charge twice for the same payment? Write the retry policy and both requirements in Haze.
+    It computes the delivery probability and shows the sequence that produces a second charge.</p>
     <div class="cta">
       <a class="btn primary big" href="#try-it">Try it in your browser</a>
       <a class="btn big" href="tour/">Take the tour</a>
       <a class="btn big" href="#install">Install</a>
     </div>
-    <p class="muted small">Version 0.1. The language may still change.</p>
+    <p class="muted small">Development build. <a href="docs/fuzzy/#continuous-parameters">Continuous parameter declarations</a> are not in v0.1.0.</p>
   </div>
   <div class="hero-card">
     <canvas id="hero-canvas" aria-label="Payments flowing through a retry protocol. Red particles are customers charged twice."></canvas>
@@ -315,9 +315,9 @@ const home = `
 <section><div class="wrap">
   <h2>What Haze does</h2>
   <div class="features">
-    ${feature("exact", "Exact answers", "Probabilities are computed as fractions, not estimated by simulation. That includes runs with no length limit: a game of craps can go on for any number of rolls, and the shooter wins with probability exactly 244/495.", "forever")}
-    ${feature("rough", "Rates you only roughly know", "Write a rate as a few values, a range such as <code>tri(0.01, 0.02, 0.05)</code>, or counts from your logs with <code>likelihood(3, 1000)</code>. Haze checks every value in the range and answers with certified bounds: how strongly what you know guarantees the property, and how strongly it allows it.", "rough-numbers")}
-    ${feature("cex", "Counterexamples", "A theorem has to hold on every run that can happen. When it doesn't, Haze shows the parameter values, the state and the step where it breaks.", "retry-bug")}
+    ${feature("exact", "Exact answers", "A game of craps can go on for any number of rolls. Haze solves the model and returns the shooter's win probability as the fraction 244/495. For larger components of unbounded checks it reports certified bounds.", "forever")}
+    ${feature("rough", "Rates you only roughly know", "List candidate rates and compare the delivery probability at each one. On this branch, a <a href=\"docs/fuzzy/#checking-a-delivery-target\">triangular range</a> or a <a href=\"docs/fuzzy/#parameters-from-data\">likelihood from counts</a> lets you check a probability claim without choosing just a few rates.", "rough-numbers")}
+    ${feature("cex", "Counterexamples", "The payment client below charges twice if its first reply is lost. Haze shows the state where the second charge occurs, with the parameter values and the step that led there.", "retry-bug")}
     ${feature("tests", "Tests from a model", "<code>#tests</code> lists a model's most likely runs as test cases and says how much of the probability they cover. For behavior that fails by design some of the time, it sizes a statistical test with a known false-alarm rate.", "tests")}
   </div>
 </div></section>
@@ -338,28 +338,20 @@ const home = `
 
 <section><div class="wrap">
   <h2>How Haze compares</h2>
-  <p class="lede">Haze checks models of software exactly, with rates given as ranges or learned
-  from counts, counterexamples and generated tests. PRISM and Storm cover more kinds of model, and
-  Lean proves properties at every size.</p>
-  <div class="table-scroll"><table class="compare">
-    <thead><tr><th></th><th class="haze">Haze</th><th>PRISM, Storm</th><th>Lean</th><th>Probabilistic programming (Stan, PyMC)</th></tr></thead>
-    <tbody>
-      <tr><td>Answers</td><td class="haze">Exact probabilities and expectations (certified bounds for large unbounded problems), proofs over every run of a finite model, counterexamples, generated tests</td><td>Probabilities, expectations and rewards for temporal logics (PCTL, CSL)</td><td>Proofs that hold for every input and size</td><td>Posterior distributions by inference</td></tr>
-      <tr><td>Rates you only roughly know</td><td class="haze">Fuzzy parameters as listed values, ranges or counts from logs, with certified belief and plausibility</td><td>Parametric and interval models</td><td>Whatever you formalize and prove yourself</td><td>Priors over parameters</td></tr>
-      <tr><td>Arithmetic</td><td class="haze">Exact fractions; floating point only proposes bounds that are then checked exactly</td><td>Floating point by default, with exact modes</td><td>Exact</td><td>Sampling or approximation</td></tr>
-      <tr><td>Models</td><td class="haze">Discrete-time Markov chains</td><td>DTMCs, MDPs, CTMCs, games and more</td><td>Any mathematics</td><td>Statistical models, often continuous</td></tr>
-      <tr><td>Scale</td><td class="haze">Explicit states: up to 2 million configurations per step, and 100,000 states by default for unbounded properties</td><td>Symbolic engines for very large state spaces</td><td>Unbounded, with effort</td><td>Large data sets</td></tr>
-      <tr><td>Effort</td><td class="haze">Write a model; checking is automatic</td><td>Write a model; checking is automatic</td><td>Write the proofs</td><td>Write a model; tune inference</td></tr>
-    </tbody>
-  </table></div>
+  <p class="lede">A client gets three attempts to deliver a message. At 2% packet loss it meets a
+  99.99% delivery target; at 5% it misses. In Haze you can keep both estimates in the same model,
+  specify how much support each has and check the target directly.
+  <a href="play/?example=rough-numbers">Run the three-send example.</a></p>
+  <p>In a <a href="docs/prism/">26-property cross-check with PRISM and Storm</a>, Haze returned
+  21 exact fractions matching the reference results and five certified intervals containing them.
+  <a href="docs/comparison/">Compare model types, property support and state-space representations.</a></p>
 </div></section>
 
 <section id="install"><div class="wrap">
   <h2>Install</h2>
-  <p class="lede">There are prebuilt binaries for Linux (x86-64), macOS (Apple silicon) and Windows
-  (x86-64), and the install scripts
-  check each download against the published checksums. You can also use Docker or GitHub Actions,
-  or <a href="docs/installation/#building-from-source">build Haze from source</a> with Lean's toolchain.</p>
+  <p class="lede">The install scripts download a release for Linux (x86-64), macOS (Apple silicon)
+  or Windows (x86-64) and verify its checksum. To run the continuous examples on this page,
+  <a href="docs/installation/#building-from-source">build the development branch</a>.</p>
   <div class="install-tabs" data-tabs role="tablist">
     ${INSTALL.map(([id, label], i) => `<button class="chip-btn ${i ? "" : "active"}" role="tab" aria-selected="${!i}" aria-controls="install-${id}">${label}</button>`).join("")}
   </div>
@@ -384,7 +376,7 @@ mkdirSync(join(DIST, "assets"), { recursive: true });
 const page = (dir, html) => { mkdirSync(join(DIST, dir), { recursive: true }); writeFileSync(join(DIST, dir, "index.html"), html); };
 
 page("", layout({ root: "./", path: "", canonical: "", title: "Haze: check software that fails some of the time", script: "home",
-  description: "Haze is a language for checking software that fails some of the time. It computes exact probabilities, handles rates known only roughly or learned from logs, shows counterexamples and generates tests, and you can try it in your browser.",
+  description: "Check software guarantees under uncertain failure rates. Haze computes probabilities and certified bounds, shows counterexamples and generates tests you can replay against code.",
   body: home, data: { presets: PRESETS, hero: HERO, features } }));
 page("play", layout({ root: "../", path: "play/", canonical: "play/", title: "Playground · Haze", script: "play", wide: true,
   description: "Write and check Haze models in your browser.",
@@ -416,7 +408,7 @@ for (const [i, d] of rendered.entries()) {
   const foot = `<nav class="doc-pager" aria-label="Previous and next">
     ${prev ? `<a href="${root}docs/${prev.id}/"><span>Previous</span>${esc(prev.label)}</a>` : "<span></span>"}
     ${next ? `<a class="next" href="${root}docs/${next.id}/"><span>Next</span>${esc(next.label)}</a>` : "<span></span>"}</nav>
-    <p class="doc-meta">These docs describe Haze 0.1. <a href="${GITHUB}/edit/main/${d.path}">Edit this page on GitHub</a></p>`;
+    <p class="doc-meta">These docs describe the ${SOURCE_BRANCH} development build. <a href="${GITHUB}/edit/${SOURCE_BRANCH}/${d.path}">Edit this page on GitHub</a></p>`;
   page(`docs/${d.id}`, layout({ root, path: "docs/", canonical: `docs/${d.id}/`, title: `${d.label} · Haze`, script: "docs", description: d.summary,
     body: `<div class="wrap docs"><nav class="docs-nav" aria-label="Documentation">${docsNav(root, d.id)}</nav>
 <article class="prose"><div class="eyebrow">${esc(d.section)}</div><h1>${esc(d.title)}</h1>${d.html.replaceAll("@ROOT@", root)}${foot}</article>${toc}</div>` }));
@@ -424,7 +416,9 @@ for (const [i, d] of rendered.entries()) {
 page("docs", layout({ root: "../", path: "docs/", canonical: "docs/", title: "Documentation · Haze", script: "docs",
   description: "Documentation for Haze: installation, a first model, guides, the language reference and how Haze compares with other tools.",
   body: `<div class="wrap docs-home"><h1>Documentation</h1>
-  <p class="lede">These pages describe Haze 0.1. If you're new, install Haze and write <a href="first-model/">your first model</a>, or take the <a href="../tour/">tour</a> in your browser.</p>
+  <p class="lede">Start with <a href="first-model/">your first model</a> or the <a href="../tour/">browser tour</a>.
+  To run the <a href="fuzzy/#checking-a-delivery-target">continuous loss-rate example</a> locally,
+  <a href="installation/#building-from-source">build this development branch</a>; v0.1.0 uses listed rates.</p>
   ${DOC_SECTIONS.map(([section, pages]) => `<section><h2>${section}</h2><div class="doc-cards">${pages.map(([id]) => { const d = rendered.find((x) => x.id === id); return `<a class="doc-card" href="${id}/"><strong>${esc(d.label)}</strong><span>${esc(d.summary)}</span></a>`; }).join("")}</div></section>`).join("")}
   </div>` }));
 
@@ -463,7 +457,7 @@ for (const [i, p] of POSTS.entries()) {
   const foot = `<nav class="doc-pager" aria-label="Older and newer posts">
     ${older ? `<a href="${root}blog/${older.slug}/"><span>Older</span>${esc(older.title)}</a>` : "<span></span>"}
     ${newer ? `<a class="next" href="${root}blog/${newer.slug}/"><span>Newer</span>${esc(newer.title)}</a>` : "<span></span>"}</nav>
-    <p class="doc-meta"><a href="${GITHUB}/edit/main/${p.file}">Edit this post on GitHub</a></p>`;
+    <p class="doc-meta"><a href="${GITHUB}/edit/${SOURCE_BRANCH}/${p.file}">Edit this post on GitHub</a></p>`;
   page(`blog/${p.slug}`, layout({ root, path: "blog/", canonical: `blog/${p.slug}/`, title: `${p.title} · Haze`, script: "docs", description: p.summary,
     body: `<div class="wrap docs"><nav class="docs-nav" aria-label="Posts">${blogNav(root, p.slug)}</nav>
 <article class="prose"><div class="eyebrow">Blog</div><h1>${esc(p.title)}</h1>

@@ -4,7 +4,7 @@ import { renderRecords, h } from "../render";
 import { linkTo } from "../share";
 import type { Record_ } from "../engine";
 
-interface Example { id: string; path: string; title: string; field: string; desc: string; code: string; records: Record_[]; slow: boolean }
+interface Example { id: string; path: string; sourceUrl: string; title: string; field: string; desc: string; code: string; records: Record_[]; slow: boolean }
 
 common();
 const { examples } = pageData<{ examples: Example[] }>();
@@ -27,7 +27,7 @@ function draw() {
       h("summary", {}, h("span", { class: "field" }, e.field), h("strong", {}, e.title), h("span", { class: "muted" }, e.desc)),
       h("div", { class: "example-body" },
         h("div", { class: "example-bar" },
-          h("a", { href: `https://github.com/ritabratamaiti/haze-lang/blob/main/${e.path}` }, e.path),
+          h("a", { href: e.sourceUrl }, e.path),
           h("div", { class: "spacer" }),
           e.slow ? h("span", { class: "muted small" }, "takes minutes in the browser; output computed in advance") : null,
           open),

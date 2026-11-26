@@ -33,6 +33,11 @@ US English, the active voice, and docstrings that make sense on their own when s
 editor hover. Each Lean file starts with a copyright header and a module docstring
 (`/-! … -/`) describing what it contains, and public definitions have docstrings.
 
+When comparing tools, start with a question a reader can check in Haze. Link the model or
+benchmark and name the relevant differences in semantics, supported inputs and limits.
+Compare specific capabilities rather than ranking whole tools. Agreement on numerical
+results, for example, is evidence about those answers, not about speed or maximum model size.
+
 Commit messages should start with a short summary line, followed by what changed and why.
 
 ## License

@@ -44,9 +44,10 @@ plausibility, so the true probability is always between the two.
 
 ## Exact numbers
 
-All numbers in results are exact. A number with a short decimal expansion is printed as it is.
-A longer one is rounded, marked with `≈`, and followed by the exact fraction when the fraction is
-short:
+Haze compares rationals before rounding them for display. In a certified interval the
+endpoints are exact rationals; the quantity they enclose need not equal either endpoint.
+A short decimal is printed in full. A longer one is rounded, sometimes with the exact
+fraction alongside it:
 
 ```
   probability 0.666667 (=2/3)
@@ -97,9 +98,17 @@ The verdict says whether the declaration was accepted:
 
 A claim without a bound is always accepted. It only reports the result.
 
+For a continuous fuzzy parameter in this development build, read the verdict with the
+bracket that follows the result. For `with prob >= q`, a lower bound on belief at or above
+`q` certifies the claim. An upper bound on belief strictly below `q` rules it out. If the
+bracket straddles `q`, `bound fails` means this check did not certify the target. For
+`with prob <= q`, apply the same reasoning to the bracket on plausibility, with the
+inequalities reversed. [Checking a delivery target](Fuzzy-Parameters.md#checking-a-delivery-target)
+shows both the coarse bracket and the refined result.
+
 ## Results by parameter value
 
-When a result depends on fuzzy parameters, a table shows the result for each combination of
+When a result depends on listed fuzzy parameters, a table shows the result for each combination of
 values, with its possibility `π`:
 
 ```
@@ -129,8 +138,8 @@ can't depend on are left out.
 
 ## Counterexamples
 
-When a theorem or a `with prob >=` bound is rejected, Haze shows an example of the property
-failing:
+When Haze can identify a failing run for a rejected theorem or `with prob >=` bound, it
+prints the run:
 
 ```
 payments_retry.hz:97:1: error: theorem naive_single_charge
@@ -147,9 +156,10 @@ an `eventually` property, the degree is replaced by "never reached on this path"
 give the values of the fuzzy parameters, the random inputs, and the state. Variables that can't
 affect the property are left out.
 
-Haze picks the example from a parameter value that breaks the bound, so the example is relevant
-to the failure. It's one run among possibly many. It isn't necessarily the most likely failing
-run; `#tests` lists those in order.
+The example illustrates an outcome at one parameter value, not the aggregate probability.
+For a continuous parameter Haze looks for a witness at a concrete value; it can reject an
+uncertified bound without finding a witness. A witness need not be the most likely failing
+run; `#tests` orders runs by probability.
 
 For a property with `forall` at the front, a further line gives values that make the property
 false:
@@ -185,9 +195,9 @@ interval that contains the true value. Raising the limit narrows it when the une
 are unlikely to be reached, as in a queue that's usually short. It can't help when they are
 likely, as in a random walk that drifts away.
 
-The second means part of the problem was too large to solve exactly. Haze solved it in floating
-point and then checked the resulting bounds in exact arithmetic. The bounds are guaranteed to
-contain the true value, but the result is no longer a single exact number.
+The second identifies a component that crossed the 120-state threshold for the certified
+solver. Floating point proposes lower and upper bounds; rational arithmetic checks them. The
+reported interval contains the true value.
 
 An expected number of steps can be infinite:
 
