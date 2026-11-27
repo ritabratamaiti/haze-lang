@@ -16,6 +16,11 @@ If you make a change that is meant to alter the output, regenerate the expected 
 committing them. A test only protects you if someone has checked that its expected output is
 right.
 
+The runnable blog posts in `examples/Gallery` are golden tests too. Moving a
+paragraph in a `.hz` article can move a query without changing its answer.
+After editing the prose, regenerate and review the `.expected` diff for line
+numbers as well as values. Building the website does not run this comparison.
+
 ## What's here
 
 - `basics.hz` covers the core features: exact probabilities (the Monty Hall problem, a Bayesian
