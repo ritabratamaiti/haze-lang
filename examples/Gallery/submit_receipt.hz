@@ -24,7 +24,8 @@ endpoint so the person running the experiment can see what really happened.
 | Before the write | No receipt (TypeError) | 0 | 1 |
 | After the write | No receipt (TypeError) | 1 | 2 |
 
-Those are browser results from an unkeyed server, not simulated loss rates.
+These counts came from running the form twice against a server without
+idempotency keys, once in each mode.
 To repeat either run, use `python examples/Conformance/submit_receipt.py before`
 or replace `before` with `after`. Open the loopback address it prints and
 check the count after each click. Restart the script for a fresh run.
@@ -54,18 +55,17 @@ def copies(retry : Bool) : Num :=
 
 Suppose the goal is exactly one saved copy. The client can stop or send
 one more request. It can't read back the result, ask a person, or supply
-a key that the server honors. Let `p` be the chance it retries when it
-sees that error. This is the client's choice, not a guess about network
-reliability. Try `0.9` and then `0.5`:
+a key that the server honors. The client chooses how often to retry after that
+error. Call that probability `p`. Try `0.9` and then `0.5`.
 
 <!-- run -->
 
 If the first write didn't happen, the success probability is `p`. If it did,
 the success probability is `1 - p`. The same observation has to produce
 the same retry policy in both cases. Its guarantee across the two histories
-is therefore the smaller of those numbers. No choice of `p` gets it above
-one half. That's a limit on this client's information, not a recommendation
-to flip a coin before saving a real form.
+is therefore the smaller of those numbers. At `p = 0.5`, either history gives the
+client a 50% chance of ending up with one copy. Any other choice makes one
+history worse.
 
 ![For retry chance p, success rises from zero to one if the first write was lost and falls from one to zero if it was saved. The two lines meet at one half.](https://haze-lang.pages.dev/blog/images/submit-retry.svg)
 At a 90% retry rate, one history gets 90% success and the other gets 10%.
@@ -86,10 +86,10 @@ write and the key under the same lock. The fixture keeps both in memory
 for one process. A production service would have to keep the key and its
 effect together for the entire retry window, including through restarts.
 
-We can now give two different specifications. No retry may create a second
-copy. Separately, we'd like a copy to exist by the end of two retries. Give
-each retry an independent 90% chance of reaching the server. That's an
-assumption you can edit, not a rate measured by this test.
+Now we can ask two questions. Can a retry ever create a second copy? If the
+first write was lost, what are the odds that a copy exists after two retries?
+For the second question, I gave each retry an independent 90% chance of
+reaching the server. You can change that number; the form doesn't measure it.
 
 <!-- run -->
 
