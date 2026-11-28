@@ -1,44 +1,47 @@
 /-
-# Click Save again? The 50% limit of a blind retry
+# I clicked Save again and got two drafts
 
-My Save button showed the same network error in two runs. One left no draft
-on the server. The other left one. Suppose the client can't check which
-happened and the server doesn't recognize duplicates. Even if a second POST
-is certain to arrive, no retry policy can give better than even odds of
-exactly one copy in both cases.
+The first click on my test form gave me a network error. I clicked Save
+again and got a receipt. A browser test that stopped there would have
+passed. The server had saved "Release checklist" twice.
+In another run that second click was the only reason I had a draft at all.
+I wanted to know whether the button could do better than tossing a coin.
 
-Run `haze submit_receipt.hz` for the whole model. Each block on this page is
-editable and runs with the code above it.
+Run `haze submit_receipt.hz` locally, or edit the blocks as you read.
+Each block uses the definitions above it.
 -/
 
 /-
-## Put the disconnect on either side of the write
+## What the browser saw
 
-I used a [local test form](../Conformance/submit_receipt.py) that makes a
-`fetch` request when you click **Save draft**. On the first POST its Python
-server closes the connection without sending a response. I moved that cut
-from just before the write to just after it. Both times the browser showed
-`No receipt (TypeError)`. Its second POST got a normal response.
+The [form and its server](../Conformance/submit_receipt.py) fit in one
+Python file. Clicking **Save draft** sends a POST; the server appends the
+draft to a list. On the first POST I make the server close the connection
+without sending a response. I can do that just before it appends the draft
+or just after. Either way, the page says `No receipt (TypeError)`.
 
-| First POST disconnected | Rows after first click | Rows after retry |
+| Where I closed the connection | Drafts after one click | Drafts after two |
 |---|---:|---:|
 | Before saving | 0 | 1 |
 | After saving | 1 | 2 |
 
-I counted the rows through `/audit`. That's a view for the person running the
-test; the button doesn't consult it. Both requests already carry the same
-`Idempotency-Key` header. In these two runs the server ignores it.
+I could tell the runs apart because I opened `/audit` in another tab and
+counted the drafts. Suppose you're writing the error handler and all you
+get is the error. You can stop, or you can send one more POST. Assume the
+second POST always gets through. Calling `save()` again would fix the
+first row in the table and give you a duplicate in the second. Doing
+nothing would lose the first draft.
 
-Try a coin flip: heads, retry once; tails, stop. In the first Haze block,
-`cut` keeps both histories possible without assigning them odds. The only
-coin toss is the button's decision. Ask for the chance of exactly one copy:
+Here's an odd thing to put in an error handler: toss a coin. On heads,
+retry. On tails, stop. In the Haze block below, `cut` is the setting I
+picked on the server *before* your handler ran. Both settings are allowed;
+I haven't said that either is more likely. The coin belongs to the button.
 
 <!-- run -->
 
-The answer is one half in *each* history. To repeat the browser test rather
-than the calculation, save the linked Python file and run
-`python submit_receipt.py before`. Open the loopback URL, click Save twice,
-and check the count after each click. Restart with `after` for the other run.
+Why does Haze print just `0.5` when there are two settings? In the first
+row of the table you need heads to get one draft. In the second row you
+need tails. Your chances are the same whichever setting I picked.
 -/
 
 enum Cut = BeforeWrite | AfterWrite
@@ -51,65 +54,80 @@ def exactly_one(p : Num) : Bool := copies(flip(p)) == 1
 #prob exactly_one(0.5)
 
 /-
-## Could a different retry rate do better?
+## Why not retry most of the time?
 
-Always retry and you duplicate the draft in the second run. Never retry
-and you lose it in the first. Suppose you retry with probability `p`.
-If the write was lost, retrying is the only way to get one copy: success
-has probability `p`. If the write went through, stopping is the only way:
-success has probability `1 - p`.
-
-The browser saw the same error, so it must use the same `p` in both cases.
-Before you run the block, change `0.9` to `0.8`. Which history gets only a
-one-in-five chance of ending up with one copy?
+I'd be tempted to retry nine times out of ten. That's a good policy for
+the first run, where there's nothing on the server yet. In the second
+run it gives me two copies nine times out of ten. Try `0.8` instead of
+`0.9` below. Which run did you just make better?
 
 <!-- run -->
 
-It's the case where the draft was already saved. Whatever `p` you pick,
-the guarantee across the two cases is `min(p, 1 - p)`. It peaks at `p = 0.5`.
-That's where the 50% comes from. It isn't the fraction of real-world
-timeouts that leave a saved draft, and it isn't advice to flip a coin
-before charging a card. The calculation counts a lost draft and a duplicate
-as equally bad; a payment service needn't treat those losses alike.
+The run with a draft already on the server benefits: you leave it alone
+20% of the time instead of 10%. If `p` is how often you retry, your chance
+of getting the first row right is `p`; your chance of getting the second
+right is `1 - p`. Those numbers add to one. You can't make them both
+bigger than a half.
 
 ![For retry chance p, success rises from zero to one if the first write was lost and falls from one to zero if it was saved. The two lines meet at one half.](https://haze-lang.pages.dev/blog/images/submit-retry.svg)
-At any retry rate, take the lower of the two lines. Its highest point is where they cross.
+Sliding to the right helps when the first write was lost. It hurts by the same amount when the draft was already there.
+
+You might know enough about your own server to do better. Suppose its logs
+show that nineteen out of twenty missing replies were for drafts that
+actually got saved. Stop on every error and you'll end up with one copy
+95% of the time on that workload. You'll still lose every draft that
+wasn't saved on the first click. I put one run in each row of my table
+on purpose. It would be a mistake to read that as a survey of network failures.
 -/
 
 #prob exactly_one(0.9)
 
 /-
-## Retry the operation, not just the request
+## The key was there on the first click
 
-Restart the form with `after --keyed`. The first click still shows the
-error. This time the second click gets a receipt **and the count stays at
-one**. The server now recognizes `draft-1` as the key for this particular
-save. A retry reuses it; a different intended save needs its own key.
-The fixture checks the key and records it with the row under one lock.
-Both vanish when the process exits. A real service needs to commit the key
-and its effect atomically and retain them across restarts for the retry window.
+Look at the call to `fetch` in the form. Both POSTs sent `Idempotency-Key: draft-1`.
+By default the server appends a row even if it has seen that key before.
+To reproduce the duplicate, save the linked file and run
+`python submit_receipt.py after`. Open the address it prints and click Save
+twice. Restart with `before` to see the case where the second click rescues
+the draft.
 
-Now there are two things to check: **at most one copy**, however many times
-we retry, and **at least one copy** by the end of two retries. Give each
-retry an independent 90% chance of reaching the server. This is a delivery
-rate we choose for the model. The earlier `p` was a decision the client
-made. Change `retry_delivery` below to `0.5` to rerun both checks.
+Now restart it with `after --keyed`. When the second POST arrives, the
+server finds `draft-1` and sends a receipt without writing another row.
+The browser still doesn't know whether the first click worked. It just
+doesn't have to know before it tries again.
+
+A different draft needs a different key. My test keeps the drafts and
+their keys in memory under one lock. Move just the drafts to a database
+and a restart between clicks will keep the first draft but forget its key.
+I'd commit the key and the draft in the same database transaction. The
+database needs to remember the key for as long as the client can retry.
+
+The last block checks that no number of retries produces two drafts. It
+also asks whether we have *any* draft after two retries. This time the
+client sends both; it's the network that may lose them. I've given each
+an independent 90% chance of arriving. Change `retry_delivery` to `0.5`
+and see which result moves.
 
 <!-- run -->
 
-At 90% delivery, two misses have probability `0.1 * 0.1`. If the first
-write was lost, a copy exists after the retries with probability 99%.
-If it was saved, a copy already exists. At 50% delivery the lower number
-falls to 75%. Neither rate produces a second copy. Those are results about
-the stored row, not promises that the browser gets a receipt.
+If the server started with no draft, both retries have to miss to leave it
+empty. At 90% delivery that happens one time in a hundred; at 50% it
+happens one time in four. If we started with a draft, we keep it either
+way. More lost requests can leave me with no draft, but they can't give
+me two.
 
-[HTTP's retry rule](https://www.rfc-editor.org/rfc/rfc9110.html#section-9.2.2)
-allows for knowing that an operation is idempotent or that the original
-request was never applied. An empty search result while the first write
-is still in flight establishes neither. For a [browser agent](https://browyhq.github.io/blog/how-i-built-browy/)
-on someone else's site, permission to click isn't evidence that the first
-click failed. Unless the site can settle that question or honor the same
-key, the honest status to show the user is **save unconfirmed**.
+I can ask a [browser agent](https://browyhq.github.io/blog/how-i-built-browy/)
+to click Save for me, but on someone else's site it doesn't get my test
+server's `/audit` tab either. I'd trust a receipt for this particular save.
+I wouldn't trust an empty list while the first POST might still be running.
+[HTTP's advice about retries](https://www.rfc-editor.org/rfc/rfc9110.html#section-9.2.2)
+is to retry a non-idempotent request automatically only if you know it
+wasn't applied, or you know that repeating it won't do the work twice.
+
+On my original form, "Save failed" would have been wrong in the run that
+left a draft. I'd put "Couldn't confirm the save" next to the button.
+I had to change the server before "Try again" was good advice in both runs.
 -/
 
 system Save(dedup : Bool, delivery : Num) {
