@@ -1,6 +1,6 @@
-examples/Gallery/submit_receipt.hz:54:1: info: #prob exactly_one(0.5)
+examples/Gallery/submit_receipt.hz:57:1: info: #prob exactly_one(0.5)
   probability 0.5
-examples/Gallery/submit_receipt.hz:83:1: info: #prob exactly_one(0.9)
+examples/Gallery/submit_receipt.hz:90:1: info: #prob exactly_one(0.9)
   belief 0.1 · plausibility 0.9
   by fuzzy parameter (π = possibility):
     cut = BeforeWrite  π 1       0.9
